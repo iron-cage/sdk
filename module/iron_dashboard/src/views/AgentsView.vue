@@ -33,9 +33,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import PageLayout from '@/components/PageLayout.vue'
-import DataTable from '@/components/DataTable.vue'
-import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
 import IconX from '@/components/icons/IconX.vue'
@@ -47,6 +44,10 @@ import IconRefresh from '@/components/icons/IconRefresh.vue'
 import IconKey from '@/components/icons/IconKey.vue'
 import IconBan from '@/components/icons/IconBan.vue'
 import IconCopy from '@/components/icons/IconCopy.vue'
+import PageLayout from '@/components/PageLayout.vue'
+import DataTable from '@/components/DataTable.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 import type { Agent, IcTokenStatus } from '@/composables/useApi'
 
@@ -118,8 +119,12 @@ function handleRemoveProviderKey(keyId: number) {
   selectedProviderKeyIds.value = selectedProviderKeyIds.value.filter(id => id !== keyId)
 }
 
+const providerKeyMap = computed(() =>
+  new Map(providers.value?.map(p => [p.id, p]) ?? [])
+)
+
 function providerKeyLabel(keyId: number): string {
-  const key = providers.value?.find(p => p.id === keyId)
+  const key = providerKeyMap.value.get(keyId)
   if (!key) return `#${keyId}`
   return key.alias || key.provider
 }
@@ -130,6 +135,29 @@ const { data: users } = useQuery({
   queryFn: () => api.getUsers({ is_active: true }),
   enabled: authStore.isAdmin,
 })
+
+// O(1) lookup map — avoids O(n×m) Array.find on every render cycle
+const ownerMap = computed(() =>
+  new Map(users.value?.users.map(u => [u.id, u]) ?? [])
+)
+
+function ownerEmail(ownerId: string | null | undefined): string {
+  if (!ownerId) return '—'
+  if (!users.value) return '—'
+  const user = ownerMap.value.get(ownerId)
+  return user?.email || user?.username || '—'
+}
+
+const showOwnerColumn = computed(() => authStore.isAdmin)
+
+const tableColumns = computed(() => [
+  { label: 'Name' },
+  ...(showOwnerColumn.value ? [{ label: 'Owner' }] : []),
+  { label: 'Providers' },
+  { label: 'IC Token' },
+  { label: 'Created' },
+  { label: 'Actions', align: 'right' as const },
+])
 
 // Create agent mutation
 const createMutation = useMutation({
@@ -149,17 +177,21 @@ const createMutation = useMutation({
   },
 })
 
+function resetUpdateForm() {
+  selectedAgent.value = null
+  name.value = ''
+  selectedProviderKeyIds.value = []
+  addingProviderKeyId.value = ''
+  selectedOwnerId.value = ''
+}
+
 // Update agent mutation
 const updateMutation = useMutation({
   mutationFn: (data: { id: number; name: string; providers: string[]; provider_key_ids: number[]; owner_id?: string }) =>
     api.updateAgent(data),
   onSuccess: () => {
     showUpdateModal.value = false
-    selectedAgent.value = null
-    name.value = ''
-    selectedProviderKeyIds.value = []
-    addingProviderKeyId.value = ''
-    selectedOwnerId.value = ''
+    resetUpdateForm()
     queryClient.invalidateQueries({ queryKey: ['agents'] })
   },
   onError: (err) => {
@@ -348,20 +380,20 @@ watch(showCreateModal, (open) => {
 })
 
 watch(showUpdateModal, (open) => {
-  if (!open) {
-    name.value = ''
-    selectedProviderKeyIds.value = []
-    addingProviderKeyId.value = ''
-    selectedOwnerId.value = ''
-    selectedAgent.value = null
-  }
+  if (!open) resetUpdateForm()
 })
+
+function handleCopyText(text: string, label = 'Copied') {
+  navigator.clipboard?.writeText(text)
+    ?.then(() => toast.success(label))
+    ?.catch(() => toast.error('Copy failed'))
+}
 
 async function copyTokenToClipboard() {
   if (!tokenDialogValue.value) return
 
   try {
-    await navigator.clipboard.writeText(tokenDialogValue.value)
+    await navigator.clipboard?.writeText(tokenDialogValue.value)
     copyMessage.value = 'Copied to clipboard'
   } catch (_err: unknown) {
     const message = _err instanceof Error ? _err.message : 'Copy failed'
@@ -383,14 +415,7 @@ async function copyTokenToClipboard() {
 
 
     <DataTable
-      :columns="[
-        { label: 'Name' },
-        { label: 'Owner' },
-        { label: 'Providers' },
-        { label: 'IC Token' },
-        { label: 'Created' },
-        { label: 'Actions', align: 'right' },
-      ]"
+      :columns="tableColumns"
       :is-loading="isLoading"
       :error="error"
       :is-empty="!agents || agents.length === 0"
@@ -406,21 +431,48 @@ async function copyTokenToClipboard() {
       </template>
 
       <tr v-for="agent in agents" :key="agent.id">
-        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground">
-          {{ agent.name }}
+        <td class="px-3 sm:px-6 py-2 max-w-[240px]">
+          <button
+            type="button"
+            class="text-left max-w-full truncate text-base font-medium text-foreground cursor-pointer"
+            :aria-label="`Copy agent name: ${agent.name}`"
+            :title="agent.name"
+            @click="handleCopyText(agent.name, 'Copied name')"
+          >{{ agent.name }}</button>
         </td>
-        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground max-w-[200px] truncate">
-          {{ agent.owner_id || 'Unknown' }}
+        <td v-if="showOwnerColumn" class="px-3 sm:px-6 py-2 text-base text-muted-foreground max-w-[220px] truncate" :title="ownerEmail(agent.owner_id)">
+          {{ ownerEmail(agent.owner_id) }}
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">
-          <div class="flex gap-1 flex-wrap items-center">
+          <div class="flex gap-1 items-center flex-wrap max-w-[200px]">
             <span
-              v-for="keyId in agent.provider_key_ids"
+              v-for="keyId in agent.provider_key_ids.slice(0, 3)"
               :key="keyId"
-              class="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-foreground border-border border"
+              class="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-foreground border-border border max-w-[190px] truncate"
+              :title="providerKeyLabel(keyId)"
             >
               {{ providerKeyLabel(keyId) }}
             </span>
+            <Popover v-if="agent.provider_key_ids.length > 3">
+              <PopoverTrigger as-child>
+                <button
+                  :aria-label="`Show ${agent.provider_key_ids.length - 3} more provider keys`"
+                  class="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground border-border border hover:text-foreground transition-colors"
+                >
+                  +{{ agent.provider_key_ids.length - 3 }}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" aria-label="Additional provider keys" class="flex flex-wrap gap-1 max-w-[320px] max-h-[200px] overflow-y-auto">
+                <span
+                  v-for="keyId in agent.provider_key_ids.slice(3)"
+                  :key="keyId"
+                  class="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-foreground border-border border"
+                  :title="providerKeyLabel(keyId)"
+                >
+                  {{ providerKeyLabel(keyId) }}
+                </span>
+              </PopoverContent>
+            </Popover>
           </div>
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">
@@ -429,7 +481,7 @@ async function copyTokenToClipboard() {
           </div>
           <div v-else class="flex gap-1 items-center">
             <StatusBadge :active="!!getIcTokenStatus(agent.id)?.has_ic_token" active-label="Active" inactive-label="None" />
-            <div v-if="getIcTokenStatus(agent.id)?.created_at" class="text-xs text-muted-foreground">
+            <div v-if="getIcTokenStatus(agent.id)?.created_at" class="text-xs text-muted-foreground max-sm:hidden">
               {{ formatTimestamp(getIcTokenStatus(agent.id)?.created_at) }}
             </div>
           </div>
@@ -445,7 +497,7 @@ async function copyTokenToClipboard() {
                 <IconDotsHorizontal />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" class="max-w-[220px]">
               <DropdownMenuItem
                 v-if="!getIcTokenStatus(agent.id)?.has_ic_token"
                 :disabled="tokenActionLoadingId === agent.id"
@@ -516,35 +568,35 @@ async function copyTokenToClipboard() {
               <div
                 v-for="keyId in selectedProviderKeyIds"
                 :key="keyId"
-                class="flex items-center gap-1.5 px-2 py-1 rounded-md border border-border text-sm bg-muted"
+                class="flex items-center gap-1.5 px-2 py-1 rounded-md border border-border text-sm bg-muted max-w-[190px]"
               >
-                <span class="text-xs text-foreground">{{ providerKeyLabel(keyId) }}</span>
+                <span class="text-xs text-foreground flex-1 truncate">{{ providerKeyLabel(keyId) }}</span>
                 <button
                   type="button"
                   :aria-label="`Remove ${providerKeyLabel(keyId)}`"
-                  class="ml-0.5 text-muted-foreground hover:text-destructive"
+                  class="ml-0.5 text-muted-foreground hover:text-destructive shrink-0"
                   @click="handleRemoveProviderKey(keyId)"
                 >
                   <IconX class="h-3 w-3" />
                 </button>
               </div>
             </div>
-            <div v-if="availableProviderKeys.length" class="flex gap-2">
+            <div v-if="availableProviderKeys.length" class="flex gap-2 max-w-full items-center">
               <Select v-model="addingProviderKeyId" :disabled="createMutation.isPending.value">
-                <SelectTrigger class="flex-1">
+                <SelectTrigger class="flex-1 min-w-0">
                   <SelectValue placeholder="Add a provider key" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent class="max-w-[280px]">
                   <SelectItem
                     v-for="pk in availableProviderKeys"
                     :key="pk.id"
                     :value="String(pk.id)"
                   >
-                    {{ pk.alias || pk.provider }}
+                    <span :title="pk.alias || pk.provider">{{ pk.alias || pk.provider }}</span>
                   </SelectItem>
                 </SelectContent>
               </Select>
-              <Button type="button" variant="outline" size="sm" :disabled="!addingProviderKeyId || createMutation.isPending.value" @click="handleAddProviderKey">
+              <Button type="button" variant="outline" size="sm" class="shrink-0" :disabled="!addingProviderKeyId || createMutation.isPending.value" @click="handleAddProviderKey">
                 <IconPlus />
               </Button>
             </div>
@@ -572,13 +624,13 @@ async function copyTokenToClipboard() {
               <SelectTrigger id="create-owner">
                 <SelectValue :placeholder="`Current User (${authStore.username})`" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent class="max-w-[280px]">
                 <SelectItem
                   v-for="user in users?.users"
                   :key="user.id"
                   :value="user.id"
                 >
-                  {{ user.username }} ({{ user.email || 'no email' }})
+                  <span :title="`${user.username} (${user.email || 'no email'})`">{{ user.username }} ({{ user.email || 'no email' }})</span>
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -636,35 +688,35 @@ async function copyTokenToClipboard() {
               <div
                 v-for="keyId in selectedProviderKeyIds"
                 :key="keyId"
-                class="flex items-center gap-1.5 px-2 py-1 rounded-md border border-border text-sm bg-muted"
+                class="flex items-center gap-1.5 px-2 py-1 rounded-md border border-border text-sm bg-muted max-w-[190px]"
               >
-                <span class="text-xs text-foreground">{{ providerKeyLabel(keyId) }}</span>
+                <span class="text-xs text-foreground flex-1 truncate">{{ providerKeyLabel(keyId) }}</span>
                 <button
                   type="button"
                   :aria-label="`Remove ${providerKeyLabel(keyId)}`"
-                  class="ml-0.5 text-muted-foreground hover:text-destructive"
+                  class="ml-0.5 text-muted-foreground hover:text-destructive shrink-0"
                   @click="handleRemoveProviderKey(keyId)"
                 >
                   <IconX class="h-3 w-3" />
                 </button>
               </div>
             </div>
-            <div v-if="availableProviderKeys.length" class="flex gap-2">
+            <div v-if="availableProviderKeys.length" class="flex gap-2 max-w-full items-center">
               <Select v-model="addingProviderKeyId" :disabled="updateMutation.isPending.value">
-                <SelectTrigger class="flex-1">
+                <SelectTrigger class="flex-1 min-w-0">
                   <SelectValue placeholder="Add a provider key" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent class="max-w-[280px]">
                   <SelectItem
                     v-for="pk in availableProviderKeys"
                     :key="pk.id"
                     :value="String(pk.id)"
                   >
-                    {{ pk.alias || pk.provider }}
+                    <span :title="pk.alias || pk.provider">{{ pk.alias || pk.provider }}</span>
                   </SelectItem>
                 </SelectContent>
               </Select>
-              <Button type="button" variant="outline" size="sm" :disabled="!addingProviderKeyId || updateMutation.isPending.value" @click="handleAddProviderKey">
+              <Button type="button" variant="outline" size="sm" class="shrink-0" :disabled="!addingProviderKeyId || updateMutation.isPending.value" @click="handleAddProviderKey">
                 <IconPlus />
               </Button>
             </div>
@@ -676,13 +728,13 @@ async function copyTokenToClipboard() {
               <SelectTrigger id="update-owner">
                 <SelectValue placeholder="Select an owner" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent class="max-w-[280px]">
                 <SelectItem
                   v-for="user in users?.users"
                   :key="user.id"
                   :value="user.id"
                 >
-                  {{ user.username }} ({{ user.email || 'no email' }})
+                  <span :title="`${user.username} (${user.email || 'no email'})`">{{ user.username }} ({{ user.email || 'no email' }})</span>
                 </SelectItem>
               </SelectContent>
             </Select>

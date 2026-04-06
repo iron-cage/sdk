@@ -5,8 +5,12 @@ import vueParser from "vue-eslint-parser"
 import prettier from "eslint-config-prettier"
 
 export default [
+  { ignores: ["dist/**", "coverage/**"] },
+
   {
-    files: ["**/*.{js,ts,vue}"],
+    // vueParser must only wrap .vue files; tseslint.configs.recommended below
+    // will set the correct parser for .ts/.js files in ESLint 9 flat config.
+    files: ["**/*.vue"],
     languageOptions: {
       parser: vueParser,
       parserOptions: {
@@ -20,6 +24,8 @@ export default [
         navigator: "readonly",
         HTMLElement: "readonly",
         MouseEvent: "readonly",
+        PointerEvent: "readonly",
+        ResizeObserver: "readonly",
         Node: "readonly",
       },
     },

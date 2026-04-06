@@ -69,9 +69,9 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
             {{ healthLoading ? 'Checking...' : healthError ? 'Service Unavailable' : 'All Systems Operational' }}
           </span>
         </div>
-        <template v-if="!healthLoading && health">
-          <span class="text-muted-foreground">·</span>
-          <span class="text-xs text-muted-foreground">Last checked {{ formatTimestamp(health.timestamp) }}</span>
+        <template v-if="!healthLoading && health && !healthError">
+          <span class="text-muted-foreground max-sm:hidden">·</span>
+          <span class="text-xs text-muted-foreground max-sm:hidden">Last checked {{ formatTimestamp(health.timestamp) }}</span>
         </template>
       </div>
       <RouterLink
@@ -209,7 +209,7 @@ const topSpenders    = computed(() => agentSpending.value?.data ?? [])
             <div class="flex items-center gap-3 min-w-0">
               <span class="text-xs text-muted-foreground w-4 shrink-0">{{ i + 1 }}</span>
               <div class="min-w-0">
-                <p class="text-sm font-medium text-foreground truncate">{{ agent.agent_name }}</p>
+                <p class="text-sm font-medium text-foreground truncate" :title="agent.agent_name">{{ agent.agent_name }}</p>
                 <p class="text-xs text-muted-foreground">{{ formatNumber(agent.request_count) }} req</p>
               </div>
             </div>

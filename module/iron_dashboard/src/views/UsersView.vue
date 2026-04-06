@@ -37,6 +37,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import PageLayout from '@/components/PageLayout.vue'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import DataTable from '@/components/DataTable.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import AvatarInitial from '@/components/AvatarInitial.vue'
@@ -51,6 +52,7 @@ import IconBan from '@/components/icons/IconBan.vue'
 import IconEdit from '@/components/icons/IconEdit.vue'
 import IconChevronLeft from '@/components/icons/IconChevronLeft.vue'
 import IconChevronRight from '@/components/icons/IconChevronRight.vue'
+import IconChevronDown from '@/components/icons/IconChevronDown.vue'
 
 import type { CreateUserRequest, User } from '@/composables/useApi'
 
@@ -66,11 +68,25 @@ const pageSize = ref(20)
 const search = ref('')
 const searchDebounced = refDebounced(search, 300)
 const roleFilter = ref<string | undefined>(undefined)
+const mobileFiltersOpen = ref(false)
 const isActiveFilter = ref<boolean | undefined>(undefined)
 const statusFilterModel = computed({
   get: (): string => isActiveFilter.value === true ? 'active' : isActiveFilter.value === false ? 'suspended' : 'all',
   set: (v: string) => { isActiveFilter.value = v === 'active' ? true : v === 'suspended' ? false : undefined },
 })
+
+const roleOptions = [
+  { value: 'all', label: 'All Roles' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'manager', label: 'Manager' },
+  { value: 'developer', label: 'Developer' },
+]
+
+const statusOptions = [
+  { value: 'all', label: 'All Statuses' },
+  { value: 'active', label: 'Active' },
+  { value: 'suspended', label: 'Suspended' },
+]
 
 const showCreateModal = ref(false)
 const showDisableConfirm = ref(false)
@@ -286,38 +302,62 @@ watch(showDisableConfirm, (open) => {
 <template>
   <PageLayout title="User Management">
     <template #actions>
+      <!-- Mobile: collapsed filter popover -->
+      <Popover v-model:open="mobileFiltersOpen">
+        <PopoverTrigger as-child>
+          <Button variant="outline" size="sm" class="sm:hidden">
+            Filters
+            <IconChevronDown class="w-3.5 h-3.5" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" class="flex flex-col gap-2 w-64">
+          <Input id="search-mobile" v-model="search" placeholder="Search by username or email..." @keydown.enter.prevent="mobileFiltersOpen = false" />
+          <Select v-model="roleFilter" @update:modelValue="mobileFiltersOpen = false">
+            <SelectTrigger>
+              <SelectValue placeholder="All Roles" class="text-foreground" />
+            </SelectTrigger>
+            <SelectContent class="max-w-[200px]">
+              <SelectItem v-for="opt in roleOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select v-model="statusFilterModel" @update:modelValue="mobileFiltersOpen = false">
+            <SelectTrigger>
+              <SelectValue placeholder="All Statuses" class="text-foreground" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="opt in statusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="sm" class="w-full mt-1" @click="mobileFiltersOpen = false">Done</Button>
+        </PopoverContent>
+      </Popover>
 
-      <div class="w-full md:w-64">
-        <Input id="search" v-model="search" placeholder="Search by username or email..." />
+      <!-- Desktop: inline filters -->
+      <div class="hidden sm:flex gap-2">
+        <div class="w-64">
+          <Input id="search" v-model="search" placeholder="Search by username or email..." />
+        </div>
+        <div class="w-40">
+          <Select v-model="roleFilter">
+            <SelectTrigger id="role-filter">
+              <SelectValue placeholder="All Roles" class="text-foreground" />
+            </SelectTrigger>
+            <SelectContent class="max-w-[200px]">
+              <SelectItem v-for="opt in roleOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div class="w-40">
+          <Select v-model="statusFilterModel">
+            <SelectTrigger id="status-filter">
+              <SelectValue placeholder="All Statuses" class="text-foreground" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="opt in statusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
-      
-      <div class="w-full md:w-40">
-        <Select v-model="roleFilter">
-          <SelectTrigger id="role-filter">
-            <SelectValue placeholder="All Roles" class="text-foreground"/>
-          </SelectTrigger>
-          <SelectContent >
-            <SelectItem value="all">All Roles</SelectItem>
-            <SelectItem value="admin">Admin</SelectItem>
-            <SelectItem value="manager">Manager</SelectItem>
-            <SelectItem value="developer">Developer</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div class="w-full md:w-40">
-        <Select v-model="statusFilterModel">
-          <SelectTrigger id="status-filter">
-            <SelectValue placeholder="All Statuses" class="text-foreground"/>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="suspended">Suspended</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
 
       <Button @click="showCreateModal = true">
         <IconPlus />
@@ -348,10 +388,10 @@ watch(showDisableConfirm, (open) => {
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap">
           <div class="flex gap-2 items-center">
             <AvatarInitial :name="user.username || 'u'" />
-          <div class="flex flex-col">
-            <span class="text-base font-medium text-foreground">{{ user.username }}</span>
-            <span class="text-muted-foreground text-xs">{{ user.email }}</span>
-          </div>
+            <div class="flex flex-col min-w-0">
+              <span class="text-base font-medium text-foreground max-w-[280px] truncate" :title="user.username">{{ user.username }}</span>
+              <span class="text-muted-foreground text-xs max-w-[280px] truncate" :title="user.email || ''">{{ user.email || '—' }}</span>
+            </div>
           </div>
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">
@@ -371,7 +411,7 @@ watch(showDisableConfirm, (open) => {
                 <IconDotsHorizontal />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" class="max-w-[220px]">
               <DropdownMenuItem :disabled="user.id === authStore.userId" @click="handleChangeRole(user)">
                 <IconEdit />
                 Change Role
@@ -584,7 +624,7 @@ watch(showDisableConfirm, (open) => {
             <SelectTrigger id="new-role">
               <SelectValue placeholder="Select a role" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent class="max-w-[200px]">
               <SelectItem value="admin">Admin</SelectItem>
               <SelectItem value="manager">Manager</SelectItem>
               <SelectItem value="developer">Developer</SelectItem>
