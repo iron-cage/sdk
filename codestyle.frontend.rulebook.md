@@ -91,7 +91,7 @@ The `.prettierrc` at the project root enforces:
 
 ```json
 {
-  "semi": true,
+  "semi": false,
   "singleQuote": true,
   "trailingComma": "es5",
   "printWidth": 100,
@@ -100,7 +100,7 @@ The `.prettierrc` at the project root enforces:
 ```
 
 Key settings:
-- **Semicolons:** Mandatory. Every statement **must** end with a semicolon.
+- **Semicolons:** Omitted. Statements **must not** end with a semicolon.
 - **Quotes:** Single quotes for all string literals. Double quotes are only permitted in HTML template attributes.
 - **Indentation:** 2 spaces. Tabs are **strictly forbidden**.
 - **Line width:** 100 characters.
@@ -138,12 +138,12 @@ export default {
 
 ```vue
 <script lang="ts">
-import { ref, defineComponent } from 'vue';
+import { ref, defineComponent } from 'vue'
 
 export default defineComponent({
   setup() {
-    const count = ref(0);
-    return { count };
+    const count = ref(0)
+    return { count }
   }
 })
 </script>
@@ -153,11 +153,11 @@ export default defineComponent({
 
 ```vue
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref } from 'vue'
 
-const count = ref(0);
+const count = ref(0)
 function increment() {
-  count.value++;
+  count.value++
 }
 </script>
 ```
@@ -184,7 +184,7 @@ It is **strictly forbidden** to place `<template>` before `<script>` or to place
 </template>
 
 <script setup lang="ts">
-const message = 'hello';
+const message = 'hello'
 </script>
 ```
 
@@ -192,7 +192,7 @@ const message = 'hello';
 
 ```vue
 <script setup lang="ts">
-const message = 'hello';
+const message = 'hello'
 </script>
 
 <template>
@@ -217,7 +217,7 @@ When default values are needed, `withDefaults(defineProps<T>(), { ... })` **must
 const props = defineProps({
   title: { type: String, required: true },
   isLoading: { type: Boolean, default: false },
-});
+})
 </script>
 ```
 
@@ -226,9 +226,9 @@ const props = defineProps({
 ```vue
 <script setup lang="ts">
 defineProps<{
-  title: string;
-  isLoading?: boolean;
-}>();
+  title: string
+  isLoading?: boolean
+}>()
 </script>
 ```
 
@@ -237,12 +237,12 @@ defineProps<{
 ```vue
 <script setup lang="ts">
 const props = withDefaults(defineProps<{
-  variant?: 'default' | 'destructive';
-  size?: 'sm' | 'md' | 'lg';
+  variant?: 'default' | 'destructive'
+  size?: 'sm' | 'md' | 'lg'
 }>(), {
   variant: 'default',
   size: 'md',
-});
+})
 </script>
 ```
 
@@ -258,7 +258,7 @@ const props = withDefaults(defineProps<{
 
 ```vue
 <script setup lang="ts">
-const emit = defineEmits(['update:modelValue', 'confirm']);
+const emit = defineEmits(['update:modelValue', 'confirm'])
 </script>
 ```
 
@@ -267,9 +267,9 @@ const emit = defineEmits(['update:modelValue', 'confirm']);
 ```vue
 <script setup lang="ts">
 const emit = defineEmits<{
-  'update:modelValue': [value: string];
-  'confirm': [];
-}>();
+  'update:modelValue': [value: string]
+  'confirm': []
+}>()
 </script>
 ```
 
@@ -398,18 +398,18 @@ export function useApi() { /* ... */ }
 > Bad
 
 ```typescript
-const loading = ref(false);
-const modal = ref(false);
-const menu = ref<HTMLElement | null>(null);
+const loading = ref(false)
+const modal = ref(false)
+const menu = ref<HTMLElement | null>(null)
 function logout() { /* ... */ }
 ```
 
 > Good
 
 ```typescript
-const isLoading = ref(false);
-const showModal = ref(false);
-const menuRef = ref<HTMLElement | null>(null);
+const isLoading = ref(false)
+const showModal = ref(false)
+const menuRef = ref<HTMLElement | null>(null)
 function handleLogout() { /* ... */ }
 ```
 
@@ -442,14 +442,14 @@ Interfaces and types should not be prefixed with `I` (e.g., `IUser`) or `T` (e.g
 > Good
 
 ```typescript
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 const PROVIDER_LABELS: Record<string, string> = {
   openai: 'OpenAI',
   anthropic: 'Anthropic',
   gemini: 'Gemini',
   xai: 'xAI',
-};
+}
 ```
 
 ---
@@ -469,24 +469,24 @@ const PROVIDER_LABELS: Record<string, string> = {
 > Good
 
 ```typescript
-import { ref, computed } from 'vue';
-import { useRouter } from 'vue-router';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query';
-import { refDebounced } from '@vueuse/core';
-import { toast } from 'vue-sonner';
+import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
+import { refDebounced } from '@vueuse/core'
+import { toast } from 'vue-sonner'
 
-import { useApi } from '@/composables/useApi';
-import { useAuthStore } from '@/stores/auth';
-import { useConfirm } from '@/composables/useConfirm';
-import { formatCostUsd, formatTimestamp } from '@/lib/formatters';
+import { useApi } from '@/composables/useApi'
+import { useAuthStore } from '@/stores/auth'
+import { useConfirm } from '@/composables/useConfirm'
+import { formatCostUsd, formatTimestamp } from '@/lib/formatters'
 
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import PageLayout from '@/components/PageLayout.vue';
-import DataTable from '@/components/DataTable.vue';
-import IconPlus from '@/components/icons/IconPlus.vue';
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import PageLayout from '@/components/PageLayout.vue'
+import DataTable from '@/components/DataTable.vue'
+import IconPlus from '@/components/icons/IconPlus.vue'
 
-import type { User, CreateUserRequest } from '@/composables/useApi';
+import type { User, CreateUserRequest } from '@/composables/useApi'
 ```
 
 ---
@@ -513,22 +513,22 @@ The `tsconfig.json` alias:
 > Bad
 
 ```typescript
-import { useApi } from '../../composables/useApi';
-import { Button } from '../../components/ui/button';
+import { useApi } from '../../composables/useApi'
+import { Button } from '../../components/ui/button'
 ```
 
 > Good
 
 ```typescript
-import { useApi } from '@/composables/useApi';
-import { Button } from '@/components/ui/button';
+import { useApi } from '@/composables/useApi'
+import { Button } from '@/components/ui/button'
 ```
 
 > Permitted (same-directory relative import in a barrel file)
 
 ```typescript
 // components/ui/button/index.ts
-export { default as Button } from './Button.vue';
+export { default as Button } from './Button.vue'
 ```
 
 ---
@@ -542,23 +542,23 @@ export { default as Button } from './Button.vue';
 > Bad (Direct import from internal file)
 
 ```typescript
-import Button from '@/components/ui/button/Button.vue';
+import Button from '@/components/ui/button/Button.vue'
 ```
 
 > Good (Import from barrel)
 
 ```typescript
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui/button'
 ```
 
 > Good (Barrel file structure)
 
 ```typescript
 // components/ui/button/index.ts
-import type { VariantProps } from 'class-variance-authority';
-import { cva } from 'class-variance-authority';
+import type { VariantProps } from 'class-variance-authority'
+import { cva } from 'class-variance-authority'
 
-export { default as Button } from './Button.vue';
+export { default as Button } from './Button.vue'
 
 export const buttonVariants = cva(
   'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-xs font-medium ...',
@@ -582,21 +582,21 @@ export const buttonVariants = cva(
       size: 'default',
     },
   },
-);
+)
 
-export type ButtonVariants = VariantProps<typeof buttonVariants>;
+export type ButtonVariants = VariantProps<typeof buttonVariants>
 ```
 
 > Good (Multi-part primitive barrel)
 
 ```typescript
 // components/ui/dialog/index.ts
-export { default as Dialog } from './Dialog.vue';
-export { default as DialogContent } from './DialogContent.vue';
-export { default as DialogDescription } from './DialogDescription.vue';
-export { default as DialogFooter } from './DialogFooter.vue';
-export { default as DialogHeader } from './DialogHeader.vue';
-export { default as DialogTitle } from './DialogTitle.vue';
+export { default as Dialog } from './Dialog.vue'
+export { default as DialogContent } from './DialogContent.vue'
+export { default as DialogDescription } from './DialogDescription.vue'
+export { default as DialogFooter } from './DialogFooter.vue'
+export { default as DialogHeader } from './DialogHeader.vue'
+export { default as DialogTitle } from './DialogTitle.vue'
 ```
 
 ---
@@ -624,7 +624,7 @@ export const useAuthStore = defineStore('auth', {
   actions: {
     login(credentials: LoginCredentials) { /* ... */ },
   },
-});
+})
 ```
 
 > Good (Composition API store)
@@ -632,27 +632,27 @@ export const useAuthStore = defineStore('auth', {
 ```typescript
 export const useAuthStore = defineStore('auth', () => {
   // State
-  const accessToken = ref<string | null>(null);
-  const role = ref<string | null>(null);
+  const accessToken = ref<string | null>(null)
+  const role = ref<string | null>(null)
 
   // Derived state
-  const isAuthenticated = computed(() => !!accessToken.value);
-  const isAdmin = computed(() => role.value === 'admin');
+  const isAuthenticated = computed(() => !!accessToken.value)
+  const isAdmin = computed(() => role.value === 'admin')
 
   // Actions
   async function login(credentials: LoginCredentials) {
-    const response = await fetch(/* ... */);
-    const tokens: AuthTokens = await response.json();
-    accessToken.value = tokens.user_token;
+    const response = await fetch(/* ... */)
+    const tokens: AuthTokens = await response.json()
+    accessToken.value = tokens.user_token
   }
 
   function clearTokens() {
-    accessToken.value = null;
-    role.value = null;
+    accessToken.value = null
+    role.value = null
   }
 
   // Initialize
-  loadTokens();
+  loadTokens()
 
   // Public API
   return {
@@ -662,8 +662,8 @@ export const useAuthStore = defineStore('auth', () => {
     isAdmin,
     login,
     clearTokens,
-  };
-});
+  }
+})
 ```
 
 ---
@@ -680,16 +680,16 @@ export const useAuthStore = defineStore('auth', () => {
 
 ```vue
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted } from 'vue'
 
-const users = ref([]);
-const isLoading = ref(true);
+const users = ref([])
+const isLoading = ref(true)
 
 onMounted(async () => {
-  const res = await fetch('/api/v1/users');
-  users.value = await res.json();
-  isLoading.value = false;
-});
+  const res = await fetch('/api/v1/users')
+  users.value = await res.json()
+  isLoading.value = false
+})
 </script>
 ```
 
@@ -697,10 +697,10 @@ onMounted(async () => {
 
 ```vue
 <script setup lang="ts">
-import { useQuery } from '@tanstack/vue-query';
-import { useApi } from '@/composables/useApi';
+import { useQuery } from '@tanstack/vue-query'
+import { useApi } from '@/composables/useApi'
 
-const api = useApi();
+const api = useApi()
 
 const { data: users, isLoading, error } = useQuery({
   queryKey: ['users', page, pageSize, searchDebounced],
@@ -709,7 +709,7 @@ const { data: users, isLoading, error } = useQuery({
     page_size: pageSize.value,
     search: searchDebounced.value || undefined,
   }),
-});
+})
 </script>
 ```
 
@@ -724,19 +724,19 @@ const { data: users, isLoading, error } = useQuery({
 > Good
 
 ```typescript
-const queryClient = useQueryClient();
+const queryClient = useQueryClient()
 
 const createMutation = useMutation({
   mutationFn: (data: CreateUserRequest) => api.createUser(data),
   onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['users'] });
-    toast.success('User created successfully');
-    showCreateModal.value = false;
+    queryClient.invalidateQueries({ queryKey: ['users'] })
+    toast.success('User created successfully')
+    showCreateModal.value = false
   },
   onError: (err) => {
-    toast.error(err instanceof Error ? err.message : 'Failed to create user');
+    toast.error(err instanceof Error ? err.message : 'Failed to create user')
   },
-});
+})
 ```
 
 ---
@@ -768,19 +768,19 @@ const createMutation = useMutation({
 
 // Types defined before the composable
 export interface User {
-  id: string;
-  username: string;
-  email?: string;
-  role: string;
-  is_active: boolean;
-  created_at: number;
+  id: string
+  username: string
+  email?: string
+  role: string
+  is_active: boolean
+  created_at: number
 }
 
 export interface CreateUserRequest {
-  username: string;
-  password: string;
-  email: string;
-  role?: string;
+  username: string
+  password: string
+  email: string
+  role?: string
 }
 
 // Composable defined after types
@@ -808,20 +808,20 @@ async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
       Authorization: authStore.getAuthHeader() ?? '',
       ...options?.headers,
     },
-  });
+  })
 
   if (!response.ok) {
-    let msg: string;
+    let msg: string
     try {
-      const body = await response.json();
-      msg = body?.error?.message ?? body?.error ?? body?.message ?? 'Request failed';
+      const body = await response.json()
+      msg = body?.error?.message ?? body?.error ?? body?.message ?? 'Request failed'
     } catch {
-      msg = 'Request failed';
+      msg = 'Request failed'
     }
-    throw new Error(msg);
+    throw new Error(msg)
   }
 
-  return response.json();
+  return response.json()
 }
 ```
 
@@ -854,13 +854,13 @@ async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
 
 <style scoped>
 .card {
-  padding: 1rem;
-  background: white;
-  border-radius: 0.5rem;
+  padding: 1rem
+  background: white
+  border-radius: 0.5rem
 }
 .card-title {
-  font-size: 1.25rem;
-  font-weight: 600;
+  font-size: 1.25rem
+  font-weight: 600
 }
 </style>
 ```
@@ -921,11 +921,11 @@ Color variables **must** use the HSL format without the `hsl()` wrapper, allowin
 
 ```vue
 <script setup lang="ts">
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/utils'
 
 const props = defineProps<{
-  class?: string;
-}>();
+  class?: string
+}>()
 </script>
 
 <template>
@@ -947,8 +947,8 @@ const props = defineProps<{
 
 ```typescript
 // components/ui/button/index.ts
-import { cva } from 'class-variance-authority';
-import type { VariantProps } from 'class-variance-authority';
+import { cva } from 'class-variance-authority'
+import type { VariantProps } from 'class-variance-authority'
 
 export const buttonVariants = cva(
   'inline-flex items-center justify-center gap-2 rounded-md text-xs font-medium transition-colors',
@@ -968,9 +968,9 @@ export const buttonVariants = cva(
       size: 'default',
     },
   },
-);
+)
 
-export type ButtonVariants = VariantProps<typeof buttonVariants>;
+export type ButtonVariants = VariantProps<typeof buttonVariants>
 ```
 
 ---
@@ -990,17 +990,17 @@ It is **strictly forbidden** to:
 ```vue
 <!-- components/ui/button/Button.vue -->
 <script setup lang="ts">
-import type { PrimitiveProps } from 'reka-ui';
-import type { HTMLAttributes } from 'vue';
-import type { ButtonVariants } from '.';
-import { Primitive } from 'reka-ui';
-import { cn } from '@/lib/utils';
-import { buttonVariants } from '.';
+import type { PrimitiveProps } from 'reka-ui'
+import type { HTMLAttributes } from 'vue'
+import type { ButtonVariants } from '.'
+import { Primitive } from 'reka-ui'
+import { cn } from '@/lib/utils'
+import { buttonVariants } from '.'
 
 interface Props extends PrimitiveProps {
-  variant?: ButtonVariants['variant'];
-  size?: ButtonVariants['size'];
-  class?: HTMLAttributes['class'];
+  variant?: ButtonVariants['variant']
+  size?: ButtonVariants['size']
+  class?: HTMLAttributes['class']
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -1008,7 +1008,7 @@ const props = withDefaults(defineProps<Props>(), {
   variant: 'default',
   size: 'default',
   class: '',
-});
+})
 </script>
 
 <template>
@@ -1081,7 +1081,7 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
   ],
-});
+})
 ```
 
 ---
@@ -1121,19 +1121,19 @@ It is **strictly forbidden** to add additional `beforeEach`, `beforeResolve`, or
 
 ```typescript
 router.beforeEach((to, _from, next) => {
-  const authStore = useAuthStore();
-  const requiresAuth = to.meta.requiresAuth !== false;
+  const authStore = useAuthStore()
+  const requiresAuth = to.meta.requiresAuth !== false
 
   if (requiresAuth && !authStore.isAuthenticated) {
-    next('/login');
+    next('/login')
   } else if (to.meta.requiresAdmin && !authStore.isAdmin) {
-    next('/dashboard');
+    next('/dashboard')
   } else if (to.path === '/login' && authStore.isAuthenticated) {
-    next('/dashboard');
+    next('/dashboard')
   } else {
-    next();
+    next()
   }
-});
+})
 ```
 
 ---
@@ -1179,29 +1179,29 @@ Prefer `it()` over `test()` for consistency with the existing test suite.
 > Good
 
 ```typescript
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { setActivePinia, createPinia } from 'pinia';
-import { useAuthStore } from './auth';
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { setActivePinia, createPinia } from 'pinia'
+import { useAuthStore } from './auth'
 
-const mockFetch = vi.fn();
-vi.stubGlobal('fetch', mockFetch);
+const mockFetch = vi.fn()
+vi.stubGlobal('fetch', mockFetch)
 
 describe('useAuthStore', () => {
   beforeEach(() => {
-    setActivePinia(createPinia());
-    localStorage.clear();
-    mockFetch.mockReset();
-  });
+    setActivePinia(createPinia())
+    localStorage.clear()
+    mockFetch.mockReset()
+  })
 
   describe('loadTokens', () => {
     it('restores session when access_token is present', () => {
-      localStorage.setItem('access_token', makeJwt({ role: 'admin' }));
-      const store = useAuthStore();
-      expect(store.isAuthenticated).toBe(true);
-      expect(store.role).toBe('admin');
-    });
-  });
-});
+      localStorage.setItem('access_token', makeJwt({ role: 'admin' }))
+      const store = useAuthStore()
+      expect(store.isAuthenticated).toBe(true)
+      expect(store.role).toBe('admin')
+    })
+  })
+})
 ```
 
 ---
@@ -1216,17 +1216,17 @@ describe('useAuthStore', () => {
 
 ```typescript
 // Derive role from the JWT payload — do not trust the localStorage value
-role.value = decodeJwtRole(storedAccessToken);
+role.value = decodeJwtRole(storedAccessToken)
 
 // SECURITY NOTE: localStorage is XSS-accessible. Access and refresh tokens are
 // stored here for SPA session persistence. The accepted risk is that an XSS
 // vulnerability would expose these tokens. Mitigations: strict CSP, short token
 // TTLs, and refresh token rotation are required to limit blast radius.
-localStorage.setItem('access_token', tokens.user_token);
+localStorage.setItem('access_token', tokens.user_token)
 
 // Prevents concurrent 401 responses from each triggering an independent
 // refresh request (token refresh race condition).
-let _refreshPromise: Promise<void> | null = null;
+let _refreshPromise: Promise<void> | null = null
 ```
 
 ---
