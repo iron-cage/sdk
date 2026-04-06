@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { useSlots } from 'vue'
-import { ScrollArea } from '@/components/ui/scroll-area'
+
 import { cn } from '@/lib/utils'
+
+import { ScrollArea } from '@/components/ui/scroll-area'
 const props = defineProps<{
   title: string
   class?: string

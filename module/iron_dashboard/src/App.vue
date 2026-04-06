@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import MainLayout from './components/MainLayout.vue'
+
 import { Toaster } from '@/components/ui/sonner'
+import MainLayout from './components/MainLayout.vue'
 
 const route = useRoute()
 const requiresAuth = computed(() => route.meta.requiresAuth !== false)

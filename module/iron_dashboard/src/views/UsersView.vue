@@ -174,7 +174,7 @@ function handleToggleStatus(user: User) {
   }
 }
 
-function confirmDisable() {
+function handleConfirmDisable() {
   if (userToDisable.value) {
     suspendMutation.mutate({ id: userToDisable.value.id, reason: suspendReason.value })
   }
@@ -199,7 +199,7 @@ function handleDeleteUser(user: User) {
   showDeleteConfirm.value = true
 }
 
-function confirmDelete() {
+function handleConfirmDelete() {
   if (userToDelete.value) {
     deleteMutation.mutate(userToDelete.value.id)
   }
@@ -225,7 +225,7 @@ function handleChangeRole(user: User) {
   showChangeRoleModal.value = true
 }
 
-function confirmChangeRole() {
+function handleConfirmChangeRole() {
   if (userToChangeRole.value) {
     changeRoleMutation.mutate({ id: userToChangeRole.value.id, role: newRole.value })
   }
@@ -254,7 +254,7 @@ function handleResetPassword(user: User) {
   showResetPasswordModal.value = true
 }
 
-function confirmResetPassword() {
+function handleConfirmResetPassword() {
   if (!newPassword.value) { toast.error('New password is required'); return }
   if (userToResetPassword.value) {
     resetPasswordMutation.mutate({
@@ -525,7 +525,7 @@ watch(showDisableConfirm, (open) => {
           <Button
             :disabled="suspendMutation.isPending.value"
             variant="destructive"
-            @click="confirmDisable"
+            @click="handleConfirmDisable"
           >
             <IconBan />
             {{ suspendMutation.isPending.value ? 'Suspending...' : 'Suspend User' }}
@@ -558,7 +558,7 @@ watch(showDisableConfirm, (open) => {
           <Button
             :disabled="deleteMutation.isPending.value"
             variant="destructive"
-            @click="confirmDelete"
+            @click="handleConfirmDelete"
           >
             <IconTrash />
             {{ deleteMutation.isPending.value ? 'Deleting...' : 'Delete User' }}
@@ -603,7 +603,7 @@ watch(showDisableConfirm, (open) => {
           </Button>
           <Button
             :disabled="changeRoleMutation.isPending.value"
-            @click="confirmChangeRole"
+            @click="handleConfirmChangeRole"
           >
             <IconCheck />
             {{ changeRoleMutation.isPending.value ? 'Saving...' : 'Save Changes' }}
@@ -665,7 +665,7 @@ watch(showDisableConfirm, (open) => {
           </Button>
           <Button
             :disabled="resetPasswordMutation.isPending.value"
-            @click="confirmResetPassword"
+            @click="handleConfirmResetPassword"
           >
             <IconKey />
             {{ resetPasswordMutation.isPending.value ? 'Resetting...' : 'Reset Password' }}

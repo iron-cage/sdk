@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { Badge } from '@/components/ui/badge'
 import { getProviderLabel, getProviderBadgeClass } from '@/lib/providers'
+
+import { Badge } from '@/components/ui/badge'
 
 defineProps<{ provider: string }>()
 </script>

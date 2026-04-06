@@ -203,7 +203,7 @@ function formatCost(cost: number): string {
   return formatCostUsd(cost, 4)
 }
 
-function loadMoreLogs() {
+function handleLoadMoreLogs() {
   if (logsPage.value >= totalPages.value || eventsFetching.value) return
   logsPage.value++
 }
@@ -211,7 +211,7 @@ function loadMoreLogs() {
 const selectedLog = ref<AnalyticsEvent | null>(null)
 const showLogModal = ref(false)
 
-function openLogModal(event: AnalyticsEvent) {
+function handleOpenLogModal(event: AnalyticsEvent) {
   selectedLog.value = event
   showLogModal.value = true
 }
@@ -587,14 +587,14 @@ onUnmounted(() => {
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-muted-foreground">{{ formatNumber(event.input_tokens + event.output_tokens) }}</td>
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-base text-foreground">{{ formatMicrodollars(event.cost_micros) }}</td>
             <td class="px-3 sm:px-6 py-4 text-right whitespace-nowrap">
-              <Button variant="ghost" size="sm" @click="openLogModal(event)">
+              <Button variant="ghost" size="sm" @click="handleOpenLogModal(event)">
                 <IconExternalLink class="h-4 w-4" />
               </Button>
             </td>
           </tr>
           <template #footer>
             <div v-if="logsPage < totalPages" class="p-4 text-center">
-              <Button variant="outline" :disabled="eventsFetching" @click="loadMoreLogs">
+              <Button variant="outline" :disabled="eventsFetching" @click="handleLoadMoreLogs">
                 <IconDownload />
                 {{ eventsFetching ? 'Loading...' : 'Load More Logs' }}
               </Button>

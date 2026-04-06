@@ -106,7 +106,7 @@ const availableProviderKeys = computed(() =>
   (providers.value ?? []).filter(p => !selectedProviderKeyIds.value.includes(p.id))
 )
 
-function addProviderKey() {
+function handleAddProviderKey() {
   const id = Number(addingProviderKeyId.value)
   if (id && !selectedProviderKeyIds.value.includes(id)) {
     selectedProviderKeyIds.value = [...selectedProviderKeyIds.value, id]
@@ -114,7 +114,7 @@ function addProviderKey() {
   }
 }
 
-function removeProviderKey(keyId: number) {
+function handleRemoveProviderKey(keyId: number) {
   selectedProviderKeyIds.value = selectedProviderKeyIds.value.filter(id => id !== keyId)
 }
 
@@ -523,7 +523,7 @@ async function copyTokenToClipboard() {
                   type="button"
                   :aria-label="`Remove ${providerKeyLabel(keyId)}`"
                   class="ml-0.5 text-muted-foreground hover:text-destructive"
-                  @click="removeProviderKey(keyId)"
+                  @click="handleRemoveProviderKey(keyId)"
                 >
                   <IconX class="h-3 w-3" />
                 </button>
@@ -544,7 +544,7 @@ async function copyTokenToClipboard() {
                   </SelectItem>
                 </SelectContent>
               </Select>
-              <Button type="button" variant="outline" size="sm" :disabled="!addingProviderKeyId || createMutation.isPending.value" @click="addProviderKey">
+              <Button type="button" variant="outline" size="sm" :disabled="!addingProviderKeyId || createMutation.isPending.value" @click="handleAddProviderKey">
                 <IconPlus />
               </Button>
             </div>
@@ -643,7 +643,7 @@ async function copyTokenToClipboard() {
                   type="button"
                   :aria-label="`Remove ${providerKeyLabel(keyId)}`"
                   class="ml-0.5 text-muted-foreground hover:text-destructive"
-                  @click="removeProviderKey(keyId)"
+                  @click="handleRemoveProviderKey(keyId)"
                 >
                   <IconX class="h-3 w-3" />
                 </button>
@@ -664,7 +664,7 @@ async function copyTokenToClipboard() {
                   </SelectItem>
                 </SelectContent>
               </Select>
-              <Button type="button" variant="outline" size="sm" :disabled="!addingProviderKeyId || updateMutation.isPending.value" @click="addProviderKey">
+              <Button type="button" variant="outline" size="sm" :disabled="!addingProviderKeyId || updateMutation.isPending.value" @click="handleAddProviderKey">
                 <IconPlus />
               </Button>
             </div>

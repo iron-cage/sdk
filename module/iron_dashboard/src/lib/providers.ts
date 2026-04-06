@@ -1,3 +1,5 @@
+import { cn } from '@/lib/utils'
+
 const PROVIDER_LABELS: Record<string, string> = {
   openai: 'OpenAI',
   anthropic: 'Anthropic',
@@ -24,9 +26,11 @@ export function getProviderLabel(provider: string): string {
 }
 
 export function getProviderBadgeClass(provider: string): string {
-  const bg = PROVIDER_BADGE_COLORS[provider] ?? 'bg-muted/80'
-  const text = PROVIDER_BADGE_COLORS[provider] ? 'text-primary-foreground' : 'text-foreground'
-  return `${bg} ${text} text-xs font-medium px-2 py-0.5 rounded-full`
+  return cn(
+    'text-xs font-medium px-2 py-0.5 rounded-full',
+    PROVIDER_BADGE_COLORS[provider] ?? 'bg-muted/80',
+    PROVIDER_BADGE_COLORS[provider] ? 'text-primary-foreground' : 'text-foreground',
+  )
 }
 
 export function getProviderKeyPlaceholder(provider: string): string {

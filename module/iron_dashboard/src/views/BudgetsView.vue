@@ -52,7 +52,7 @@ const { data: budgetStatus, isLoading: isBudgetLoading, error: budgetQueryError,
   queryFn: () => api.getBudgetStatus(),
 })
 
-function openBudgetModal(row: BudgetStatus) {
+function handleOpenBudgetModal(row: BudgetStatus) {
   budgetAgentId.value = row.agent_id
   budgetAgentName.value = row.agent_name
   budgetUsd.value = Number(row.budget.toFixed(2))
@@ -220,7 +220,7 @@ function riskBadgeVariant(risk: string) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem @click="openBudgetModal(row)">
+              <DropdownMenuItem @click="handleOpenBudgetModal(row)">
                 <IconEdit />
                 Update Budget
               </DropdownMenuItem>

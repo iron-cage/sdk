@@ -78,7 +78,7 @@ const createMutation = useMutation({
   onSuccess: () => {
     showCreateModal.value = false
     createKeyError.value = ''
-    resetForm()
+    handleResetForm()
     queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
   },
   onError: (err) => {
@@ -135,7 +135,7 @@ const toggleMutation = useMutation({
 
 
 
-function resetForm() {
+function handleResetForm() {
   provider.value = 'openai'
   apiKey.value = ''
   alias.value = ''
@@ -160,7 +160,7 @@ function handleCreateKey() {
   })
 }
 
-function openEditModal(key: ProviderKey) {
+function handleOpenEditModal(key: ProviderKey) {
   editingKey.value = key
   alias.value = key.alias || ''
   baseUrl.value = key.base_url || ''
@@ -196,7 +196,7 @@ function handleToggleEnabled(key: ProviderKey) {
 }
 
 watch(showCreateModal, (open) => {
-  if (!open) { resetForm(); createKeyError.value = '' }
+  if (!open) { handleResetForm(); createKeyError.value = '' }
 })
 
 </script>
@@ -265,7 +265,7 @@ watch(showCreateModal, (open) => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem :disabled="updateMutation.isPending.value" @click="openEditModal(key)">
+              <DropdownMenuItem :disabled="updateMutation.isPending.value" @click="handleOpenEditModal(key)">
                 <IconEdit />
                 Edit
               </DropdownMenuItem>
@@ -363,7 +363,7 @@ watch(showCreateModal, (open) => {
           <Button
             :disabled="createMutation.isPending.value"
             variant="outline"
-            @click="showCreateModal = false; createKeyError = ''; resetForm()"
+            @click="showCreateModal = false; createKeyError = ''; handleResetForm()"
           >
             <IconX />
             Cancel
