@@ -62,6 +62,7 @@ yarn-error.log*
 
 # Claude Code workspace files
 .claude/
+CLAUDE.md
 
 # IDEs
 .vscode/
