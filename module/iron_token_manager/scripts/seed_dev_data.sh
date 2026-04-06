@@ -91,7 +91,7 @@ VALUES
     'user_demo',
     'demo',
     'demo@ironcage.ai',
-    'user',
+    'manager',
     '\$2b\$12\$zZOfQakwkynHa0mBVlSvQ.rmzFZxkkN6OelZE/bLDCY1whIW.IWf2',
     1,
     $NOW_MS
@@ -100,7 +100,7 @@ VALUES
     'user_viewer',
     'viewer',
     'viewer@viewer.com',
-    'user',
+    'developer',
     '\$2b\$12\$zZOfQakwkynHa0mBVlSvQ.rmzFZxkkN6OelZE/bLDCY1whIW.IWf2',
     0,
     $NOW_MS
@@ -282,8 +282,8 @@ echo "  Viewer:     $TOKEN_VIEWER"
 echo ""
 log_info "Test credentials:"
 echo "  Admin:      username=admin, role=admin, is_active=1"
-echo "  Demo:       username=demo, role=user, is_active=1"
-echo "  Viewer:     username=viewer, role=user, is_active=0 (INACTIVE)"
+echo "  Demo:       username=demo, role=manager, is_active=1"
+echo "  Viewer:     username=viewer, role=developer, is_active=0 (INACTIVE)"
 echo ""
 log_info "Projects:"
 echo "  project_alpha (admin)"

@@ -9,6 +9,7 @@
 # 3. Database must have usage records (at least 7 total)
 # 4. Database must have exactly 3 usage limits
 # 5. Core test users must exist (admin, demo, viewer; optionally tester, guest)
+#    Roles: admin=admin, demo=manager, viewer=developer, tester=manager, guest=manager
 #
 # Usage:
 #   ./scripts/validate_seed_data.sh [database_path]
@@ -105,33 +106,33 @@ else
 fi
 
 # Check for demo user
-PM_EXISTS=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM users WHERE username='demo' AND role='user' AND is_active=1;")
+PM_EXISTS=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM users WHERE username='demo' AND role='manager' AND is_active=1;")
 if [ "$PM_EXISTS" -eq 1 ]; then
-  log_success "Test user exists: demo (role=user, active=1)"
+  log_success "Test user exists: demo (role=manager, active=1)"
 else
   log_error "Test user missing or incorrect: demo"
   ((USER_VIOLATIONS++))
 fi
 
 # Check for viewer user
-VIEWER_EXISTS=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM users WHERE username='viewer' AND role='user' AND is_active=0;")
+VIEWER_EXISTS=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM users WHERE username='viewer' AND role='developer' AND is_active=0;")
 if [ "$VIEWER_EXISTS" -eq 1 ]; then
-  log_success "Test user exists: viewer (role=user, active=0)"
+  log_success "Test user exists: viewer (role=developer, active=0)"
 else
   log_error "Test user missing or incorrect: viewer"
   ((USER_VIOLATIONS++))
 fi
 
 # Check for tester user (optional - only in Rust seed)
-TESTER_EXISTS=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM users WHERE username='tester' AND role='user' AND is_active=1;")
+TESTER_EXISTS=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM users WHERE username='tester' AND role='manager' AND is_active=1;")
 if [ "$TESTER_EXISTS" -eq 1 ]; then
-  log_success "Test user exists: tester (role=user, active=1) [Rust seed]"
+  log_success "Test user exists: tester (role=manager, active=1) [Rust seed]"
 fi
 
 # Check for guest user (optional - only in Rust seed)
-GUEST_EXISTS=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM users WHERE username='guest' AND role='user' AND is_active=1;")
+GUEST_EXISTS=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM users WHERE username='guest' AND role='manager' AND is_active=1;")
 if [ "$GUEST_EXISTS" -eq 1 ]; then
-  log_success "Test user exists: guest (role=user, active=1) [Rust seed]"
+  log_success "Test user exists: guest (role=manager, active=1) [Rust seed]"
 fi
 
 if [ $USER_VIOLATIONS -gt 0 ]; then

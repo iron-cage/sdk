@@ -302,7 +302,7 @@ async fn test_api_tokens_user_fk_constraint() {
   .bind("testuser")
   .bind("hash123")
   .bind("test@example.com")
-  .bind("user")
+  .bind("manager")
   .bind(1)
   .bind(1_733_270_400_000_i64)
   .execute(&pool)
@@ -353,7 +353,7 @@ async fn test_api_tokens_cascade_delete_on_user_deletion() {
   .bind("cascadeuser")
   .bind("hash456")
   .bind("cascade@example.com")
-  .bind("user")
+  .bind("manager")
   .bind(1)
   .bind(1_733_270_400_000_i64)
   .execute(&pool)
@@ -438,7 +438,7 @@ async fn test_all_indexes_created() {
   // Migration 022: 1 index (idx_agents_ic_token_hash)
   // Total: 15 + 2 + 5 + 4 + 4 + 2 + 3 + 1 + 2 + 8 + 1 + 0 + 1 + 1 + 0 + 1 + 1 = 51
   assert_eq!(
-    index_count, 51,
-    "Expected 51 indexes to be created across all migrations"
+    index_count, 53,
+    "Expected 53 indexes to be created across all migrations"
   );
 }

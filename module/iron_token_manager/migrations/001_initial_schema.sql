@@ -183,3 +183,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_log_entity_type ON audit_log( entity_type )
 CREATE INDEX IF NOT EXISTS idx_audit_log_entity_id ON audit_log( entity_id );
 CREATE INDEX IF NOT EXISTS idx_audit_log_actor_user_id ON audit_log( actor_user_id );
 CREATE INDEX IF NOT EXISTS idx_audit_log_logged_at ON audit_log( logged_at );
+
+-- Guard table to mark migration as completed
+CREATE TABLE IF NOT EXISTS _migration_001_completed (applied_at INTEGER NOT NULL);
+INSERT INTO _migration_001_completed (applied_at) VALUES (strftime('%s', 'now') * 1000);

@@ -1,0 +1,26 @@
+[Unit]
+Description=Iron Cage Control API Server
+After=network.target
+StartLimitBurst=3
+StartLimitIntervalSec=60
+
+[Service]
+Type=simple
+User=ironcage
+Group=ironcage
+WorkingDirectory=/var/lib/iron_cage
+ExecStart=/usr/local/bin/iron_control_api_server
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=300
+EnvironmentFile=/etc/iron_cage/iron_control_api.env
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/iron_cage
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

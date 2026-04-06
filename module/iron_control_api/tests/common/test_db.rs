@@ -21,6 +21,7 @@
 //! migration_verification.rs` for full migration rationale.
 
 use iron_test_db::{TestDatabase, TestDatabaseBuilder};
+use iron_token_manager::provider_key_storage::ProviderKeyStorage;
 
 /// Authentication schema for `iron_control_api` tests
 ///
@@ -124,4 +125,24 @@ pub async fn create_test_db() -> TestDatabase {
     .expect("LOUD FAILURE: Failed to apply authentication schema");
 
   db
+}
+
+/// Create test `ProviderKeyStorage` with all migrations applied.
+///
+/// Uses a separate in-memory database (independent of the main test DB)
+/// with all `iron_token_manager` migrations applied.
+///
+/// # Panics
+///
+/// Panics with LOUD FAILURE message if pool creation or migration fails.
+#[allow(dead_code)]
+pub async fn create_test_provider_storage() -> ProviderKeyStorage {
+  let provider_pool = sqlx::sqlite::SqlitePoolOptions::new()
+    .connect("sqlite::memory:")
+    .await
+    .expect("LOUD FAILURE: Failed to create provider pool");
+  iron_token_manager::apply_all_migrations(&provider_pool)
+    .await
+    .expect("LOUD FAILURE: Failed to apply provider migrations");
+  ProviderKeyStorage::new(provider_pool)
 }

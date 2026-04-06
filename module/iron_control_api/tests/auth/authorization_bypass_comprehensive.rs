@@ -1,10 +1,7 @@
 //! Comprehensive Authorization Bypass Security Tests - Security Audit Phase 3
 //!
-//! **Authority:** `-security_test_implementation_status.md` Phase 3
-//! **Status:** Week 1 - Day 1 Implementation
-//!
 //! Tests comprehensive authorization bypass prevention across all endpoints:
-//! - Vertical privilege escalation (user to admin)
+//! - Vertical privilege escalation (manager to admin)
 //! - Horizontal privilege escalation (user A to user B resources)
 //! - Insecure Direct Object Reference (IDOR) vulnerabilities
 //! - Role modification prevention
@@ -17,17 +14,17 @@
 //! - Users MUST NOT elevate privileges without authorization
 //! - Sequential IDs MUST NOT enable resource enumeration
 //! - Role changes MUST require admin privileges
-//! - All 25 RBAC permissions MUST be enforced
+//! - All RBAC permissions MUST be enforced
 //!
 //! # Attack Vector Coverage
 //!
-//! - Vertical escalation (user to admin via token manipulation)
+//! - Vertical escalation (manager to admin via token manipulation)
 //! - Horizontal escalation (user A accessing user B's data)
 //! - IDOR via sequential ID enumeration
 //! - IDOR via UUID guessing
 //! - Role modification via API
 //! - Role modification via token tampering
-//! - RBAC bypass attempts (all 25 permissions)
+//! - RBAC bypass attempts (all permissions)
 //! - Bulk operation authorization checks
 //!
 //! # Test Coverage
@@ -38,6 +35,12 @@
 //! - IDOR vulnerability prevention
 //! - Role modification prevention
 //! - RBAC permission matrix enforcement
+//!
+//! # Role Vocabulary (post migration-025)
+//!
+//! - `"admin"` — full system access
+//! - `"manager"` — key/token management (formerly `"user"`)
+//! - `"developer"` — read-only (formerly `"viewer"`)
 
 use super::common;
 use axum::{
@@ -48,43 +51,31 @@ use serde_json::json;
 use sqlx::SqlitePool;
 use tower::ServiceExt;
 
-/// Test vertical privilege escalation (user → admin)
+/// Test vertical privilege escalation (manager → admin)
 ///
 /// # Test Scenario
 ///
-/// 1. User logs in with "user" role → gets JWT token
-/// 2. User attempts admin-only operations:
+/// 1. Manager logs in → gets JWT token
+/// 2. Manager attempts admin-only operations:
 ///    - Create/modify other users
 ///    - Change user roles
 ///    - Access admin endpoints
 /// 3. Verify ALL attempts rejected with 403 Forbidden
-/// 4. User attempts to modify own JWT role claim
+/// 4. Manager attempts to modify own JWT role claim
 /// 5. Verify tampered JWT rejected (signature validation)
-///
-/// # Expected Behavior
-///
-/// - User role MUST NOT access admin endpoints (403 Forbidden)
-/// - Admin role required for user management operations
-/// - JWT role claim tampering MUST be detected
-/// - Privilege escalation attempts logged for security monitoring
 ///
 /// # Security Requirement
 ///
 /// Vertical privilege escalation allows low-privilege user to gain
 /// admin access. System MUST enforce role-based access control at
 /// every endpoint and verify JWT signature to prevent tampering.
-///
-/// # Implementation Status
-///
-/// ⚠️ REQUIRES IMPLEMENTATION
-/// Need admin-only endpoints and role enforcement middleware.
 #[tokio::test]
 #[ignore = "Requires admin endpoint implementation and role enforcement"]
 async fn test_vertical_privilege_escalation_user_to_admin() {
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
 
-  // Create regular user (role: "user")
-  common::auth::seed_test_user(&pool, "user@example.com", "password", "user", true).await;
+  // Create regular user (role: "manager")
+  common::auth::seed_test_user(&pool, "user@example.com", "password", "manager", true).await;
 
   // Create admin user for comparison (role: "admin")
   common::auth::seed_test_user(&pool, "admin@example.com", "admin_password", "admin", true).await;
@@ -145,7 +136,7 @@ async fn test_vertical_privilege_escalation_user_to_admin() {
     assert_eq!(
       response.status(),
       StatusCode::FORBIDDEN,
-      "User role should be forbidden from admin endpoint: {method} {uri}"
+      "Manager role should be forbidden from admin endpoint: {method} {uri}"
     );
 
     // Verify error response indicates insufficient permissions
@@ -202,7 +193,7 @@ async fn test_vertical_privilege_escalation_user_to_admin() {
 ///
 /// # Test Scenario
 ///
-/// 1. Create user A and user B (both with "user" role)
+/// 1. Create user A and user B (both with "manager" role)
 /// 2. User A creates resources (agent, budget, tokens)
 /// 3. User B attempts to access user A's resources:
 ///    - GET `/api/v1/agents/{user_a_agent_id}`
@@ -210,31 +201,18 @@ async fn test_vertical_privilege_escalation_user_to_admin() {
 ///    - DELETE `/api/v1/agents/{user_a_agent_id}`
 /// 4. Verify ALL attempts rejected with 403 Forbidden
 ///
-/// # Expected Behavior
-///
-/// - Users MUST only access their own resources
-/// - Resource ownership verified on EVERY request
-/// - No data leakage between users (multi-tenancy isolation)
-/// - Authorization checked at database level (`owner_id` filtering)
-///
 /// # Security Requirement
 ///
 /// Horizontal privilege escalation allows user A to access user B's
 /// data. System MUST verify resource ownership before granting access.
-///
-/// # Implementation Status
-///
-/// ⚠️ REQUIRES VERIFICATION
-/// Existing `authorization_checks.rs` tests some scenarios.
-/// Need comprehensive coverage across ALL endpoints.
 #[tokio::test]
 #[ignore = "Requires comprehensive horizontal privilege escalation prevention"]
 async fn test_horizontal_privilege_escalation_user_to_user() {
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
 
-  // Create user A and user B
-  common::auth::seed_test_user(&pool, "user_a@example.com", "password_a", "user", true).await;
-  common::auth::seed_test_user(&pool, "user_b@example.com", "password_b", "user", true).await;
+  // Create user A and user B (both with "manager" role)
+  common::auth::seed_test_user(&pool, "user_a@example.com", "password_a", "manager", true).await;
+  common::auth::seed_test_user(&pool, "user_b@example.com", "password_b", "manager", true).await;
 
   let router = common::auth::create_auth_router(pool.clone());
 
@@ -360,29 +338,14 @@ async fn test_horizontal_privilege_escalation_user_to_user() {
 ///
 /// 1. Create 10 users with sequential IDs (1, 2, 3, ..., 10)
 /// 2. User 5 attempts to enumerate all user IDs:
-///    - GET /api/v1/users/1
-///    - GET /api/v1/users/2
-///    - ...
-///    - GET /api/v1/users/10
+///    - GET /api/v1/users/1 through /api/v1/users/10
 /// 3. Verify sequential ID enumeration blocked (403 Forbidden)
 /// 4. Test UUID vs sequential ID resistance to enumeration
-///
-/// # Expected Behavior
-///
-/// - Direct object references MUST verify authorization
-/// - Sequential IDs MUST NOT enable resource enumeration
-/// - UUIDs preferred over sequential IDs (prevents guessing)
-/// - Authorization checked before resource lookup (fail-closed)
 ///
 /// # Security Requirement
 ///
 /// IDOR allows attacker to enumerate all resources by guessing IDs.
 /// System MUST use UUIDs and verify authorization before lookup.
-///
-/// # Implementation Status
-///
-/// ⚠️ REQUIRES VERIFICATION
-/// Need to audit all endpoints for IDOR vulnerabilities.
 #[tokio::test]
 #[ignore = "Requires IDOR vulnerability prevention verification"]
 async fn test_idor_vulnerabilities() {
@@ -395,7 +358,7 @@ async fn test_idor_vulnerabilities() {
     let email = format!("user{i}@example.com");
     let password = format!("password_{i}");
 
-    common::auth::seed_test_user(&pool, &email, &password, "user", true).await;
+    common::auth::seed_test_user(&pool, &email, &password, "manager", true).await;
 
     // Get user ID (may be sequential or UUID)
     let user_id = sqlx::query_scalar::<_, String>("SELECT id FROM users WHERE email = ?")
@@ -480,39 +443,27 @@ async fn test_idor_vulnerabilities() {
 ///
 /// # Test Scenario
 ///
-/// 1. User logs in with "user" role
-/// 2. User attempts to modify their own role to "admin":
+/// 1. Manager logs in
+/// 2. Manager attempts to modify their own role to "admin":
 ///    - PUT /api/v1/users/me → { "role": "admin" }
 ///    - PUT /api/v1/profile → { "role": "admin" }
-/// 3. User attempts to modify another user's role
+/// 3. Manager attempts to modify another user's role
 /// 4. Verify ALL attempts rejected (role changes require admin)
-///
-/// # Expected Behavior
-///
-/// - Users MUST NOT modify their own role
-/// - Role changes MUST require admin privileges
-/// - Role field excluded from user-editable profile updates
-/// - Admin-only endpoint required for role changes
 ///
 /// # Security Requirement
 ///
 /// Role modification is critical for privilege escalation. System
 /// MUST prevent users from changing their own or others' roles.
-///
-/// # Implementation Status
-///
-/// ⚠️ REQUIRES VERIFICATION
-/// Need to verify role field protection in profile update endpoints.
 #[tokio::test]
 #[ignore = "Requires role modification prevention verification"]
 async fn test_role_modification_prevention() {
   let pool: SqlitePool = common::auth::setup_auth_test_db().await;
 
-  common::auth::seed_test_user(&pool, "user@example.com", "password", "user", true).await;
+  common::auth::seed_test_user(&pool, "user@example.com", "password", "manager", true).await;
 
   let router = common::auth::create_auth_router(pool.clone());
 
-  // Login as user
+  // Login as manager
   let login_request = Request::builder()
     .method("POST")
     .uri("/api/v1/auth/login")
@@ -571,13 +522,13 @@ async fn test_role_modification_prevention() {
         .unwrap();
 
       assert_eq!(
-        current_role, "user",
+        current_role, "manager",
         "Role should NOT change after profile update attempt"
       );
     }
   }
 
-  // Phase 2: Verify role field is read-only for users
+  // Phase 2: Verify role field is read-only for managers
   let get_profile = Request::builder()
     .method("GET")
     .uri("/api/v1/users/me")
@@ -596,43 +547,27 @@ async fn test_role_modification_prevention() {
 
   assert_eq!(
     profile_data["role"].as_str().unwrap(),
-    "user",
-    "Role should remain 'user' after all modification attempts"
+    "manager",
+    "Role should remain 'manager' after all modification attempts"
   );
 }
 
-/// Test RBAC permission matrix enforcement (25 permissions)
+/// Test RBAC permission matrix enforcement
 ///
 /// # Test Scenario
 ///
-/// 1. Define 25 RBAC permissions (e.g., user:create, agent:delete, budget:read)
-/// 2. Create role hierarchy: Admin > User > Viewer
-/// 3. Test permission enforcement for each role:
-///    - Admin: all 25 permissions
-///    - User: 15 permissions (read/write own resources)
-///    - Viewer: 5 permissions (read-only)
-/// 4. Verify permission checks at every endpoint
-///
-/// # Expected Behavior
-///
-/// - Every protected endpoint MUST check permissions
-/// - Permission denied returns 403 Forbidden
-/// - Permission hierarchy respected (Admin > User > Viewer)
-/// - Fine-grained permissions (not just role-based)
+/// 1. Define RBAC permissions across 5 domains
+/// 2. Test permission hierarchy: Admin > Manager > Developer
+/// 3. Verify permission checks enforced at all endpoints
 ///
 /// # Security Requirement
 ///
 /// RBAC provides fine-grained access control beyond simple roles.
-/// System MUST enforce all 25 permissions consistently across endpoints.
-///
-/// # Implementation Status
-///
-/// ⚠️ REQUIRES IMPLEMENTATION
-/// Need RBAC permission system with 25 defined permissions.
+/// System MUST enforce all permissions consistently across endpoints.
 #[tokio::test]
 #[ignore = "Requires RBAC permission matrix implementation"]
 async fn test_rbac_permission_matrix_enforcement() {
-  // Define 25 RBAC permissions
+  // Define RBAC permissions across 5 domains
   let permissions = vec![
     "user:create",
     "user:read",
@@ -661,16 +596,12 @@ async fn test_rbac_permission_matrix_enforcement() {
     "system:metrics",
   ];
 
-  assert_eq!(
-    permissions.len(),
-    25,
-    "Should have 25 RBAC permissions defined"
-  );
+  assert_eq!(permissions.len(), 25, "Should have 25 RBAC permissions defined");
 
   // Define role→permission mappings
   let admin_permissions: std::collections::HashSet<_> = permissions.iter().copied().collect();
 
-  let user_permissions: std::collections::HashSet<_> = vec![
+  let manager_permissions: std::collections::HashSet<_> = vec![
     "agent:create",
     "agent:read",
     "agent:update",
@@ -690,7 +621,7 @@ async fn test_rbac_permission_matrix_enforcement() {
   .into_iter()
   .collect();
 
-  let viewer_permissions: std::collections::HashSet<_> = vec![
+  let developer_permissions: std::collections::HashSet<_> = vec![
     "agent:read",
     "budget:read",
     "token:read",
@@ -700,31 +631,19 @@ async fn test_rbac_permission_matrix_enforcement() {
   .into_iter()
   .collect();
 
-  assert_eq!(
-    admin_permissions.len(),
-    25,
-    "Admin should have all 25 permissions"
-  );
-  assert_eq!(
-    user_permissions.len(),
-    15,
-    "User should have 15 permissions"
-  );
-  assert_eq!(
-    viewer_permissions.len(),
-    5,
-    "Viewer should have 5 permissions"
-  );
+  assert_eq!(admin_permissions.len(), 25, "Admin should have all 25 permissions");
+  assert_eq!(manager_permissions.len(), 15, "Manager should have 15 permissions");
+  assert_eq!(developer_permissions.len(), 5, "Developer should have 5 permissions");
 
   // Verify permission hierarchy
   assert!(
-    viewer_permissions.is_subset(&user_permissions),
-    "Viewer permissions should be subset of User permissions"
+    developer_permissions.is_subset(&manager_permissions),
+    "Developer permissions should be subset of Manager permissions"
   );
 
   assert!(
-    user_permissions.is_subset(&admin_permissions),
-    "User permissions should be subset of Admin permissions"
+    manager_permissions.is_subset(&admin_permissions),
+    "Manager permissions should be subset of Admin permissions"
   );
 
   // NOTE: Actual test implementation would:

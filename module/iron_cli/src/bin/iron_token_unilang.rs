@@ -28,8 +28,8 @@
 //! - ✅ Adapter infrastructure
 //! - ✅ Pipeline integration
 
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
+
 use unilang::prelude::*;
 
 fn main() -> Result<(), Box<dyn core::error::Error>> {

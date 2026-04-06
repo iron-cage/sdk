@@ -1,7 +1,6 @@
 #![allow(missing_docs)]
 
 use iron_secrets::ip_token::{IpTokenCrypto, IpTokenError, IpTokenKey};
-use secrecy::ExposeSecret;
 
 const KEY_SIZE: usize = 32;
 
@@ -21,7 +20,7 @@ fn encrypt_decrypt_roundtrip() {
   let ip_token = crypto.encrypt(plaintext).unwrap();
   let decrypted = crypto.decrypt(&ip_token).unwrap();
 
-  assert_eq!(decrypted.expose_secret().as_str(), plaintext);
+  assert_eq!(decrypted.as_str(), plaintext);
 }
 
 #[test]
@@ -31,7 +30,7 @@ fn encrypt_decrypt_empty_string() {
   let ip_token = crypto.encrypt("").unwrap();
   let decrypted = crypto.decrypt(&ip_token).unwrap();
 
-  assert_eq!(decrypted.expose_secret().as_str(), "");
+  assert_eq!(decrypted.as_str(), "");
 }
 
 #[test]
@@ -42,7 +41,7 @@ fn encrypt_decrypt_long_key() {
   let ip_token = crypto.encrypt(&long_key).unwrap();
   let decrypted = crypto.decrypt(&ip_token).unwrap();
 
-  assert_eq!(decrypted.expose_secret().as_str(), long_key);
+  assert_eq!(decrypted.as_str(), long_key);
 }
 
 #[test]
@@ -236,7 +235,7 @@ fn encrypted_token_is_not_a_valid_provider_api_key() {
   // The only correct action is to decrypt — never use the raw token as a key.
   let plaintext = crypto.decrypt(&ip_token).unwrap();
   assert_eq!(
-    plaintext.expose_secret().as_str(),
+    plaintext.as_str(),
     "sk-proj-real-openai-key"
   );
 }
@@ -276,11 +275,11 @@ fn decrypted_key_does_not_contain_ciphertext_prefix() {
   // After correct decryption — no AES256: prefix, the plaintext key is recovered.
   // Before the fix, the `None` fallback arm bypassed this step entirely.
   assert!(
-    !decrypted.expose_secret().as_str().starts_with("AES256:"),
+    !decrypted.as_str().starts_with("AES256:"),
     "Decrypted key must NOT contain the ciphertext prefix — it must be the plaintext key"
   );
   assert_eq!(
-    decrypted.expose_secret().as_str(),
+    decrypted.as_str(),
     original_key,
     "Decrypted key must exactly match the original plaintext key"
   );
@@ -346,7 +345,7 @@ fn stack_key_copy_is_zeroed_after_clone_and_try_from() {
   let decrypted = crypto_cloned.decrypt(&encrypted).unwrap();
 
   assert_eq!(
-    decrypted.expose_secret().as_str(),
+    decrypted.as_str(),
     plaintext,
     "Cloned key must decrypt data encrypted by the original key"
   );

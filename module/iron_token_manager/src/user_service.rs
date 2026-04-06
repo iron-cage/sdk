@@ -3,9 +3,18 @@
 //! Provides admin-only operations for user lifecycle management: create, suspend,
 //! activate, delete, role changes, and password resets. All operations are audited.
 
-use crate::error::Result;
+use core::str::FromStr;
+
 use sqlx::{Row, SqlitePool};
 use tracing::error;
+use uuid::Uuid;
+
+use crate::error::{Result, TokenError};
+use iron_types::Role;
+
+/// `BCrypt` cost factor for password hashing.
+/// Must be 12 (not `DEFAULT_COST=10`) per Fix(issue-001) security requirements.
+const BCRYPT_COST: u32 = 12;
 
 /// User data returned from database
 #[derive(Debug, Clone)]
@@ -138,58 +147,48 @@ impl UserService {
   pub async fn create_user(&self, params: CreateUserParams, admin_id: &str) -> Result<User> {
     // Validate inputs
     if params.username.trim().is_empty() {
-      return Err(crate::error::TokenError::Validation {
+      return Err(TokenError::Validation {
         field: "username".to_string(),
         reason: "username is required and cannot be empty".to_string(),
       });
     }
 
     if params.password.trim().is_empty() {
-      return Err(crate::error::TokenError::Validation {
+      return Err(TokenError::Validation {
         field: "password".to_string(),
         reason: "password is required and cannot be empty".to_string(),
       });
     }
 
     if params.email.trim().is_empty() {
-      return Err(crate::error::TokenError::Validation {
+      return Err(TokenError::Validation {
         field: "email".to_string(),
         reason: "email is required and cannot be empty".to_string(),
       });
     }
 
-    // Validate role (only admin, user, viewer allowed)
-    let valid_roles = ["admin", "user", "viewer"];
-    if !valid_roles.contains(&params.role.as_str()) {
-      return Err(crate::error::TokenError::Validation {
+    // Validate role via iron_types::Role (single source of truth)
+    if Role::from_str(&params.role).is_err() {
+      return Err(TokenError::Validation {
         field: "role".to_string(),
         reason: format!(
-          "invalid role '{}'. Must be admin, user, or viewer",
+          "invalid role '{}'. Must be admin, manager, or developer",
           params.role
         ),
       });
     }
 
-    // Fix(issue-001): BCrypt cost must be explicitly 12 (not DEFAULT_COST=10)
-    //
-    // Root cause: Used bcrypt::DEFAULT_COST which is 10 for backward compatibility,
-    // but our security requirements mandate cost=12 for adequate protection against
-    // brute-force attacks. DEFAULT_COST=10 is 4x weaker than cost=12.
-    //
-    // Pitfall: Library defaults prioritize backward compatibility over security.
-    // When implementing security-critical features (password hashing, encryption,
-    // key derivation), ALWAYS specify security parameters explicitly. Never rely
-    // on library defaults - they may be weak for current security standards.
-    const BCRYPT_COST: u32 = 12;
+    // Fix(issue-001): BCrypt cost must be explicitly 12 (not DEFAULT_COST=10).
+    // See module-level BCRYPT_COST constant for details.
     let password_hash = bcrypt::hash(&params.password, BCRYPT_COST).map_err(|e| {
       error!("Error hashing password: {}", e);
-      crate::error::TokenError::Generic
+      TokenError::Generic
     })?;
 
     let now_ms = current_time_ms();
 
     let mut user_prefix = "user_".to_string();
-    let user_id = uuid::Uuid::new_v4().to_string();
+    let user_id = Uuid::new_v4().to_string();
     user_prefix.push_str(&user_id);
 
     // Insert user
@@ -207,7 +206,7 @@ impl UserService {
     .await
     .map_err(|e| {
       error!("Error creating user: {}", e);
-      crate::error::TokenError::Generic
+      TokenError::Generic
     })?;
 
     let user_id = user_prefix;
@@ -220,11 +219,11 @@ impl UserService {
         admin_id,
         None,
         Some(
-          serde_json::json!( {
-        "username": params.username,
-        "email": params.email,
-        "role": params.role,
-      } )
+          serde_json::json!({
+            "username": params.username,
+            "email": params.email,
+            "role": params.role,
+          })
           .to_string(),
         ),
         None,
@@ -333,7 +332,7 @@ impl UserService {
     let total = count_q
       .fetch_one(&self.pool)
       .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
+      .map_err(|_| TokenError::Generic)?;
 
     // Build data query with parameters
     let mut data_q = sqlx::query(&query);
@@ -356,7 +355,7 @@ impl UserService {
     let rows = data_q
       .fetch_all(&self.pool)
       .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
+      .map_err(|_| TokenError::Generic)?;
 
     let users = rows
       .iter()
@@ -402,7 +401,7 @@ impl UserService {
     .bind(user_id)
     .fetch_one(&self.pool)
     .await
-    .map_err(|_| crate::error::TokenError::Generic)?;
+    .map_err(|_| TokenError::Generic)?;
 
     Ok(User {
       id: row.get("id"),
@@ -452,7 +451,7 @@ impl UserService {
 
     // Check if already suspended
     if !user.is_active {
-      return Err(crate::error::TokenError::Generic);
+      return Err(TokenError::Generic);
     }
 
     // Suspend user
@@ -464,7 +463,7 @@ impl UserService {
     .bind(user_id)
     .execute(&self.pool)
     .await
-    .map_err(|_| crate::error::TokenError::Generic)?;
+    .map_err(|_| TokenError::Generic)?;
 
     // Audit log
     self
@@ -472,8 +471,8 @@ impl UserService {
         "suspend",
         user_id,
         admin_id,
-        Some(serde_json::json!( { "is_active": true } ).to_string()),
-        Some(serde_json::json!( { "is_active": false } ).to_string()),
+        Some(serde_json::json!({"is_active": true}).to_string()),
+        Some(serde_json::json!({"is_active": false}).to_string()),
         reason,
       )
       .await?;
@@ -504,7 +503,7 @@ impl UserService {
 
     // Check if already active
     if user.is_active {
-      return Err(crate::error::TokenError::Generic);
+      return Err(TokenError::Generic);
     }
 
     // Activate user
@@ -514,7 +513,7 @@ impl UserService {
     .bind(user_id)
     .execute(&self.pool)
     .await
-    .map_err(|_| crate::error::TokenError::Generic)?;
+    .map_err(|_| TokenError::Generic)?;
 
     // Audit log
     self
@@ -522,8 +521,8 @@ impl UserService {
         "activate",
         user_id,
         admin_id,
-        Some(serde_json::json!( { "is_active": false } ).to_string()),
-        Some(serde_json::json!( { "is_active": true } ).to_string()),
+        Some(serde_json::json!({"is_active": false}).to_string()),
+        Some(serde_json::json!({"is_active": true}).to_string()),
         None,
       )
       .await?;
@@ -551,7 +550,7 @@ impl UserService {
   pub async fn delete_user(&self, user_id: &str, admin_id: &str) -> Result<User> {
     // Prevent deleting self
     if user_id == admin_id {
-      return Err(crate::error::TokenError::Generic);
+      return Err(TokenError::Generic);
     }
 
     let now_ms = current_time_ms();
@@ -563,7 +562,7 @@ impl UserService {
       .bind(user_id)
       .execute(&self.pool)
       .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
+      .map_err(|_| TokenError::Generic)?;
 
     // Audit log
     self
@@ -572,7 +571,7 @@ impl UserService {
         user_id,
         admin_id,
         None,
-        Some(serde_json::json!( { "deleted": true } ).to_string()),
+        Some(serde_json::json!({"deleted": true}).to_string()),
         None,
       )
       .await?;
@@ -604,9 +603,17 @@ impl UserService {
     admin_id: &str,
     new_role: String,
   ) -> Result<User> {
+    // Validate role string via iron_types::Role (single source of truth)
+    if Role::from_str(&new_role).is_err() {
+      return Err(TokenError::Validation {
+        field: "role".to_string(),
+        reason: format!("invalid role '{new_role}'. Must be admin, manager, or developer"),
+      });
+    }
+
     // Prevent changing own role
     if user_id == admin_id {
-      return Err(crate::error::TokenError::Generic);
+      return Err(TokenError::Generic);
     }
 
     // Get current user state
@@ -619,7 +626,7 @@ impl UserService {
       .bind(user_id)
       .execute(&self.pool)
       .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
+      .map_err(|_| TokenError::Generic)?;
 
     // Audit log
     self
@@ -627,8 +634,8 @@ impl UserService {
         "role_change",
         user_id,
         admin_id,
-        Some(serde_json::json!( { "role": old_role } ).to_string()),
-        Some(serde_json::json!( { "role": &new_role } ).to_string()),
+        Some(serde_json::json!({"role": old_role}).to_string()),
+        Some(serde_json::json!({"role": &new_role}).to_string()),
         None,
       )
       .await?;
@@ -663,8 +670,8 @@ impl UserService {
     force_change: bool,
   ) -> Result<User> {
     // Hash new password
-    let password_hash = bcrypt::hash(&new_password, bcrypt::DEFAULT_COST)
-      .map_err(|_| crate::error::TokenError::Generic)?;
+    let password_hash =
+      bcrypt::hash(&new_password, BCRYPT_COST).map_err(|_| TokenError::Generic)?;
 
     let force_change_val = i32::from(force_change);
 
@@ -675,7 +682,7 @@ impl UserService {
       .bind(user_id)
       .execute(&self.pool)
       .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
+      .map_err(|_| TokenError::Generic)?;
 
     // Audit log
     self
@@ -684,7 +691,7 @@ impl UserService {
         user_id,
         admin_id,
         None,
-        Some(serde_json::json!( { "force_change": force_change } ).to_string()),
+        Some(serde_json::json!({"force_change": force_change}).to_string()),
         None,
       )
       .await?;
@@ -716,7 +723,7 @@ impl UserService {
     reason: Option<String>,
   ) -> Result<()> {
     let now_ms = current_time_ms();
-    let audit_id = format!("audit_{}", uuid::Uuid::new_v4());
+    let audit_id = format!("audit_{}", Uuid::new_v4());
 
     sqlx::query(
       "INSERT INTO user_audit_log \
@@ -735,7 +742,7 @@ impl UserService {
     .await
     .map_err(|e| {
       error!("Error logging audit: {}", e);
-      crate::error::TokenError::Generic
+      TokenError::Generic
     })?;
 
     Ok(())

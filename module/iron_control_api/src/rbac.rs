@@ -1,13 +1,11 @@
 //! RBAC (Role-Based Access Control) module
 //!
-//! Phase 4 Day 27: RBAC Authorization implementation
-//!
 //! # Architecture
 //!
 //! Three-tier permission model:
-//! - **Admin**: Full system access (manage users, tokens, all agent operations)
-//! - **User**: Standard access (read/write/stop own agents, read metrics)
-//! - **Viewer**: Read-only access (read agents and metrics only)
+//! - **Admin**: Full system access (manage users, roles, keys, tokens, all agent operations)
+//! - **Manager**: Key/token management (read/write agents, manage provider keys and IC tokens)
+//! - **Developer**: Read-only access (read agents, metrics, inspect own token)
 //!
 //! # Usage
 //!
@@ -16,62 +14,19 @@
 //!
 //! let checker = PermissionChecker::new();
 //!
-//! // Check if user role has permission to stop agents
-//! if checker.has_permission( Role::User, Permission::StopAgents )
+//! // Check if a Manager can manage provider keys
+//! if checker.has_permission( Role::Manager, Permission::ManageProviderKeys )
 //! {
 //!   // Allow operation
 //! }
 //! ```
 
 use core::str::FromStr;
+
 use serde::{Deserialize, Serialize};
 
-/// User role in RBAC system
-///
-/// Roles are ordered by privilege level: Admin > User > Viewer
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub enum Role {
-  /// Read-only access
-  Viewer = 0,
-  /// Standard user access
-  User = 1,
-  /// Full administrative access
-  Admin = 2,
-}
-
-impl Role {
-  /// Convert role to string
-  #[must_use]
-  pub fn as_str(&self) -> &'static str {
-    match self {
-      Self::Admin => "admin",
-      Self::User => "user",
-      Self::Viewer => "viewer",
-    }
-  }
-}
-
-impl FromStr for Role {
-  type Err = String;
-
-  /// Parse role from string (case-insensitive)
-  ///
-  /// # Arguments
-  ///
-  /// * `s` - Role name ("admin", "user", "viewer")
-  ///
-  /// # Errors
-  ///
-  /// Returns error if role name is invalid
-  fn from_str(s: &str) -> Result<Self, Self::Err> {
-    match s.to_lowercase().as_str() {
-      "admin" => Ok(Self::Admin),
-      "user" => Ok(Self::User),
-      "viewer" => Ok(Self::Viewer),
-      _ => Err(format!("Invalid role: {s}")),
-    }
-  }
-}
+// Role is defined in iron_types as the single source of truth
+pub use iron_types::Role;
 
 /// System permissions
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -80,24 +35,22 @@ pub enum Permission {
   ReadAgents,
   /// Create and modify agents
   WriteAgents,
-  /// Stop running agents
-  StopAgents,
+  /// Manage AI provider keys (CRUD, rotation)
+  ManageProviderKeys,
+  /// Manage IC tokens (create, revoke, assign)
+  ManageIcTokens,
+  /// Manage user accounts (CRUD, suspend, activate)
+  ManageUsers,
+  /// Assign or change user roles (Admin-only privilege escalation guard)
+  AssignRoles,
   /// Read usage metrics and statistics
   ReadMetrics,
-  /// Manage user accounts and roles
-  ManageUsers,
-  /// Manage API tokens
-  ManageTokens,
 }
 
 impl FromStr for Permission {
   type Err = String;
 
   /// Parse permission from string
-  ///
-  /// # Arguments
-  ///
-  /// * `s` - Permission name (`snake_case`: `read_agents`, `manage_users`, etc.)
   ///
   /// # Errors
   ///
@@ -106,10 +59,11 @@ impl FromStr for Permission {
     match s {
       "read_agents" => Ok(Self::ReadAgents),
       "write_agents" => Ok(Self::WriteAgents),
-      "stop_agents" => Ok(Self::StopAgents),
-      "read_metrics" => Ok(Self::ReadMetrics),
+      "manage_provider_keys" => Ok(Self::ManageProviderKeys),
+      "manage_ic_tokens" => Ok(Self::ManageIcTokens),
       "manage_users" => Ok(Self::ManageUsers),
-      "manage_tokens" => Ok(Self::ManageTokens),
+      "assign_roles" => Ok(Self::AssignRoles),
+      "read_metrics" => Ok(Self::ReadMetrics),
       _ => Err(format!("Invalid permission: {s}")),
     }
   }
@@ -132,41 +86,34 @@ impl PermissionChecker {
 
   /// Check if role has permission
   ///
-  /// # Arguments
-  ///
-  /// * `role` - User role
-  /// * `permission` - Required permission
-  ///
-  /// # Returns
-  ///
-  /// `true` if role has permission, `false` otherwise
-  ///
   /// # Permission Matrix
   ///
-  /// | Permission      | Admin | User | Viewer |
-  /// |-----------------|-------|------|--------|
-  /// | ReadAgents      | ✓     | ✓    | ✓      |
-  /// | WriteAgents     | ✓     | ✓    | ✗      |
-  /// | StopAgents      | ✓     | ✓    | ✗      |
-  /// | ReadMetrics     | ✓     | ✓    | ✓      |
-  /// | ManageUsers     | ✓     | ✗    | ✗      |
-  /// | ManageTokens    | ✓     | ✗    | ✗      |
+  /// | Permission         | Admin | Manager | Developer |
+  /// |--------------------|-------|---------|-----------|
+  /// | ReadAgents         | ✓     | ✓       | ✓         |
+  /// | WriteAgents        | ✓     | ✓       | ✗         |
+  /// | ManageProviderKeys | ✓     | ✓       | ✗         |
+  /// | ManageIcTokens     | ✓     | ✓       | ✗         |
+  /// | ManageUsers        | ✓     | ✗       | ✗         |
+  /// | AssignRoles        | ✓     | ✗       | ✗         |
+  /// | ReadMetrics        | ✓     | ✓       | ✓         |
   #[must_use]
   pub fn has_permission(&self, role: Role, permission: Permission) -> bool {
     match role {
-      Role::Admin => true, // Admin has all permissions
+      Role::Admin => true,
 
-      Role::User => {
+      Role::Manager => {
         matches!(
           permission,
           Permission::ReadAgents
             | Permission::WriteAgents
-            | Permission::StopAgents
+            | Permission::ManageProviderKeys
+            | Permission::ManageIcTokens
             | Permission::ReadMetrics
         )
       }
 
-      Role::Viewer => {
+      Role::Developer => {
         matches!(permission, Permission::ReadAgents | Permission::ReadMetrics)
       }
     }
@@ -193,13 +140,12 @@ impl Default for PermissionChecker {
 ///   let user_context = UserContext
 ///   {
 ///     user_id: "user_123".to_string(),
-///     role: Role::User,
+///     role: Role::Manager,
 ///   };
 ///   check_permission( user_context, Permission::ReadAgents, request, next ).await
 /// }
 /// ```
 pub mod middleware {
-  use super::{Permission, PermissionChecker, Role};
   use axum::{
     extract::Request,
     http::StatusCode,
@@ -207,6 +153,8 @@ pub mod middleware {
     response::{IntoResponse, Response},
   };
   use serde_json::json;
+
+  use super::{Permission, PermissionChecker, Role};
 
   /// User context extracted from request
   ///
@@ -221,15 +169,7 @@ pub mod middleware {
 
   /// Require specific permission for route access
   ///
-  /// # Arguments
-  ///
-  /// * `request` - HTTP request
-  /// * `next` - Next middleware in chain
-  /// * `required_permission` - Permission required to access route
-  ///
-  /// # Returns
-  ///
-  /// 403 Forbidden if permission denied, otherwise continues to next middleware
+  /// Returns 403 Forbidden if permission denied, otherwise continues to next middleware
   pub async fn check_permission(
     user_context: UserContext,
     required_permission: Permission,
@@ -239,10 +179,8 @@ pub mod middleware {
     let checker = PermissionChecker::new();
 
     if checker.has_permission(user_context.role, required_permission) {
-      // Permission granted - continue to handler
       next.run(request).await
     } else {
-      // Permission denied
       (
         StatusCode::FORBIDDEN,
         axum::Json(json!({
@@ -255,12 +193,22 @@ pub mod middleware {
     }
   }
 
-  /// Extract user role from JWT claims (helper for testing)
+  /// Extract user role from JWT claims.
   ///
-  /// In production, this would be replaced with actual JWT extraction middleware
-  #[must_use]
-  pub fn extract_role_from_claims(claims: &crate::jwt_auth::AccessTokenClaims) -> Role {
+  /// # Errors
+  ///
+  /// Returns `401 Unauthorized` if the role string is not recognized.
+  pub fn extract_role_from_claims(
+    claims: &crate::jwt_auth::AccessTokenClaims,
+  ) -> Result<Role, impl IntoResponse> {
     use core::str::FromStr;
-    Role::from_str(&claims.role).unwrap_or(Role::User)
+    Role::from_str(&claims.role).map_err(|_| {
+      (
+        StatusCode::UNAUTHORIZED,
+        axum::Json(json!({
+          "error": format!("Unrecognized role: {}", claims.role)
+        })),
+      )
+    })
   }
 }

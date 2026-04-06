@@ -20,6 +20,12 @@ pub enum TokenError {
   Generic,
   /// Database error preserving sqlx details for FK constraint detection
   Database(sqlx::Error),
+  /// Spending cap would be exceeded
+  SpendingCapExceeded,
+  /// Resource not found
+  NotFound,
+  /// Key quota exceeded
+  KeyQuotaExceeded,
   /// Validation error with specific field and reason
   Validation {
     /// Field that failed validation
@@ -34,6 +40,9 @@ impl core::fmt::Display for TokenError {
     match self {
       Self::Generic => write!(f, "Token management error"),
       Self::Database(e) => write!(f, "Database error: {e}"),
+      Self::SpendingCapExceeded => write!(f, "Spending cap exceeded"),
+      Self::NotFound => write!(f, "Not found"),
+      Self::KeyQuotaExceeded => write!(f, "Key quota exceeded"),
       Self::Validation { field, reason } => write!(f, "Validation error: {field} - {reason}"),
     }
   }

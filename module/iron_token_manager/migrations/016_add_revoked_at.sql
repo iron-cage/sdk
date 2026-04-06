@@ -9,6 +9,8 @@
 --   - NULL when token is rotated or otherwise deactivated
 --   - Enables distinguishing revoked (409) from rotated (404) states
 
+BEGIN;
+
 ALTER TABLE api_tokens ADD COLUMN revoked_at INTEGER;
 
 -- Note: Existing inactive tokens will have revoked_at = NULL
@@ -18,3 +20,5 @@ ALTER TABLE api_tokens ADD COLUMN revoked_at INTEGER;
 -- Create guard table to prevent re-running this migration
 CREATE TABLE IF NOT EXISTS _migration_016_completed (id INTEGER PRIMARY KEY);
 INSERT INTO _migration_016_completed (id) VALUES (1);
+
+COMMIT;

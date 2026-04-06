@@ -23,12 +23,8 @@ enabled = [
 full = ["enabled"]
 
 [dependencies]
-iron_types = { workspace = true, optional = true, features = ["full"] }
 
 # Logging and tracing
 tracing = { workspace = true, optional = true }
 tracing-subscriber = { workspace = true, optional = true, features = ["env-filter", "json"] }
 serde = { workspace = true, optional = true, features = ["derive"] }
-
-[dev-dependencies]
-tokio = { workspace = true, features = ["full"] }

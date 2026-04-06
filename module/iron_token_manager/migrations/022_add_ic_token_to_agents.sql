@@ -7,6 +7,8 @@
 -- IC tokens are JWTs used by agents to authenticate with the budget runtime.
 -- The actual token is shown only once on creation (like API tokens).
 
+BEGIN;
+
 -- Add IC token hash column (stores SHA-256 hash, not the actual token)
 ALTER TABLE agents ADD COLUMN ic_token_hash TEXT;
 
@@ -19,3 +21,5 @@ CREATE INDEX IF NOT EXISTS idx_agents_ic_token_hash ON agents(ic_token_hash);
 -- Create guard table to prevent re-running this migration
 CREATE TABLE IF NOT EXISTS _migration_022_completed (id INTEGER PRIMARY KEY);
 INSERT INTO _migration_022_completed (id) VALUES (1);
+
+COMMIT;

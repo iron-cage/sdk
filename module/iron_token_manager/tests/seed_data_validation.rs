@@ -57,7 +57,7 @@ async fn validate_demo_user_properties() {
       .expect("LOUD FAILURE: Demo user should exist");
 
   assert_eq!(demo.0, "demo", "Username should be 'demo'");
-  assert_eq!(demo.1, "user", "Role should be 'user' (not admin)");
+  assert_eq!(demo.1, "manager", "Role should be 'manager' (not admin)");
   assert_eq!(demo.2, 1, "Demo user should be active");
 }
 
@@ -72,7 +72,7 @@ async fn validate_viewer_user_inactive() {
       .expect("LOUD FAILURE: Viewer user should exist");
 
   assert_eq!(viewer.0, "viewer", "Username should be 'viewer'");
-  assert_eq!(viewer.1, "user", "Role should be 'user'");
+  assert_eq!(viewer.1, "developer", "Role should be 'developer'");
   assert_eq!(
     viewer.2, 0,
     "Viewer should be INACTIVE (for revocation testing)"

@@ -9,16 +9,30 @@
 //! - POST `/api/providers/{id}/balance` - Fetch balance from provider API
 //! - POST `/api/projects/{project_id}/provider` - Assign provider key to project
 
-use crate::error::ValidationError;
+use core::{
+  error::Error,
+  fmt::{Debug, Formatter, Result as FmtResult},
+  str::FromStr,
+};
+use std::sync::Arc;
+
 use axum::{
   extract::{Path, State},
   http::StatusCode,
   response::{IntoResponse, Json},
 };
-use iron_secrets::crypto::{mask_api_key, CryptoService};
-use iron_token_manager::provider_key_storage::{ProviderKeyStorage, ProviderType};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use sqlx::sqlite::SqlitePoolOptions;
+
+use crate::{
+  error::{JsonBody, ValidationError},
+  jwt_auth::AuthenticatedUser,
+  rbac::{Permission, PermissionChecker},
+};
+use iron_secrets::crypto::{mask_api_key, CryptoService};
+use iron_token_manager::provider_key_storage::{
+  ProviderKeyMetadata, ProviderKeyStorage, ProviderType,
+};
 
 /// Provider management state
 #[derive(Clone)]
@@ -29,8 +43,8 @@ pub struct ProvidersState {
   pub crypto: Option<Arc<CryptoService>>,
 }
 
-impl core::fmt::Debug for ProvidersState {
-  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl Debug for ProvidersState {
+  fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
     f.debug_struct("ProvidersState")
       .field("storage", &"<ProviderKeyStorage>")
       .field("crypto", &self.crypto.as_ref().map(|_| "<CryptoService>"))
@@ -47,10 +61,16 @@ impl ProvidersState {
   /// # Errors
   ///
   /// Returns an error if the database connection fails.
-  pub async fn new(database_url: &str) -> Result<Self, Box<dyn core::error::Error>> {
-    let storage = ProviderKeyStorage::connect(database_url)
+  pub async fn new(database_url: &str) -> Result<Self, Box<dyn Error>> {
+    let pool = SqlitePoolOptions::new()
+      .max_connections(5)
+      .connect(database_url)
       .await
-      .map_err(|e| Box::new(e) as Box<dyn core::error::Error>)?;
+      .map_err(|e| Box::new(e) as Box<dyn Error>)?;
+    iron_token_manager::apply_all_migrations(&pool)
+      .await
+      .map_err(|e| Box::new(e) as Box<dyn Error>)?;
+    let storage = ProviderKeyStorage::new(pool);
 
     // Try to initialize crypto, but don't fail if master key not set
     let crypto = if let Ok(c) = CryptoService::from_env() {
@@ -77,7 +97,7 @@ impl ProvidersState {
 /// Create provider key request
 #[derive(Debug, Deserialize)]
 pub struct CreateProviderKeyRequest {
-  /// Provider type (e.g., "openai", "anthropic")
+  /// Provider type (e.g., "openai", "anthropic", "gemini", "xai")
   pub provider: String,
   /// Plaintext API key to encrypt
   pub api_key: String,
@@ -85,6 +105,9 @@ pub struct CreateProviderKeyRequest {
   pub base_url: Option<String>,
   /// Optional human-readable description
   pub description: Option<String>,
+  /// Optional spending cap in USD. If provided, sets the cap when the key is created,
+  /// eliminating the uncapped window between key creation and a separate PUT call.
+  pub spending_cap_usd: Option<f64>,
 }
 
 impl CreateProviderKeyRequest {
@@ -105,22 +128,25 @@ impl CreateProviderKeyRequest {
   /// or too long, or optional fields exceed length limits.
   pub fn validate(&self) -> Result<(), ValidationError> {
     // Validate provider type
-    if self.provider != "openai" && self.provider != "anthropic" {
+    if !matches!(
+      self.provider.as_str(),
+      "openai" | "anthropic" | "gemini" | "xai"
+    ) {
       return Err(ValidationError::InvalidFormat {
-        field: "provider".to_string(),
-        expected: "'openai' or 'anthropic'".to_string(),
+        field: "provider".to_owned(),
+        expected: "'openai', 'anthropic', 'gemini', or 'xai'".to_owned(),
       });
     }
 
     // Validate API key not empty
     if self.api_key.trim().is_empty() {
-      return Err(ValidationError::MissingField("api_key".to_string()));
+      return Err(ValidationError::MissingField("api_key".to_owned()));
     }
 
     // Validate API key length
     if self.api_key.len() > Self::MAX_API_KEY_LENGTH {
       return Err(ValidationError::TooLong {
-        field: "api_key".to_string(),
+        field: "api_key".to_owned(),
         max_length: Self::MAX_API_KEY_LENGTH,
       });
     }
@@ -128,8 +154,8 @@ impl CreateProviderKeyRequest {
     // Validate no NULL bytes
     if self.api_key.contains('\0') {
       return Err(ValidationError::InvalidCharacter {
-        field: "api_key".to_string(),
-        character: "NULL".to_string(),
+        field: "api_key".to_owned(),
+        character: "NULL".to_owned(),
       });
     }
 
@@ -137,14 +163,14 @@ impl CreateProviderKeyRequest {
     if let Some(ref base_url) = self.base_url {
       if base_url.len() > Self::MAX_BASE_URL_LENGTH {
         return Err(ValidationError::TooLong {
-          field: "base_url".to_string(),
+          field: "base_url".to_owned(),
           max_length: Self::MAX_BASE_URL_LENGTH,
         });
       }
       if base_url.contains('\0') {
         return Err(ValidationError::InvalidCharacter {
-          field: "base_url".to_string(),
-          character: "NULL".to_string(),
+          field: "base_url".to_owned(),
+          character: "NULL".to_owned(),
         });
       }
     }
@@ -153,14 +179,14 @@ impl CreateProviderKeyRequest {
     if let Some(ref description) = self.description {
       if description.len() > Self::MAX_DESCRIPTION_LENGTH {
         return Err(ValidationError::TooLong {
-          field: "description".to_string(),
+          field: "description".to_owned(),
           max_length: Self::MAX_DESCRIPTION_LENGTH,
         });
       }
       if description.contains('\0') {
         return Err(ValidationError::InvalidCharacter {
-          field: "description".to_string(),
-          character: "NULL".to_string(),
+          field: "description".to_owned(),
+          character: "NULL".to_owned(),
         });
       }
     }
@@ -178,6 +204,8 @@ pub struct UpdateProviderKeyRequest {
   pub description: Option<String>,
   /// Enable or disable this key
   pub is_enabled: Option<bool>,
+  /// Spending cap in USD (None = don't change, Some(None) = remove cap, Some(Some(x)) = set cap)
+  pub spending_cap_usd: Option<Option<f64>>,
 }
 
 /// Provider key response (never contains plaintext API key)
@@ -201,6 +229,34 @@ pub struct ProviderKeyResponse {
   pub masked_key: String,
   /// Projects this key is assigned to
   pub assigned_projects: Vec<String>,
+  /// Spending cap in USD (None = unlimited)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub spending_cap_usd: Option<f64>,
+  /// Amount spent in USD
+  pub spending_used_usd: f64,
+}
+
+impl ProviderKeyResponse {
+  /// Construct response from metadata, masked key, and assigned projects.
+  fn from_metadata(
+    metadata: ProviderKeyMetadata,
+    masked_key: impl Into<String>,
+    assigned_projects: Vec<String>,
+  ) -> Self {
+    Self {
+      id: metadata.id,
+      provider: metadata.provider.to_string(),
+      base_url: metadata.base_url,
+      description: metadata.description,
+      is_enabled: metadata.is_enabled,
+      created_at: metadata.created_at,
+      last_used_at: metadata.last_used_at,
+      masked_key: masked_key.into(),
+      assigned_projects,
+      spending_cap_usd: metadata.spending_cap_microdollars.map(microdollars_to_usd),
+      spending_used_usd: microdollars_to_usd(metadata.spending_used_microdollars),
+    }
+  }
 }
 
 /// Assign provider to project request
@@ -208,6 +264,55 @@ pub struct ProviderKeyResponse {
 pub struct AssignProviderRequest {
   /// ID of provider key to assign
   pub provider_key_id: i64,
+}
+
+/// Convert microdollars (i64) to USD (f64)
+#[allow(clippy::cast_precision_loss)]
+fn microdollars_to_usd(microdollars: i64) -> f64 {
+  // Safe: spending caps won't exceed f64 precision (~9 * 10^15 microdollars)
+  microdollars as f64 / 1_000_000.0
+}
+
+/// Convert USD (f64) to microdollars (i64), rounding to nearest
+#[allow(clippy::cast_possible_truncation)]
+fn usd_to_microdollars(usd: f64) -> i64 {
+  // Safe: spending caps are bounded; matches iron_cost::converter pattern
+  (usd * 1_000_000.0).round() as i64
+}
+
+/// Validate and convert a spending cap from USD to microdollars.
+///
+/// Rejects NaN, Infinity, and negative values before conversion so that
+/// the storage layer never receives nonsensical cap values.
+fn validate_and_convert_spending_cap(usd: f64) -> Result<i64, &'static str> {
+  if !usd.is_finite() {
+    return Err("spending_cap_usd must be a finite number");
+  }
+  if usd < 0.0 {
+    return Err("spending_cap_usd must be non-negative");
+  }
+  Ok(usd_to_microdollars(usd))
+}
+
+/// Check if user has `ManageProviderKeys` permission
+fn check_manage_provider_keys(role_str: &str) -> Result<(), impl IntoResponse> {
+  let role = iron_types::Role::from_str(role_str).map_err(|_| {
+    (
+      StatusCode::FORBIDDEN,
+      Json(serde_json::json!({ "error": format!("Invalid role: {role_str}") })),
+    )
+  })?;
+  let checker = PermissionChecker::new();
+  if checker.has_permission(role, Permission::ManageProviderKeys) {
+    Ok(())
+  } else {
+    Err((
+      StatusCode::FORBIDDEN,
+      Json(serde_json::json!({
+        "error": "Insufficient permissions: ManageProviderKeys required"
+      })),
+    ))
+  }
 }
 
 /// Error response for disabled feature
@@ -225,9 +330,14 @@ fn feature_disabled_response() -> impl IntoResponse {
 /// Create new AI provider key
 pub async fn create_provider_key(
   State(state): State<ProvidersState>,
-  crate::jwt_auth::AuthenticatedUser(claims): crate::jwt_auth::AuthenticatedUser,
-  crate::error::JsonBody(request): crate::error::JsonBody<CreateProviderKeyRequest>,
+  AuthenticatedUser(claims): AuthenticatedUser,
+  JsonBody(request): JsonBody<CreateProviderKeyRequest>,
 ) -> impl IntoResponse {
+  // RBAC: require ManageProviderKeys permission
+  if let Err(resp) = check_manage_provider_keys(&claims.role) {
+    return resp.into_response();
+  }
+
   // Check if crypto is enabled
   let Some(crypto) = &state.crypto else {
     return feature_disabled_response().into_response();
@@ -248,6 +358,8 @@ pub async fn create_provider_key(
   let provider = match request.provider.as_str() {
     "openai" => ProviderType::OpenAI,
     "anthropic" => ProviderType::Anthropic,
+    "gemini" => ProviderType::Gemini,
+    "xai" => ProviderType::XAI,
     _ => {
       return (
         StatusCode::BAD_REQUEST,
@@ -333,6 +445,36 @@ pub async fn create_provider_key(
     }
   };
 
+  // If a spending cap was requested, set it atomically as part of creation.
+  // This eliminates the uncapped window that would exist if the caller had to
+  // make a separate PUT request after creating the key.
+  if let Some(cap_usd) = request.spending_cap_usd {
+    let cap_microdollars = match validate_and_convert_spending_cap(cap_usd) {
+      Ok(v) => v,
+      Err(msg) => {
+        return (
+          StatusCode::BAD_REQUEST,
+          Json(serde_json::json!({ "error": msg })),
+        )
+          .into_response();
+      }
+    };
+    if state
+      .storage
+      .set_spending_cap(key_id, Some(cap_microdollars))
+      .await
+      .is_err()
+    {
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(serde_json::json!({
+          "error": "Failed to set spending cap"
+        })),
+      )
+        .into_response();
+    }
+  }
+
   // Get metadata for response
   let Ok(metadata) = state.storage.get_key_metadata(key_id).await else {
     return (
@@ -346,17 +488,11 @@ pub async fn create_provider_key(
 
   (
     StatusCode::CREATED,
-    Json(ProviderKeyResponse {
-      id: metadata.id,
-      provider: metadata.provider.to_string(),
-      base_url: metadata.base_url,
-      description: metadata.description,
-      is_enabled: metadata.is_enabled,
-      created_at: metadata.created_at,
-      last_used_at: metadata.last_used_at,
+    Json(ProviderKeyResponse::from_metadata(
+      metadata,
       masked_key,
-      assigned_projects: vec![], // New key has no assignments
-    }),
+      vec![],
+    )),
   )
     .into_response()
 }
@@ -366,7 +502,7 @@ pub async fn create_provider_key(
 /// List all provider keys for authenticated user
 pub async fn list_provider_keys(
   State(state): State<ProvidersState>,
-  crate::jwt_auth::AuthenticatedUser(claims): crate::jwt_auth::AuthenticatedUser,
+  AuthenticatedUser(claims): AuthenticatedUser,
 ) -> impl IntoResponse {
   let Ok(keys) = state.storage.list_keys(&claims.sub).await else {
     return (
@@ -389,17 +525,11 @@ pub async fn list_provider_keys(
       .await
       .unwrap_or_default();
 
-    responses.push(ProviderKeyResponse {
-      id: meta.id,
-      provider: meta.provider.to_string(),
-      base_url: meta.base_url,
-      description: meta.description,
-      is_enabled: meta.is_enabled,
-      created_at: meta.created_at,
-      last_used_at: meta.last_used_at,
-      masked_key: "***".to_string(),
+    responses.push(ProviderKeyResponse::from_metadata(
+      meta,
+      "***",
       assigned_projects,
-    });
+    ));
   }
 
   (StatusCode::OK, Json(responses)).into_response()
@@ -410,7 +540,7 @@ pub async fn list_provider_keys(
 /// Get specific provider key details
 pub async fn get_provider_key(
   State(state): State<ProvidersState>,
-  crate::jwt_auth::AuthenticatedUser(claims): crate::jwt_auth::AuthenticatedUser,
+  AuthenticatedUser(claims): AuthenticatedUser,
   Path(key_id): Path<i64>,
 ) -> impl IntoResponse {
   let Ok(metadata) = state.storage.get_key_metadata(key_id).await else {
@@ -443,30 +573,29 @@ pub async fn get_provider_key(
 
   (
     StatusCode::OK,
-    Json(ProviderKeyResponse {
-      id: metadata.id,
-      provider: metadata.provider.to_string(),
-      base_url: metadata.base_url,
-      description: metadata.description,
-      is_enabled: metadata.is_enabled,
-      created_at: metadata.created_at,
-      last_used_at: metadata.last_used_at,
-      masked_key: "***".to_string(),
+    Json(ProviderKeyResponse::from_metadata(
+      metadata,
+      "***",
       assigned_projects,
-    }),
+    )),
   )
     .into_response()
 }
 
 /// PUT /api/providers/{id}
 ///
-/// Update provider key (description, `base_url`, `is_enabled`)
+/// Update provider key (description, `base_url`, `is_enabled`, `spending_cap_usd`)
 pub async fn update_provider_key(
   State(state): State<ProvidersState>,
-  crate::jwt_auth::AuthenticatedUser(claims): crate::jwt_auth::AuthenticatedUser,
+  AuthenticatedUser(claims): AuthenticatedUser,
   Path(key_id): Path<i64>,
-  crate::error::JsonBody(request): crate::error::JsonBody<UpdateProviderKeyRequest>,
+  JsonBody(request): JsonBody<UpdateProviderKeyRequest>,
 ) -> impl IntoResponse {
+  // RBAC: require ManageProviderKeys permission
+  if let Err(resp) = check_manage_provider_keys(&claims.role) {
+    return resp.into_response();
+  }
+
   // Verify ownership
   let Ok(metadata) = state.storage.get_key_metadata(key_id).await else {
     return (
@@ -535,6 +664,37 @@ pub async fn update_provider_key(
     }
   }
 
+  if let Some(spending_cap) = request.spending_cap_usd {
+    // Validate the cap value before converting; None means "remove the cap".
+    let cap_microdollars = match spending_cap {
+      None => None,
+      Some(usd) => match validate_and_convert_spending_cap(usd) {
+        Ok(v) => Some(v),
+        Err(msg) => {
+          return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": msg })),
+          )
+            .into_response();
+        }
+      },
+    };
+    if state
+      .storage
+      .set_spending_cap(key_id, cap_microdollars)
+      .await
+      .is_err()
+    {
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(serde_json::json!({
+          "error": "Failed to update spending_cap"
+        })),
+      )
+        .into_response();
+    }
+  }
+
   // Get updated metadata
   let Ok(updated) = state.storage.get_key_metadata(key_id).await else {
     return (
@@ -555,17 +715,11 @@ pub async fn update_provider_key(
 
   (
     StatusCode::OK,
-    Json(ProviderKeyResponse {
-      id: updated.id,
-      provider: updated.provider.to_string(),
-      base_url: updated.base_url,
-      description: updated.description,
-      is_enabled: updated.is_enabled,
-      created_at: updated.created_at,
-      last_used_at: updated.last_used_at,
-      masked_key: "***".to_string(),
+    Json(ProviderKeyResponse::from_metadata(
+      updated,
+      "***",
       assigned_projects,
-    }),
+    )),
   )
     .into_response()
 }
@@ -575,9 +729,14 @@ pub async fn update_provider_key(
 /// Delete provider key
 pub async fn delete_provider_key(
   State(state): State<ProvidersState>,
-  crate::jwt_auth::AuthenticatedUser(claims): crate::jwt_auth::AuthenticatedUser,
+  AuthenticatedUser(claims): AuthenticatedUser,
   Path(key_id): Path<i64>,
 ) -> impl IntoResponse {
+  // RBAC: require ManageProviderKeys permission
+  if let Err(resp) = check_manage_provider_keys(&claims.role) {
+    return resp.into_response();
+  }
+
   // Verify ownership
   let Ok(metadata) = state.storage.get_key_metadata(key_id).await else {
     return (
@@ -615,98 +774,46 @@ pub async fn delete_provider_key(
 /// POST `/api/projects/{project_id}/provider`
 ///
 /// Assign provider key to project
+///
+/// Returns 501 until project ownership can be properly enforced.
+#[allow(clippy::unused_async)] // async required by axum handler signature
 pub async fn assign_provider_to_project(
-  State(state): State<ProvidersState>,
-  crate::jwt_auth::AuthenticatedUser(claims): crate::jwt_auth::AuthenticatedUser,
-  Path(project_id): Path<String>,
-  crate::error::JsonBody(request): crate::error::JsonBody<AssignProviderRequest>,
+  _state: State<ProvidersState>,
+  _claims: AuthenticatedUser,
+  _path: Path<String>,
+  _request: JsonBody<AssignProviderRequest>,
 ) -> impl IntoResponse {
-  // Verify key ownership
-  let Ok(metadata) = state
-    .storage
-    .get_key_metadata(request.provider_key_id)
-    .await
-  else {
-    return (
-      StatusCode::NOT_FOUND,
-      Json(serde_json::json!({
-        "error": "Provider key not found"
-      })),
-    )
-      .into_response();
-  };
-
-  if metadata.user_id != claims.sub {
-    return (
-      StatusCode::NOT_FOUND,
-      Json(serde_json::json!({
-        "error": "Provider key not found"
-      })),
-    )
-      .into_response();
-  }
-
-  // Assign to project
-  match state
-    .storage
-    .assign_to_project(request.provider_key_id, &project_id)
-    .await
-  {
-    Ok(()) => StatusCode::OK.into_response(),
-    Err(_) => (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json(serde_json::json!({
-        "error": "Failed to assign provider key to project"
-      })),
-    )
-      .into_response(),
-  }
+  // Projects are not yet implemented as first-class entities.
+  // Return 501 until project ownership can be properly enforced.
+  // TODO: implement once projects table exists (tracks owner_id).
+  (
+    StatusCode::NOT_IMPLEMENTED,
+    Json(serde_json::json!({
+      "error": "project assignment is not yet implemented"
+    })),
+  )
+    .into_response()
 }
 
 /// DELETE `/api/projects/{project_id}/provider`
 ///
 /// Unassign provider key from project
+///
+/// Returns 501 until project ownership can be properly enforced.
+#[allow(clippy::unused_async)] // async required by axum handler signature
 pub async fn unassign_provider_from_project(
-  State(state): State<ProvidersState>,
-  crate::jwt_auth::AuthenticatedUser(_claims): crate::jwt_auth::AuthenticatedUser,
-  Path(project_id): Path<String>,
+  _state: State<ProvidersState>,
+  _claims: AuthenticatedUser,
+  _path: Path<String>,
 ) -> impl IntoResponse {
-  // Get the current assignment to verify it exists
-  let provider_key_id = match state.storage.get_project_key(&project_id).await {
-    Ok(Some(id)) => id,
-    Ok(None) => {
-      return (
-        StatusCode::NOT_FOUND,
-        Json(serde_json::json!({
-          "error": "No provider key assigned to this project"
-        })),
-      )
-        .into_response();
-    }
-    Err(_) => {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({
-          "error": "Failed to query project assignment"
-        })),
-      )
-        .into_response();
-    }
-  };
-
-  // Unassign from project
-  match state
-    .storage
-    .unassign_from_project(provider_key_id, &project_id)
-    .await
-  {
-    Ok(()) => StatusCode::NO_CONTENT.into_response(),
-    Err(_) => (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json(serde_json::json!({
-        "error": "Failed to unassign provider key from project"
-      })),
-    )
-      .into_response(),
-  }
+  // Projects are not yet implemented as first-class entities.
+  // Return 501 until project ownership can be properly enforced.
+  // TODO: implement once projects table exists (tracks owner_id).
+  (
+    StatusCode::NOT_IMPLEMENTED,
+    Json(serde_json::json!({
+      "error": "project unassignment is not yet implemented"
+    })),
+  )
+    .into_response()
 }

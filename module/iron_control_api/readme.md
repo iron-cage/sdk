@@ -376,7 +376,6 @@ Provides REST API and WebSocket endpoints for programmatic control of Iron Cage 
 | lib.rs | REST API and WebSocket server for Iron Runtime dashboard. |
 | error.rs | Custom error types and JSON error responses for API |
 | ic_token.rs | ic token claims implementation |
-| ip_token.rs | IP Token (Iron Provider Token) encryption |
 | jwt_auth.rs | JWT authentication middleware |
 | rbac.rs | RBAC (Role-Based Access Control) module |
 | token_auth.rs | API Token authentication middleware |

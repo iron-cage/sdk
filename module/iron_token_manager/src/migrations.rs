@@ -28,20 +28,65 @@
 //! - Guard tables prevent data loss
 //! - Foreign keys always enabled
 //! - All migrations applied in order
+//! - SQL is embedded at compile time via `include_str!()` (no filesystem access at runtime)
 //!
 //! # Known Pitfalls
 //!
-//! - Migration 007 intentionally skipped (reserved)
 //! - Guard tables must not be deleted manually
 //! - Foreign key pragma must run before migrations
 
-use sqlx::{query_scalar, SqlitePool};
+use sqlx::SqlitePool;
 
-use crate::error::Result;
+use crate::error::{Result, TokenError};
+
+/// Embeds a migration SQL file at compile time and pairs it with its filename.
+/// The filename is parsed at runtime to extract the migration number (first 3 chars).
+macro_rules! migration {
+  ($name:literal) => {
+    (
+      $name,
+      include_str!(concat!("../migrations/", $name, ".sql")),
+    )
+  };
+}
+
+/// All migrations embedded at compile time.
+/// Each entry is `(name, sql)` - sorted by number prefix for deterministic ordering.
+/// Using `include_str!()` ensures deployed binaries carry their own migrations
+/// without depending on the build machine's filesystem paths.
+static MIGRATIONS: &[(&str, &str)] = &[
+  migration!("001_initial_schema"),
+  migration!("002_add_length_constraints"),
+  migration!("003_create_users_table"),
+  migration!("004_create_ai_provider_keys"),
+  migration!("005_enhance_users_table"),
+  migration!("006_create_user_audit_log"),
+  migration!("007_create_blacklist_table"),
+  migration!("008_create_agents_table"),
+  migration!("009_create_budget_leases"),
+  migration!("010_create_agent_budgets"),
+  migration!("011_create_budget_requests"),
+  migration!("012_create_analytics_events"),
+  migration!("013_create_budget_history"),
+  migration!("014_add_api_tokens_fk"),
+  migration!("015_add_agents_owner_id"),
+  migration!("016_add_revoked_at"),
+  migration!("017_add_lease_return_columns"),
+  migration!("018_create_system_config"),
+  migration!("019_convert_budgets_to_microdollars"),
+  migration!("020_add_agent_provider_key_id"),
+  migration!("021_add_account_lockout_fields"),
+  migration!("022_add_ic_token_to_agents"),
+  migration!("023_seed_agent1_ic_token"),
+  migration!("024_add_ip_key_spending_cap"),
+  migration!("025_rename_roles"),
+  migration!("026_add_spending_constraints"),
+  migration!("027_add_agent_token_index"),
+];
 
 /// Applies all migrations to the database pool.
 ///
-/// Migrations are applied in order (001-023, skipping 007).
+/// All migrations are embedded at compile time and applied in sorted order.
 /// Uses guard tables to prevent re-running destructive operations.
 /// Safe to call multiple times (idempotent).
 ///
@@ -63,640 +108,35 @@ pub async fn apply_all_migrations(pool: &SqlitePool) -> Result<()> {
     .await
     .map_err(|e| {
       eprintln!("PRAGMA foreign_keys failed: {e:?}");
-      crate::error::TokenError::Generic
+      TokenError::Generic
     })?;
 
-  // Migration 001: Initial schema (5 core tables)
-  apply_migration_001(pool).await.map_err(|e| {
-    eprintln!("Migration 001 failed: {e:?}");
-    e
-  })?;
-
-  // Migration 002: Length constraints (guarded)
-  apply_migration_002(pool).await.map_err(|e| {
-    eprintln!("Migration 002 failed: {e:?}");
-    e
-  })?;
-
-  // Migration 003: Users table (guarded)
-  apply_migration_003(pool).await.map_err(|e| {
-    eprintln!("Migration 003 failed: {e:?}");
-    e
-  })?;
-
-  // Migration 004: AI provider keys
-  apply_migration_004(pool).await.map_err(|e| {
-    eprintln!("Migration 004 failed: {e:?}");
-    e
-  })?;
-
-  // Migration 005: Enhanced users table
-  apply_migration_005(pool).await.map_err(|e| {
-    eprintln!("Migration 005 failed: {e:?}");
-    e
-  })?;
-
-  // Migration 006: User audit log
-  apply_migration_006(pool).await?;
-
-  // Migration 007: RESERVED (intentionally skipped)
-
-  // Migration 008: Agents table
-  apply_migration_008(pool).await?;
-
-  // Migration 009: Budget leases (Protocol 005)
-  apply_migration_009(pool).await?;
-
-  // Migration 010: Agent budgets (Protocol 005)
-  apply_migration_010(pool).await?;
-
-  // Migration 011: Budget requests (Protocol 012)
-  apply_migration_011(pool).await?;
-
-  // Migration 012: Analytics events table
-  apply_migration_012(pool).await?;
-
-  // Migration 013: Budget modification history (Protocol 017)
-  apply_migration_013(pool).await?;
-
-  // Migration 014: Add FK constraint to api_tokens
-  apply_migration_014(pool).await?;
-
-  // Migration 015: Add owner_id to agents table
-  apply_migration_015(pool).await?;
-
-  // Migration 016: Add revoked_at timestamp to api_tokens
-  apply_migration_016(pool).await?;
-
-  // Migration 017: Add lease return columns (Protocol 005)
-  apply_migration_017(pool).await?;
-
-  // Migration 018: Create system_config table and seed dev data
-  apply_migration_018(pool).await?;
-
-  // Migration 019: Convert budget columns from REAL to INTEGER (microdollars)
-  apply_migration_019(pool).await?;
-
-  // Migration 020: Add provider_key_id to agents table (Feature 014)
-  apply_migration_020(pool).await?;
-
-  // Migration 021: Add account lockout fields (Protocol 007)
-  apply_migration_021(pool).await?;
-
-  // Migration 022: Add IC token fields to agents table
-  apply_migration_022(pool).await?;
-
-  // Migration 023: Seed dev IC token hash for agent_1 (demo)
-  apply_migration_023(pool).await?;
+  for (name, sql) in MIGRATIONS {
+    apply_guarded_migration(pool, name, sql).await?;
+  }
 
   Ok(())
 }
 
-/// Migration 001: Initial schema
+/// Apply a single guarded migration.
 ///
-/// Creates 5 core tables:
-/// - `api_tokens`: Token metadata and hashes
-/// - `token_usage`: Usage tracking per token
-/// - `usage_limits`: Quota per user/project
-/// - `api_call_traces`: Detailed call logs
-/// - `audit_log`: Compliance audit trail
-async fn apply_migration_001(pool: &SqlitePool) -> Result<()> {
-  let migration = include_str!("../migrations/001_initial_schema.sql");
-  sqlx::raw_sql(migration)
-    .execute(pool)
-    .await
-    .map_err(|_| crate::error::TokenError::Generic)?;
-  Ok(())
-}
+/// Checks the guard table `_migration_{number}_completed` before running.
+/// If the guard table exists, the migration is skipped (idempotent).
+async fn apply_guarded_migration(pool: &SqlitePool, name: &str, sql: &str) -> Result<()> {
+  let number = &name[..3];
+  let guard_table = format!("_migration_{number}_completed");
 
-/// Migration 002: Length constraints (GUARDED)
-///
-/// Adds length constraints to prevent `DoS` attacks (issue-001 defense).
-/// Uses guard table to prevent re-running (CASCADE DELETE protection).
-///
-/// Fix(issue-003): Guard table prevents CASCADE DELETE data loss
-/// Root cause: Dropping `api_tokens` table cascaded to `token_usage` deletion
-/// Pitfall: Always check guard tables before destructive schema changes
-async fn apply_migration_002(pool: &SqlitePool) -> Result<()> {
-  // Check guard table
-  let completed: i64 = query_scalar(
-    "SELECT COUNT(*) FROM sqlite_master
-     WHERE type='table' AND name='_migration_002_completed'",
-  )
-  .fetch_one(pool)
-  .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
-
-  if completed == 0 {
-    let migration = include_str!("../migrations/002_add_length_constraints.sql");
-    sqlx::raw_sql(migration)
-      .execute(pool)
+  let completed: i64 =
+    sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = ?")
+      .bind(&guard_table)
+      .fetch_one(pool)
       .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
-  }
-
-  Ok(())
-}
-
-/// Migration 003: Users table (GUARDED)
-///
-/// Creates users table with authentication fields.
-/// Uses guard table to prevent re-running.
-async fn apply_migration_003(pool: &SqlitePool) -> Result<()> {
-  let completed: i64 = query_scalar(
-    "SELECT COUNT(*) FROM sqlite_master
-     WHERE type='table' AND name='_migration_003_completed'",
-  )
-  .fetch_one(pool)
-  .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
+      .map_err(|_| TokenError::Generic)?;
 
   if completed == 0 {
-    let migration = include_str!("../migrations/003_create_users_table.sql");
-    sqlx::raw_sql(migration)
-      .execute(pool)
-      .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
-  }
-
-  Ok(())
-}
-
-/// Migration 004: AI provider keys
-async fn apply_migration_004(pool: &SqlitePool) -> Result<()> {
-  let completed: i64 = query_scalar(
-    "SELECT COUNT(*) FROM sqlite_master
-     WHERE type='table' AND name='_migration_004_completed'",
-  )
-  .fetch_one(pool)
-  .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
-
-  if completed == 0 {
-    let migration = include_str!("../migrations/004_create_ai_provider_keys.sql");
-    sqlx::raw_sql(migration)
-      .execute(pool)
-      .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
-  }
-
-  Ok(())
-}
-
-/// Migration 005: Enhanced users table
-async fn apply_migration_005(pool: &SqlitePool) -> Result<()> {
-  let completed: i64 = query_scalar(
-    "SELECT COUNT(*) FROM sqlite_master
-     WHERE type='table' AND name='_migration_005_completed'",
-  )
-  .fetch_one(pool)
-  .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
-
-  if completed == 0 {
-    let migration = include_str!("../migrations/005_enhance_users_table.sql");
-    sqlx::raw_sql(migration)
-      .execute(pool)
-      .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
-  }
-
-  Ok(())
-}
-
-/// Migration 006: User audit log
-async fn apply_migration_006(pool: &SqlitePool) -> Result<()> {
-  let completed: i64 = query_scalar(
-    "SELECT COUNT(*) FROM sqlite_master
-     WHERE type='table' AND name='_migration_006_completed'",
-  )
-  .fetch_one(pool)
-  .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
-
-  if completed == 0 {
-    let migration = include_str!("../migrations/006_create_user_audit_log.sql");
-    sqlx::raw_sql(migration)
-      .execute(pool)
-      .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
-  }
-
-  Ok(())
-}
-
-// Migration 007: RESERVED
-//
-// This migration number is intentionally skipped/reserved.
-// See: `migrations/007_reserved.md` for explanation.
-
-/// Migration 008: Agents table
-async fn apply_migration_008(pool: &SqlitePool) -> Result<()> {
-  let completed: i64 = query_scalar(
-    "SELECT COUNT(*) FROM sqlite_master
-     WHERE type='table' AND name='_migration_008_completed'",
-  )
-  .fetch_one(pool)
-  .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
-
-  if completed == 0 {
-    let migration = include_str!("../migrations/008_create_agents_table.sql");
-    sqlx::raw_sql(migration)
-      .execute(pool)
-      .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
-  }
-
-  Ok(())
-}
-
-/// Migration 009: Budget leases (Protocol 005)
-async fn apply_migration_009(pool: &SqlitePool) -> Result<()> {
-  let completed: i64 = query_scalar(
-    "SELECT COUNT(*) FROM sqlite_master
-     WHERE type='table' AND name='_migration_009_completed'",
-  )
-  .fetch_one(pool)
-  .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
-
-  if completed == 0 {
-    let migration = include_str!("../migrations/009_create_budget_leases.sql");
-    sqlx::raw_sql(migration)
-      .execute(pool)
-      .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
-  }
-
-  Ok(())
-}
-
-/// Migration 010: Agent budgets (Protocol 005)
-async fn apply_migration_010(pool: &SqlitePool) -> Result<()> {
-  let completed: i64 = query_scalar(
-    "SELECT COUNT(*) FROM sqlite_master
-     WHERE type='table' AND name='_migration_010_completed'",
-  )
-  .fetch_one(pool)
-  .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
-
-  if completed == 0 {
-    let migration = include_str!("../migrations/010_create_agent_budgets.sql");
-    sqlx::raw_sql(migration)
-      .execute(pool)
-      .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
-  }
-
-  Ok(())
-}
-
-/// Migration 011: Budget requests (Protocol 012)
-async fn apply_migration_011(pool: &SqlitePool) -> Result<()> {
-  let completed: i64 = query_scalar(
-    "SELECT COUNT(*) FROM sqlite_master
-     WHERE type='table' AND name='_migration_011_completed'",
-  )
-  .fetch_one(pool)
-  .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
-
-  if completed == 0 {
-    let migration = include_str!("../migrations/011_create_budget_requests.sql");
-    sqlx::raw_sql(migration)
-      .execute(pool)
-      .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
-  }
-
-  Ok(())
-}
-
-/// Migration 012: Analytics events table (Protocol 012)
-async fn apply_migration_012(pool: &SqlitePool) -> Result<()> {
-  let completed: i64 = query_scalar(
-    "SELECT COUNT(*) FROM sqlite_master
-     WHERE type='table' AND name='_migration_012_completed'",
-  )
-  .fetch_one(pool)
-  .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
-
-  if completed == 0 {
-    let migration = include_str!("../migrations/012_create_analytics_events.sql");
-    sqlx::raw_sql(migration)
-      .execute(pool)
-      .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
-  }
-
-  Ok(())
-}
-
-/// Migration 013: Budget modification history table (Protocol 017)
-///
-/// Creates `budget_modification_history` table for tracking all budget changes.
-/// Records who changed what budget, by how much, and why.
-async fn apply_migration_013(pool: &SqlitePool) -> Result<()> {
-  let completed: i64 = query_scalar(
-    "SELECT COUNT(*) FROM sqlite_master
-     WHERE type='table' AND name='_migration_013_completed'",
-  )
-  .fetch_one(pool)
-  .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
-
-  if completed == 0 {
-    let migration = include_str!("../migrations/013_create_budget_history.sql");
-    sqlx::raw_sql(migration)
-      .execute(pool)
-      .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
-  }
-
-  Ok(())
-}
-
-/// Migration 014: Add FK constraint from `api_tokens` to users (Protocol 014)
-///
-/// Rebuilds `api_tokens` table with foreign key constraint to users table.
-/// Implements IMPOSSIBLE STATE: "Cannot create token without valid `user_id` (FK constraint fails)"
-async fn apply_migration_014(pool: &SqlitePool) -> Result<()> {
-  let completed: i64 = query_scalar(
-    "SELECT COUNT(*) FROM sqlite_master
-     WHERE type='table' AND name='_migration_014_completed'",
-  )
-  .fetch_one(pool)
-  .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
-
-  if completed == 0 {
-    let migration = include_str!("../migrations/014_add_api_tokens_fk.sql");
-    sqlx::raw_sql(migration)
-      .execute(pool)
-      .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
-  }
-
-  Ok(())
-}
-
-/// Migration 015: Add `owner_id` to agents table
-///
-/// Adds user ownership to agents table for multi-tenant isolation.
-/// Implements authorization requirement: users can only access their own agents.
-async fn apply_migration_015(pool: &SqlitePool) -> Result<()> {
-  let completed: i64 = query_scalar(
-    "SELECT COUNT(*) FROM sqlite_master
-     WHERE type='table' AND name='_migration_015_completed'",
-  )
-  .fetch_one(pool)
-  .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
-
-  if completed == 0 {
-    let migration = include_str!("../migrations/015_add_agents_owner_id.sql");
-    sqlx::raw_sql(migration)
-      .execute(pool)
-      .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
-  }
-
-  Ok(())
-}
-
-/// Migration 016: Add `revoked_at` timestamp to `api_tokens`
-///
-/// Adds timestamp to distinguish explicit revocations from rotations.
-/// Fixes concurrency race condition where revoke returns wrong status code.
-///
-/// Fix(issue-TBD): Enable distinguishing revoked (409) vs rotated (404) tokens
-/// Root cause: `is_active` flag alone cannot distinguish revocation reason
-/// Pitfall: Without this field, concurrent rotate+revoke returns wrong status
-async fn apply_migration_016(pool: &SqlitePool) -> Result<()> {
-  let completed: i64 = query_scalar(
-    "SELECT COUNT(*) FROM sqlite_master
-     WHERE type='table' AND name='_migration_016_completed'",
-  )
-  .fetch_one(pool)
-  .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
-
-  if completed == 0 {
-    let migration = include_str!("../migrations/016_add_revoked_at.sql");
-    sqlx::raw_sql(migration)
-      .execute(pool)
-      .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
-  }
-
-  Ok(())
-}
-
-/// Migration 017: Add lease return columns (Protocol 005)
-///
-/// Adds columns to `budget_leases` for tracking lease returns:
-/// - `returned_amount`: USD returned when lease closed
-/// - `closed_at`: Timestamp when lease was closed
-/// - `updated_at`: Last activity timestamp for stale detection
-async fn apply_migration_017(pool: &SqlitePool) -> Result<()> {
-  // Check if migration has already run using the guard table pattern
-  let completed: i64 = query_scalar(
-    "SELECT COUNT(*) FROM sqlite_master
-     WHERE type='table' AND name='_migration_017_completed'",
-  )
-  .fetch_one(pool)
-  .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
-
-  // Only execute if not previously completed
-  if completed == 0 {
-    // The SQL file handles table creation, data seeding, and guard table creation
-    let migration = include_str!("../migrations/017_add_lease_return_columns.sql");
-
-    sqlx::raw_sql(migration)
-      .execute(pool)
-      .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
-  }
-
-  Ok(())
-}
-
-/// Migration 018: Create `system_config` table and seed development data
-async fn apply_migration_018(pool: &SqlitePool) -> Result<()> {
-  // Check if migration has already run using the guard table pattern
-  let completed: i64 = query_scalar(
-    "SELECT COUNT(*) FROM sqlite_master
-     WHERE type='table' AND name='_migration_018_completed'",
-  )
-  .fetch_one(pool)
-  .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
-
-  // Only execute if not previously completed
-  if completed == 0 {
-    let migration = include_str!("../migrations/018_create_system_config.sql");
-
-    sqlx::raw_sql(migration).execute(pool).await.map_err(|e| {
-      eprintln!("Migration 018 failed: {e:?}");
-      crate::error::TokenError::Generic
-    })?;
-  }
-
-  Ok(())
-}
-
-/// Migration 019: Convert budget columns from REAL (USD) to INTEGER (microdollars)
-async fn apply_migration_019(pool: &SqlitePool) -> Result<()> {
-  // Check if migration has already run using the guard table pattern
-  let completed: i64 = query_scalar(
-    "SELECT COUNT(*) FROM sqlite_master
-     WHERE type='table' AND name='_migration_019_completed'",
-  )
-  .fetch_one(pool)
-  .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
-
-  // Only execute if not previously completed
-  if completed == 0 {
-    // The SQL file handles schema conversion and guard table creation
-    let migration = include_str!("../migrations/019_convert_budgets_to_microdollars.sql");
-
-    sqlx::raw_sql(migration).execute(pool).await.map_err(|e| {
-      eprintln!("Migration 019 failed: {e:?}");
-      crate::error::TokenError::Generic
-    })?;
-  }
-
-  Ok(())
-}
-
-/// Migration 020: Add `provider_key_id` to agents table (Feature 014)
-///
-/// Adds FK from agents to `ai_provider_keys` for provider key assignment.
-/// Each agent can have one assigned provider key.
-async fn apply_migration_020(pool: &SqlitePool) -> Result<()> {
-  let completed: i64 = query_scalar(
-    "SELECT COUNT(*) FROM sqlite_master
-     WHERE type='table' AND name='_migration_020_completed'",
-  )
-  .fetch_one(pool)
-  .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
-
-  if completed == 0 {
-    let migration = include_str!("../migrations/020_add_agent_provider_key_id.sql");
-
-    sqlx::raw_sql(migration).execute(pool).await.map_err(|e| {
-      eprintln!("Migration 020 failed: {e:?}");
-      crate::error::TokenError::Generic
-    })?;
-  }
-
-  Ok(())
-}
-
-/// Migration 021: Add account lockout fields (Protocol 007)
-///
-/// Adds columns to users table for login attempt tracking and lockout:
-/// - `failed_login_count`: Counter for consecutive failed login attempts
-/// - `last_failed_login`: Timestamp of most recent failed login
-/// - `locked_until`: Timestamp when account lockout expires
-async fn apply_migration_021(pool: &SqlitePool) -> Result<()> {
-  let completed: i64 = query_scalar(
-    "SELECT COUNT(*) FROM sqlite_master
-     WHERE type='table' AND name='_migration_021_completed'",
-  )
-  .fetch_one(pool)
-  .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
-
-  if completed == 0 {
-    // Check if columns already exist (for idempotency)
-    let column_exists: i64 = query_scalar(
-      "SELECT COUNT(*) FROM pragma_table_info('users') WHERE name='failed_login_count'",
-    )
-    .fetch_one(pool)
-    .await
-    .map_err(|_| crate::error::TokenError::Generic)?;
-
-    if column_exists == 0 {
-      // Columns don't exist, apply migration
-      let migration = include_str!("../migrations/021_add_account_lockout_fields.sql");
-
-      sqlx::raw_sql(migration).execute(pool).await.map_err(|e| {
-        eprintln!("Migration 021 failed: {e:?}");
-        crate::error::TokenError::Generic
-      })?;
-    } else {
-      // Columns already exist, just create guard table
-      sqlx::query(
-        "CREATE TABLE IF NOT EXISTS _migration_021_completed (applied_at INTEGER NOT NULL)",
-      )
-      .execute(pool)
-      .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
-
-      sqlx::query(
-        "INSERT INTO _migration_021_completed (applied_at) VALUES (strftime('%s', 'now') * 1000)",
-      )
-      .execute(pool)
-      .await
-      .map_err(|_| crate::error::TokenError::Generic)?;
-    }
-  }
-
-  Ok(())
-}
-
-/// Migration 022: Add IC token fields to agents table
-///
-/// Adds columns for IC token storage metadata:
-/// - `ic_token_hash` (TEXT)
-/// - `ic_token_created_at` (INTEGER)
-async fn apply_migration_022(pool: &SqlitePool) -> Result<()> {
-  let completed: i64 = query_scalar(
-    "SELECT COUNT(*) FROM sqlite_master
-     WHERE type='table' AND name='_migration_022_completed'",
-  )
-  .fetch_one(pool)
-  .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
-
-  if completed == 0 {
-    let migration = include_str!("../migrations/022_add_ic_token_to_agents.sql");
-
-    sqlx::raw_sql(migration).execute(pool).await.map_err(|e| {
-      eprintln!("Migration 022 failed: {e:?}");
-      crate::error::TokenError::Generic
-    })?;
-  }
-
-  Ok(())
-}
-
-/// Migration 023: Seed dev IC token hash for `agent_1`
-///
-/// Sets `ic_token_hash`/`ic_token_created_at` for `agent_1` using the pre-generated dev IC token
-/// from migration 018. Safe to run multiple times (only updates when hash is NULL).
-async fn apply_migration_023(pool: &SqlitePool) -> Result<()> {
-  let completed: i64 = query_scalar(
-    "SELECT COUNT(*) FROM sqlite_master
-     WHERE type='table' AND name='_migration_023_completed'",
-  )
-  .fetch_one(pool)
-  .await
-  .map_err(|_| crate::error::TokenError::Generic)?;
-
-  if completed == 0 {
-    let migration = include_str!("../migrations/023_seed_agent1_ic_token.sql");
-
-    sqlx::raw_sql(migration).execute(pool).await.map_err(|e| {
-      eprintln!("Migration 023 failed: {e:?}");
-      crate::error::TokenError::Generic
+    sqlx::raw_sql(sql).execute(pool).await.map_err(|e| {
+      eprintln!("Migration {name} failed: {e:?}");
+      TokenError::Generic
     })?;
   }
 

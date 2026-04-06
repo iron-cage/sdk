@@ -15,18 +15,16 @@
 //! 3. Audit logging for all key fetches (verified via E2E)
 //! 4. API tokens treated as secrets
 
-use crate::common::extract_response;
-use axum::body::Body;
-use axum::{http::Request, routing::get, Router};
 use core::time::Duration;
 use std::sync::Arc;
+
+use axum::{body::Body, http::Request, routing::get, Router};
 use tower::ServiceExt;
 
+use crate::common::{self, test_db};
 use iron_control_api::routes::keys::{get_key, KeyResponse, KeysState};
 use iron_secrets::crypto::CryptoService;
-use iron_token_manager::provider_key_storage::ProviderKeyStorage;
-use iron_token_manager::rate_limiter::RateLimiter;
-use iron_token_manager::storage::TokenStorage;
+use iron_token_manager::{rate_limiter::RateLimiter, storage::TokenStorage};
 
 /// Test master key for cryptographic operations (32 bytes).
 const TEST_MASTER_KEY: [u8; 32] = [
@@ -132,9 +130,7 @@ async fn test_error_message_sanitization() {
     .await
     .expect("LOUD FAILURE: Failed to create token storage");
 
-  let provider_storage = ProviderKeyStorage::connect("sqlite::memory:")
-    .await
-    .expect("LOUD FAILURE: Failed to create provider key storage");
+  let provider_storage = test_db::create_test_provider_storage().await;
 
   let crypto =
     CryptoService::new(&TEST_MASTER_KEY).expect("LOUD FAILURE: Failed to create crypto service");
@@ -161,7 +157,7 @@ async fn test_error_message_sanitization() {
 
   let response = router.oneshot(request).await.unwrap();
 
-  let (_status, body) = extract_response(response).await;
+  let (_status, body) = common::extract_response(response).await;
 
   // Verify error message doesn't contain sensitive info
   assert!(

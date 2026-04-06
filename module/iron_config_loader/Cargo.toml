@@ -38,7 +38,7 @@ toml = { workspace = true, optional = true }
 thiserror = { workspace = true, optional = true }
 
 # System directories
-dirs = { version = "5.0", optional = true }
+dirs = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

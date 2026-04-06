@@ -1,7 +1,8 @@
 //! Tests for `OpenAI` to Anthropic request translation
 
-use iron_runtime::llm_router::translate_openai_to_anthropic;
 use serde_json::{json, Value};
+
+use iron_llm_core::translate_openai_to_anthropic;
 
 #[test]
 fn test_basic_translation() {

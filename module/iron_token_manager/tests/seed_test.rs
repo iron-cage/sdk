@@ -120,7 +120,7 @@ async fn test_seed_users_creates_correct_roles() {
     .fetch_one(&pool)
     .await
     .unwrap();
-  assert_eq!(dev_role, "user", "Demo user should have user role");
+  assert_eq!(dev_role, "manager", "Demo user should have manager role");
 
   // Verify inactive user
   let viewer_active: i64 =

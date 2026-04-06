@@ -77,21 +77,12 @@ log_info "Applying migrations..."
 # Enable foreign keys first
 sqlite3 "$DB_PATH" "PRAGMA foreign_keys = ON;"
 
-# Apply migrations in order
+# Apply all .sql migrations in sorted order
 MIGRATIONS_DIR="$PROJECT_ROOT/migrations"
-for migration_num in 001 002 003 004 005 006 008 009 010 011 012 013 014 015 016 017 018 019 020 021 022 023; do
-  migration_file="$MIGRATIONS_DIR/${migration_num}_*.sql"
-  if ls $migration_file 1> /dev/null 2>&1; then
-    for file in $migration_file; do
-      log_info "Applying $(basename "$file")..."
-      sqlite3 "$DB_PATH" < "$file"
-    done
-  else
-    log_warning "Migration file not found: ${migration_num}_*.sql"
-  fi
+for file in $(ls "$MIGRATIONS_DIR"/*.sql 2>/dev/null | sort); do
+  log_info "Applying $(basename "$file")..."
+  sqlite3 "$DB_PATH" < "$file"
 done
-
-# Note: Migration 007 is intentionally skipped (reserved)
 
 # Verify database structure
 TABLE_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")

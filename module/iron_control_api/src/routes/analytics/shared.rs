@@ -650,9 +650,8 @@ impl AnalyticsState {
       .connect(database_url)
       .await?;
 
-    // Run migration
-    let migration = include_str!("../../../migrations/011_create_analytics_events.sql");
-    sqlx::raw_sql(migration).execute(&pool).await?;
+    // Apply all migrations from the single source of truth (iron_token_manager)
+    iron_token_manager::migrations::apply_all_migrations(&pool).await?;
 
     Ok(Self {
       pool,

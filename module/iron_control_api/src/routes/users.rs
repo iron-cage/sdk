@@ -11,6 +11,9 @@
 //!
 //! All endpoints require Admin role (`ManageUsers` permission).
 
+use core::str::FromStr;
+use std::sync::Arc;
+
 use axum::{
   extract::{Path, Query, State},
   http::StatusCode,
@@ -19,12 +22,12 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Sqlite};
-use std::sync::Arc;
 
-use crate::error::ValidationError;
-use crate::jwt_auth::AuthenticatedUser;
-use crate::rbac::{Permission, PermissionChecker, Role};
-use core::str::FromStr;
+use crate::{
+  error::ValidationError,
+  jwt_auth::AuthenticatedUser,
+  rbac::{Permission, PermissionChecker, Role},
+};
 use iron_token_manager::user_service::{CreateUserParams, ListUsersFilters, User, UserService};
 
 /// State for user management endpoints
@@ -98,11 +101,11 @@ impl CreateUserRequest {
   pub fn validate(&self) -> Result<(), ValidationError> {
     // Username validation
     if self.username.is_empty() {
-      return Err(ValidationError::MissingField("username".to_string()));
+      return Err(ValidationError::MissingField("username".to_owned()));
     }
     if self.username.len() > Self::MAX_USERNAME_LENGTH {
       return Err(ValidationError::TooLong {
-        field: "username".to_string(),
+        field: "username".to_owned(),
         max_length: Self::MAX_USERNAME_LENGTH,
       });
     }
@@ -110,40 +113,42 @@ impl CreateUserRequest {
     // Password validation
     if self.password.len() < Self::MIN_PASSWORD_LENGTH {
       return Err(ValidationError::TooShort {
-        field: "password".to_string(),
+        field: "password".to_owned(),
         min_length: Self::MIN_PASSWORD_LENGTH,
       });
     }
     if self.password.len() > Self::MAX_PASSWORD_LENGTH {
       return Err(ValidationError::TooLong {
-        field: "password".to_string(),
+        field: "password".to_owned(),
         max_length: Self::MAX_PASSWORD_LENGTH,
       });
     }
 
     // Email validation
     if self.email.is_empty() {
-      return Err(ValidationError::MissingField("email".to_string()));
+      return Err(ValidationError::MissingField("email".to_owned()));
     }
     if self.email.len() > Self::MAX_EMAIL_LENGTH {
       return Err(ValidationError::TooLong {
-        field: "email".to_string(),
+        field: "email".to_owned(),
         max_length: Self::MAX_EMAIL_LENGTH,
       });
     }
     if !self.email.contains('@') {
       return Err(ValidationError::InvalidFormat {
-        field: "email".to_string(),
-        expected: "must contain @ symbol".to_string(),
+        field: "email".to_owned(),
+        expected: "must contain @ symbol".to_owned(),
       });
     }
 
     // Role validation
-    let valid_roles = ["viewer", "user", "admin"];
-    if !valid_roles.contains(&self.role.as_str()) {
+    if Role::from_str(&self.role).is_err() {
       return Err(ValidationError::InvalidFormat {
         field: "role".to_string(),
-        expected: format!("one of: {}", valid_roles.join(", ")),
+        expected: format!(
+          "invalid role '{}'. Must be admin, manager, or developer",
+          self.role
+        ),
       });
     }
 
@@ -267,7 +272,7 @@ impl SuspendUserRequest {
     if let Some(ref reason) = self.reason {
       if reason.len() > Self::MAX_REASON_LENGTH {
         return Err(ValidationError::TooLong {
-          field: "reason".to_string(),
+          field: "reason".to_owned(),
           max_length: Self::MAX_REASON_LENGTH,
         });
       }
@@ -290,11 +295,13 @@ impl ChangeRoleRequest {
   ///
   /// Returns [`ValidationError::InvalidFormat`] if the role is not a recognized value.
   pub fn validate(&self) -> Result<(), ValidationError> {
-    let valid_roles = ["viewer", "user", "admin"];
-    if !valid_roles.contains(&self.role.as_str()) {
+    if Role::from_str(&self.role).is_err() {
       return Err(ValidationError::InvalidFormat {
         field: "role".to_string(),
-        expected: format!("one of: {}", valid_roles.join(", ")),
+        expected: format!(
+          "invalid role '{}'. Must be admin, manager, or developer",
+          self.role
+        ),
       });
     }
     Ok(())
@@ -323,13 +330,13 @@ impl ResetPasswordRequest {
   pub fn validate(&self) -> Result<(), ValidationError> {
     if self.new_password.len() < Self::MIN_PASSWORD_LENGTH {
       return Err(ValidationError::TooShort {
-        field: "password".to_string(),
+        field: "password".to_owned(),
         min_length: Self::MIN_PASSWORD_LENGTH,
       });
     }
     if self.new_password.len() > Self::MAX_PASSWORD_LENGTH {
       return Err(ValidationError::TooLong {
-        field: "password".to_string(),
+        field: "password".to_owned(),
         max_length: Self::MAX_PASSWORD_LENGTH,
       });
     }
@@ -354,8 +361,7 @@ pub async fn create_user(
   if let Err(validation_error) = request.validate() {
     return (
       StatusCode::BAD_REQUEST,
-      Json(serde_json::json!
-      ({
+      Json(serde_json::json!({
         "error": validation_error.to_string()
       })),
     )
@@ -363,15 +369,17 @@ pub async fn create_user(
   }
 
   // Check RBAC permission
-  let role = Role::from_str(&claims.role).unwrap_or(Role::User);
+  let role = match crate::rbac::middleware::extract_role_from_claims(&claims) {
+    Ok(r) => r,
+    Err(resp) => return resp.into_response(),
+  };
   if !state
     .permission_checker
     .has_permission(role, Permission::ManageUsers)
   {
     return (
       StatusCode::FORBIDDEN,
-      Json(serde_json::json!
-      ({
+      Json(serde_json::json!({
         "error": "insufficient permissions"
       })),
     )
@@ -399,8 +407,7 @@ pub async fn create_user(
     }
     Err(e) => (
       StatusCode::INTERNAL_SERVER_ERROR,
-      Json(serde_json::json!
-      ({
+      Json(serde_json::json!({
         "error": format!( "failed to create user: {}", e )
       })),
     )
@@ -418,15 +425,17 @@ pub async fn list_users(
   Query(query): Query<ListUsersQuery>,
 ) -> impl IntoResponse {
   // Check RBAC permission
-  let role = Role::from_str(&claims.role).unwrap_or(Role::User);
+  let role = match crate::rbac::middleware::extract_role_from_claims(&claims) {
+    Ok(r) => r,
+    Err(resp) => return resp.into_response(),
+  };
   if !state
     .permission_checker
     .has_permission(role, Permission::ManageUsers)
   {
     return (
       StatusCode::FORBIDDEN,
-      Json(serde_json::json!
-      ({
+      Json(serde_json::json!({
         "error": "insufficient permissions"
       })),
     )
@@ -462,8 +471,7 @@ pub async fn list_users(
     }
     Err(e) => (
       StatusCode::INTERNAL_SERVER_ERROR,
-      Json(serde_json::json!
-      ({
+      Json(serde_json::json!({
         "error": format!( "failed to list users: {}", e )
       })),
     )
@@ -481,15 +489,17 @@ pub async fn get_user(
   Path(user_id): Path<String>,
 ) -> impl IntoResponse {
   // Check RBAC permission
-  let role = Role::from_str(&claims.role).unwrap_or(Role::User);
+  let role = match crate::rbac::middleware::extract_role_from_claims(&claims) {
+    Ok(r) => r,
+    Err(resp) => return resp.into_response(),
+  };
   if !state
     .permission_checker
     .has_permission(role, Permission::ManageUsers)
   {
     return (
       StatusCode::FORBIDDEN,
-      Json(serde_json::json!
-      ({
+      Json(serde_json::json!({
         "error": "insufficient permissions"
       })),
     )
@@ -507,8 +517,7 @@ pub async fn get_user(
     }
     Err(e) => (
       StatusCode::NOT_FOUND,
-      Json(serde_json::json!
-      ({
+      Json(serde_json::json!({
         "error": format!( "user not found: {}", e )
       })),
     )
@@ -530,27 +539,28 @@ pub async fn suspend_user(
   if let Err(validation_error) = request.validate() {
     return (
       StatusCode::BAD_REQUEST,
-      Json(serde_json::json!
-      ({
+      Json(serde_json::json!({
         "error": validation_error.to_string()
       })),
     )
       .into_response();
   }
 
+  // Check RBAC permission
+  let role = match crate::rbac::middleware::extract_role_from_claims(&claims) {
+    Ok(r) => r,
+    Err(resp) => return resp.into_response(),
+  };
+
   // Get admin ID from claims
   let admin_id = claims.sub;
-
-  // Check RBAC permission
-  let role = Role::from_str(&claims.role).unwrap_or(Role::User);
   if !state
     .permission_checker
     .has_permission(role, Permission::ManageUsers)
   {
     return (
       StatusCode::FORBIDDEN,
-      Json(serde_json::json!
-      ({
+      Json(serde_json::json!({
         "error": "insufficient permissions"
       })),
     )
@@ -571,8 +581,7 @@ pub async fn suspend_user(
     }
     Err(e) => (
       StatusCode::INTERNAL_SERVER_ERROR,
-      Json(serde_json::json!
-      ({
+      Json(serde_json::json!({
         "error": format!( "failed to suspend user: {}", e )
       })),
     )
@@ -589,19 +598,21 @@ pub async fn activate_user(
   AuthenticatedUser(claims): AuthenticatedUser,
   Path(user_id): Path<String>,
 ) -> impl IntoResponse {
+  // Check RBAC permission
+  let role = match crate::rbac::middleware::extract_role_from_claims(&claims) {
+    Ok(r) => r,
+    Err(resp) => return resp.into_response(),
+  };
+
   // Get admin ID from claims
   let admin_id = claims.sub;
-
-  // Check RBAC permission
-  let role = Role::from_str(&claims.role).unwrap_or(Role::User);
   if !state
     .permission_checker
     .has_permission(role, Permission::ManageUsers)
   {
     return (
       StatusCode::FORBIDDEN,
-      Json(serde_json::json!
-      ({
+      Json(serde_json::json!({
         "error": "insufficient permissions"
       })),
     )
@@ -619,8 +630,7 @@ pub async fn activate_user(
     }
     Err(e) => (
       StatusCode::INTERNAL_SERVER_ERROR,
-      Json(serde_json::json!
-      ({
+      Json(serde_json::json!({
         "error": format!( "failed to activate user: {}", e )
       })),
     )
@@ -637,19 +647,21 @@ pub async fn delete_user(
   AuthenticatedUser(claims): AuthenticatedUser,
   Path(user_id): Path<String>,
 ) -> impl IntoResponse {
+  // Check RBAC permission
+  let role = match crate::rbac::middleware::extract_role_from_claims(&claims) {
+    Ok(r) => r,
+    Err(resp) => return resp.into_response(),
+  };
+
   // Get admin ID from claims
   let admin_id = claims.sub;
-
-  // Check RBAC permission
-  let role = Role::from_str(&claims.role).unwrap_or(Role::User);
   if !state
     .permission_checker
     .has_permission(role, Permission::ManageUsers)
   {
     return (
       StatusCode::FORBIDDEN,
-      Json(serde_json::json!
-      ({
+      Json(serde_json::json!({
         "error": "insufficient permissions"
       })),
     )
@@ -667,8 +679,7 @@ pub async fn delete_user(
     }
     Err(e) => (
       StatusCode::INTERNAL_SERVER_ERROR,
-      Json(serde_json::json!
-      ({
+      Json(serde_json::json!({
         "error": format!( "failed to delete user: {}", e )
       })),
     )
@@ -679,7 +690,7 @@ pub async fn delete_user(
 /// Change a user's role
 ///
 /// PUT /api/v1/users/{id}/role
-/// Requires: Admin role
+/// Requires: Admin role (`AssignRoles` permission)
 pub async fn change_user_role(
   State(state): State<UserManagementState>,
   AuthenticatedUser(claims): AuthenticatedUser,
@@ -690,27 +701,28 @@ pub async fn change_user_role(
   if let Err(validation_error) = request.validate() {
     return (
       StatusCode::BAD_REQUEST,
-      Json(serde_json::json!
-      ({
+      Json(serde_json::json!({
         "error": validation_error.to_string()
       })),
     )
       .into_response();
   }
 
+  // Check RBAC permission — role assignment is Admin-only
+  let role = match crate::rbac::middleware::extract_role_from_claims(&claims) {
+    Ok(r) => r,
+    Err(resp) => return resp.into_response(),
+  };
+
   // Get admin ID from claims
   let admin_id = claims.sub;
-
-  // Check RBAC permission
-  let role = Role::from_str(&claims.role).unwrap_or(Role::User);
   if !state
     .permission_checker
-    .has_permission(role, Permission::ManageUsers)
+    .has_permission(role, Permission::AssignRoles)
   {
     return (
       StatusCode::FORBIDDEN,
-      Json(serde_json::json!
-      ({
+      Json(serde_json::json!({
         "error": "insufficient permissions"
       })),
     )
@@ -731,8 +743,7 @@ pub async fn change_user_role(
     }
     Err(e) => (
       StatusCode::INTERNAL_SERVER_ERROR,
-      Json(serde_json::json!
-      ({
+      Json(serde_json::json!({
         "error": format!( "failed to change user role: {}", e )
       })),
     )
@@ -754,27 +765,28 @@ pub async fn reset_password(
   if let Err(validation_error) = request.validate() {
     return (
       StatusCode::BAD_REQUEST,
-      Json(serde_json::json!
-      ({
+      Json(serde_json::json!({
         "error": validation_error.to_string()
       })),
     )
       .into_response();
   }
 
+  // Check RBAC permission
+  let role = match crate::rbac::middleware::extract_role_from_claims(&claims) {
+    Ok(r) => r,
+    Err(resp) => return resp.into_response(),
+  };
+
   // Get admin ID from claims
   let admin_id = claims.sub;
-
-  // Check RBAC permission
-  let role = Role::from_str(&claims.role).unwrap_or(Role::User);
   if !state
     .permission_checker
     .has_permission(role, Permission::ManageUsers)
   {
     return (
       StatusCode::FORBIDDEN,
-      Json(serde_json::json!
-      ({
+      Json(serde_json::json!({
         "error": "insufficient permissions"
       })),
     )
@@ -796,8 +808,7 @@ pub async fn reset_password(
     }
     Err(e) => (
       StatusCode::INTERNAL_SERVER_ERROR,
-      Json(serde_json::json!
-      ({
+      Json(serde_json::json!({
         "error": format!( "failed to reset password: {}", e )
       })),
     )

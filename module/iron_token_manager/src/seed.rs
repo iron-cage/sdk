@@ -186,7 +186,7 @@ fn demo_users() -> Vec<SeedUser> {
       id: "user_demo",
       username: "demo",
       email: "demo@ironcage.ai",
-      role: "user",
+      role: "manager",
       is_active: true,
       days_ago: 0,
     },
@@ -194,7 +194,7 @@ fn demo_users() -> Vec<SeedUser> {
       id: "user_viewer",
       username: "viewer",
       email: "viewer@ironcage.ai",
-      role: "user",
+      role: "developer",
       is_active: false,
       days_ago: 0,
     },
@@ -202,7 +202,7 @@ fn demo_users() -> Vec<SeedUser> {
       id: "user_tester",
       username: "tester",
       email: "tester@ironcage.ai",
-      role: "user",
+      role: "manager",
       is_active: true,
       days_ago: 7,
     },
@@ -210,7 +210,7 @@ fn demo_users() -> Vec<SeedUser> {
       id: "user_guest",
       username: "guest",
       email: "guest@ironcage.ai",
-      role: "user",
+      role: "manager",
       is_active: true,
       days_ago: 0,
     },
@@ -221,10 +221,10 @@ fn demo_users() -> Vec<SeedUser> {
 ///
 /// Creates 5 demo users (only when `ENABLE_DEMO_SEED=true`):
 /// - `admin@ironcage.ai` (admin, active)
-/// - `demo@ironcage.ai` (user, active)
-/// - `viewer@ironcage.ai` (user, inactive — for revocation testing)
-/// - `tester@ironcage.ai` (user, active)
-/// - `guest@ironcage.ai` (user, active)
+/// - `demo@ironcage.ai` (manager, active)
+/// - `viewer@ironcage.ai` (developer, inactive - for revocation testing)
+/// - `tester@ironcage.ai` (manager, active)
+/// - `guest@ironcage.ai` (manager, active)
 /// - Password: `IronDemo2025!`
 ///
 /// # Errors

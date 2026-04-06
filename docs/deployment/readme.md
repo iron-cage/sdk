@@ -47,4 +47,5 @@
 ```
 
 *For operational procedures, see [deployment_guide.md](../deployment_guide.md)*
+*For server-proxy deployment runbook, see [deployment.md](../deployment.md)*
 <!-- TODO: Add module package matrix documentation -->

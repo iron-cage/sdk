@@ -36,7 +36,6 @@ sqlx = { workspace = true, optional = true, features = ["sqlite", "runtime-tokio
 
 # Serialization
 serde = { workspace = true, optional = true, features = ["derive"] }
-serde_json = { workspace = true, optional = true }
 
 # Async runtime
 tokio = { workspace = true, optional = true, features = ["full"] }

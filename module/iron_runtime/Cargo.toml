@@ -23,6 +23,7 @@ enabled = [
   "dep:iron_cost",
   "dep:iron_reliability",
   "dep:iron_secrets",
+  "dep:iron_llm_core",
   "dep:zeroize",
   "dep:secrecy",
   "dep:hex",
@@ -49,6 +50,7 @@ iron_cost = { workspace = true, optional = true, features = ["full"] }
 iron_reliability = { workspace = true, optional = true, features = ["full"] }
 iron_secrets = { workspace = true, optional = true }
 iron_runtime_analytics = { workspace = true, optional = true, features = ["full"] }
+iron_llm_core = { workspace = true, optional = true }
 
 # Note: PyO3 moved to iron_sdk (ADR-010)
 
@@ -81,6 +83,7 @@ secrecy = { workspace = true, optional = true }
 
 # Logging
 tracing = { workspace = true, optional = true }
+futures-util = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }

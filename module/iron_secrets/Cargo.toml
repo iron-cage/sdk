@@ -33,9 +33,6 @@ enabled = [
 full = ["enabled"]
 
 [dependencies]
-# Workspace crates (always available)
-iron_types = { workspace = true }
-
 # Workspace crates (feature-gated)
 iron_runtime_state = { workspace = true, optional = true }
 
@@ -61,7 +58,3 @@ tracing = { workspace = true, optional = true }
 
 # Modularity
 mod_interface = { workspace = true, optional = true }
-
-[dev-dependencies]
-tempfile = { workspace = true }
-criterion = { workspace = true }
