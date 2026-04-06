@@ -59,7 +59,7 @@ export function generateProviderAlias(
   for (const k of existingKeys) {
     if (k.provider !== provider) continue
     const m = k.alias?.match(re)
-    if (m) max = Math.max(max, parseInt(m[1], 10))
+    if (m) max = Math.max(max, parseInt(m[1]!, 10))
   }
   return `${label} ${max + 1}`
 }
