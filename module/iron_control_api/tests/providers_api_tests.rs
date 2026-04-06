@@ -1,10 +1,28 @@
 //! Integration tests for providers API: RBAC, validation, happy paths, ownership.
 //!
-//! Covers:
-//! - RBAC: developer role blocked from mutating endpoints (403)
-//! - Input validation: create rejects empty/too-long/invalid api_key and provider
-//! - Happy paths: update, delete, assign/unassign all return correct status codes
-//! - Ownership: another user's key returns 404 (GET/PUT/DELETE) or 403 (unassign)
+//! Test Matrix:
+//! | Test Name                          | Purpose                    | Verification       |
+//! |------------------------------------|----------------------------|--------------------|
+//! | list_…_requires_manage_permission  | RBAC: dev cannot list      | 403 Forbidden      |
+//! | get_…_requires_manage_permission   | RBAC: dev cannot get       | 403 Forbidden      |
+//! | update_…_requires_manage_perm      | RBAC: dev cannot update    | 403 Forbidden      |
+//! | delete_…_requires_manage_perm      | RBAC: dev cannot delete    | 403 Forbidden      |
+//! | assign_requires_manage_permission  | RBAC: dev cannot assign    | 403 Forbidden      |
+//! | unassign_requires_manage_perm      | RBAC: dev cannot unassign  | 403 Forbidden      |
+//! | create_rejects_empty_api_key       | Empty api_key rejected     | 400 Bad Request    |
+//! | create_rejects_api_key_too_long    | 501-char api_key rejected  | 400 Bad Request    |
+//! | create_rejects_null_byte_in_key    | NULL byte in key rejected  | 400 Bad Request    |
+//! | create_rejects_invalid_provider    | Unknown provider rejected  | 400 Bad Request    |
+//! | create_rejects_description_long    | 501-char desc rejected     | 400 Bad Request    |
+//! | create_disabled_without_master_key | No crypto → 503            | 503 Unavailable    |
+//! | update_provider_key_success        | Update desc & is_enabled   | 200 OK w/ updates  |
+//! | delete_provider_key_success        | Delete then GET → 404      | 204 then 404       |
+//! | assign_and_unassign_project_prov   | Assign then unassign       | 200 then 204       |
+//! | get_…_returns_404_for_wrong_owner  | Wrong owner GET            | 404 Not Found      |
+//! | update_…_404_for_wrong_owner       | Wrong owner PUT            | 404 Not Found      |
+//! | delete_…_404_for_wrong_owner       | Wrong owner DELETE         | 404 Not Found      |
+//! | unassign_403_for_wrong_owner       | Non-owner unassign         | 403 Forbidden      |
+//! | cross_tenant_project_assign_reject | Cross-tenant assign        | 404 Not Found      |
 
 #![allow(missing_docs)]
 

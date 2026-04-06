@@ -12,7 +12,8 @@ tests/
 ├── common/
 │   ├── mod.rs              # Test helpers and shared utilities
 │   ├── fixtures.rs         # Test data factories
-│   └── test_state.rs       # Test state builders (DB, Auth, App state)
+│   ├── test_state.rs       # Test state builders (DB, Auth, App state)
+│   └── providers.rs        # Shared helpers for provider test setup
 ├── auth/
 │   ├── login.rs            # Login endpoint tests
 │   └── validation.rs       # Auth validation tests
@@ -47,7 +48,9 @@ tests/
 │   └── readme.md           # Manual testing procedures (416 lines, covers FR-7/8/9)
 ├── api_test.rs             # API integration tests
 ├── integration_tests.rs    # Full integration test suite
-└── rbac.rs                 # RBAC middleware tests
+├── rbac.rs                 # RBAC middleware tests
+├── providers_api_tests.rs  # Integration tests for providers API (RBAC, validation, ownership)
+└── providers_multi_key_tests.rs # Integration tests for multi-key provider support
 ```
 
 ## Responsibility Table
@@ -61,6 +64,7 @@ tests/
 | `limits/` | Test budget limits CRUD and validation | Limits scenarios → Constraint validation | NOT tokens (tokens/), NOT usage analytics (usage/), NOT integration flows (integration_tests.rs) |
 | `auth/` | Test authentication and authorization flows | Auth scenarios → Security validation | NOT token operations (tokens/), NOT business logic (tokens/, usage/, limits/), NOT RBAC middleware (rbac.rs), NOT integration (integration_tests.rs) |
 | `common/` | Provide shared test infrastructure and helpers | Test needs → Reusable utilities | NOT domain tests (tokens/, usage/, limits/), NOT integration tests (integration_tests.rs), NOT manual tests (manual/) |
+| `common/providers.rs` | Provide shared helpers for provider test setup | Provider test needs → Reusable provider utilities | NOT domain tests (tokens/, usage/, limits/), NOT integration tests (integration_tests.rs) |
 | `manual/` | Document manual testing procedures | Test procedures → Manual validation steps | NOT automated tests (tokens/, usage/, limits/), NOT test infrastructure (common/), NOT integration (integration_tests.rs) |
 | `integration_tests.rs` | Test full API integration across endpoints | Integration scenarios → End-to-end validation | NOT domain-specific details (tokens/, usage/, limits/), NOT auth internals (auth/), NOT manual procedures (manual/) |
 | `rbac.rs` | Test role-based access control middleware | RBAC scenarios → Authorization validation | NOT auth flows (auth/), NOT endpoint logic (tokens/, usage/, limits/), NOT integration (integration_tests.rs) |
@@ -88,6 +92,8 @@ tests/
 | `test_no_url_redirect.rs` | Validate url_redirect middleware deletion | Source code → NEGATIVE ACCEPTANCE validation | NOT endpoint tests (tokens/, auth/), NOT integration (integration_tests.rs), NOT manual (manual/) |
 | `test_cors_configuration.rs` | Validate CORS configuration via environment variable | Source code → Environment variable enforcement | NOT endpoint tests (tokens/, auth/), NOT integration (integration_tests.rs), NOT manual (manual/) |
 | `test_server_port_configuration.rs` | Validate server port via environment variable | Source code → Environment variable enforcement | NOT endpoint tests (tokens/, auth/), NOT integration (integration_tests.rs), NOT manual (manual/) |
+| `providers_api_tests.rs` | Integration tests for providers API: RBAC, validation, happy paths, ownership | Provider API scenarios → RBAC and validation results | NOT multi-key (providers_multi_key_tests.rs), NOT tokens (tokens/), NOT budget (budget_*), NOT auth (auth/) |
+| `providers_multi_key_tests.rs` | Integration tests for multi-key provider support: quota, cross-tenant, handshake | Multi-key scenarios → Quota and isolation validation | NOT single-key API (providers_api_tests.rs), NOT tokens (tokens/), NOT budget (budget_*), NOT auth (auth/) |
 
 ## Test Coverage Summary
 

@@ -334,7 +334,9 @@ pub async fn create_provider_key(
 
   check_manage_provider_keys(&claims.role)?;
 
-  //qqq: [Low] 503 implies transient failure — 501 Not Implemented is more accurate for a missing configuration
+  // qqq: [Low] 503 implies transient failure —
+  // 501 Not Implemented is more accurate for a missing
+  // configuration
   let crypto = state.crypto.as_ref().ok_or_else(|| {
     ApiError::ServiceUnavailable(
       "AI Provider Keys feature is disabled. Set IRON_SECRETS_MASTER_KEY to enable.".into(),
@@ -431,7 +433,16 @@ pub async fn list_provider_keys(
   };
 
   let key_ids: Vec<i64> = keys.iter().map(|m| m.id).collect();
-  let mut all_projects = state.storage.get_all_key_projects(&key_ids).await.unwrap_or_default();
+  let mut all_projects = state
+    .storage
+    .get_all_key_projects(&key_ids)
+    .await
+    .unwrap_or_else(|e| {
+      tracing::error!(
+        "Failed to fetch project assignments: {e}"
+      );
+      std::collections::HashMap::new()
+    });
   let mut responses: Vec<ProviderKeyResponse> = Vec::with_capacity(keys.len());
   for meta in keys {
     let assigned_projects = all_projects.remove(&meta.id).unwrap_or_default();
@@ -548,7 +559,9 @@ pub async fn update_provider_key(
   // Apply all field updates atomically via update_key_fields.
   // description is Option<Option<String>>: None = skip, Some(None) = clear, Some(Some(s)) = set.
   let description = request.description.as_ref().map(|opt| opt.as_deref());
-  //qqq: [Low] empty string is a sentinel to clear base_url — undocumented and inconsistent with description field semantics
+  // qqq: [Low] empty string is a sentinel to clear
+  // base_url — undocumented and inconsistent with
+  // description field semantics
   let base_url = request.base_url.as_deref().map(|u| if u.is_empty() { None } else { Some(u) });
 
   // Validate and convert spending cap: None = skip, Some(None) = remove, Some(Some(v)) = set.
@@ -721,7 +734,9 @@ pub async fn assign_provider_to_project(
     }
   }
 
-  //qqq: [Medium] no UNIQUE(project_id) constraint — a project can accumulate multiple key assignments; active key is resolved by most-recent assigned_at
+  // qqq: [Medium] no UNIQUE(project_id) constraint —
+  // a project can accumulate multiple key assignments;
+  // active key is resolved by most-recent assigned_at
   // Assign to project
   match state
     .storage
@@ -788,7 +803,9 @@ pub async fn unassign_provider_from_project(
       .into_response();
   };
 
-  //qqq: [Low] returns 403 on wrong owner; assign returns 404 — inconsistent; 404 is preferable to not leak key existence
+  // qqq: [Low] returns 403 on wrong owner; assign
+  // returns 404 — inconsistent; 404 is preferable
+  // to not leak key existence
   // aaa: Fixed — now returns 404, consistent with get/update/delete/assign endpoints.
   if metadata.user_id != claims.sub {
     return (

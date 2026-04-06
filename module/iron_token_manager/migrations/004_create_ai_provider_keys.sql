@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS ai_provider_keys
   provider TEXT NOT NULL CHECK ( provider IN ( 'openai', 'anthropic' ) ),
 
   -- Encrypted API key (AES-256-GCM encrypted, base64 encoded)
-  -- //qqq: [Low] no non-empty CHECK — empty string satisfies NOT NULL
+  -- // qqq: [Low] no non-empty CHECK — empty string satisfies NOT NULL
   encrypted_api_key TEXT NOT NULL,
 
   -- Encryption nonce (12 bytes, base64 encoded)
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS ai_provider_keys
 );
 
 -- Indexes for common queries
--- //qqq: [Low] superseded by composite index in migration 026 — drop in a follow-up migration
+-- // qqq: [Low] superseded by composite index in migration 026 — drop in a follow-up migration
 CREATE INDEX IF NOT EXISTS idx_ai_provider_keys_user_id ON ai_provider_keys( user_id );
 CREATE INDEX IF NOT EXISTS idx_ai_provider_keys_provider ON ai_provider_keys( provider );
 CREATE INDEX IF NOT EXISTS idx_ai_provider_keys_is_enabled ON ai_provider_keys( is_enabled );

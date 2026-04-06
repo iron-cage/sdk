@@ -25,7 +25,9 @@ use sqlx::{Row, SqlitePool};
 use crate::jwt_auth::AuthenticatedUser;
 
 /// Parse role from claims, returning 401 for unrecognized roles.
-fn parse_role(claims: &crate::jwt_auth::AccessTokenClaims) -> Result<crate::rbac::Role, (StatusCode, String)> {
+fn parse_role(
+  claims: &crate::jwt_auth::AccessTokenClaims,
+) -> Result<crate::rbac::Role, (StatusCode, String)> {
   use core::str::FromStr;
   crate::rbac::Role::from_str(&claims.role)
     .map_err(|_| (StatusCode::UNAUTHORIZED, format!("Unrecognized role: {}", claims.role)))

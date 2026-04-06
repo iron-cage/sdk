@@ -1,12 +1,18 @@
 //! Integration tests for multi-key provider support (Task 002)
 //!
-//! Verifies:
-//! - Two POSTs for the same provider create two distinct keys (no upsert)
-//! - Cross-tenant isolation: user B cannot overwrite user A's key
-//! - Quota limit: 429 after 20 keys per user per provider
-//! - Handshake uses agent's assigned key when provider_key_id is omitted
-//! - Handshake rejects explicit provider_key_id owned by another user (403)
-//! - Handshake returns 403 when agent has no assigned key and none is provided
+//! Test Matrix:
+//! | Test Name                            | Purpose                      | Verification                |
+//! |--------------------------------------|------------------------------|-----------------------------|
+//! | post_providers_creates_new_key       | Two POSTs → two distinct IDs | 201 with different IDs      |
+//! | post_providers_cross_tenant          | User B POST ≠ user A key     | Distinct IDs, ownership ok  |
+//! | post_providers_quota_limit           | 21st key rejected            | 429 Too Many Requests       |
+//! | handshake_uses_agent_assigned_key    | Resolves agent-assigned key  | 200, ip_token matches key   |
+//! | handshake_rejects_cross_tenant_key   | Other user's key rejected    | 403 UNAUTHORIZED_KEY_ACCESS |
+//! | handshake_no_assigned_key_403        | No assigned or explicit key  | 403 NO_PROVIDER_ASSIGNED    |
+//! | dev_key_creation_requires_flag       | agent 1 w/o DEV_KEYS flag    | 403 NO_PROVIDER_ASSIGNED    |
+//! | dev_key_creation_works_with_flag     | agent 1 w/ DEV_KEYS flag     | 200 w/ non-empty ip_token   |
+//! | toctou_recheck_fails_wrong_owner     | Key owner ≠ agent owner      | 403, budget unchanged       |
+//! | fails_after_assigned_key_deleted     | Key hard-deleted then shake  | 403/404, budget unchanged   |
 
 #![allow(missing_docs)]
 
@@ -254,7 +260,9 @@ async fn test_handshake_uses_agent_assigned_key() {
   let encrypted = crypto.encrypt("sk-agent-assigned-key").unwrap();
   let provider_key_id: i64 = 9001;
   sqlx::query(
-    "INSERT INTO ai_provider_keys (id, provider, encrypted_api_key, encryption_nonce, is_enabled, created_at, user_id)
+    "INSERT INTO ai_provider_keys \
+     (id, provider, encrypted_api_key, encryption_nonce, \
+      is_enabled, created_at, user_id) \
      VALUES (?, ?, ?, ?, ?, ?, ?)",
   )
   .bind(provider_key_id)
@@ -286,7 +294,9 @@ async fn test_handshake_uses_agent_assigned_key() {
 
   // Seed agent budget
   sqlx::query(
-    "INSERT OR IGNORE INTO agent_budgets (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at)
+    "INSERT OR IGNORE INTO agent_budgets \
+     (agent_id, total_allocated, total_spent, \
+      budget_remaining, created_at, updated_at) \
      VALUES (?, ?, 0, ?, ?, ?)",
   )
   .bind(agent_id)
@@ -300,7 +310,10 @@ async fn test_handshake_uses_agent_assigned_key() {
 
   // Seed usage limits for owner_h1
   sqlx::query(
-    "INSERT OR IGNORE INTO usage_limits (user_id, max_cost_microdollars_per_month, current_cost_microdollars_this_month, created_at, updated_at)
+    "INSERT OR IGNORE INTO usage_limits \
+     (user_id, max_cost_microdollars_per_month, \
+      current_cost_microdollars_this_month, \
+      created_at, updated_at) \
      VALUES (?, ?, 0, ?, ?)",
   )
   .bind("owner_h1")
@@ -381,7 +394,9 @@ async fn test_handshake_rejects_cross_tenant_explicit_key() {
   let crypto = state.crypto_service.as_ref().unwrap();
   let encrypted = crypto.encrypt("sk-other-user-key").unwrap();
   sqlx::query(
-    "INSERT INTO ai_provider_keys (id, provider, encrypted_api_key, encryption_nonce, is_enabled, created_at, user_id)
+    "INSERT INTO ai_provider_keys \
+     (id, provider, encrypted_api_key, encryption_nonce, \
+      is_enabled, created_at, user_id) \
      VALUES (?, ?, ?, ?, ?, ?, ?)",
   )
   .bind(other_key_id)
@@ -411,7 +426,9 @@ async fn test_handshake_rejects_cross_tenant_explicit_key() {
 
   // Seed agent budget
   sqlx::query(
-    "INSERT OR IGNORE INTO agent_budgets (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at)
+    "INSERT OR IGNORE INTO agent_budgets \
+     (agent_id, total_allocated, total_spent, \
+      budget_remaining, created_at, updated_at) \
      VALUES (?, ?, 0, ?, ?, ?)",
   )
   .bind(agent_id)
@@ -424,7 +441,10 @@ async fn test_handshake_rejects_cross_tenant_explicit_key() {
   .unwrap();
 
   sqlx::query(
-    "INSERT OR IGNORE INTO usage_limits (user_id, max_cost_microdollars_per_month, current_cost_microdollars_this_month, created_at, updated_at)
+    "INSERT OR IGNORE INTO usage_limits \
+     (user_id, max_cost_microdollars_per_month, \
+      current_cost_microdollars_this_month, \
+      created_at, updated_at) \
      VALUES (?, ?, 0, ?, ?)",
   )
   .bind("owner_h2")
@@ -509,7 +529,9 @@ async fn test_handshake_no_assigned_key_returns_403() {
   .unwrap();
 
   sqlx::query(
-    "INSERT OR IGNORE INTO agent_budgets (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at)
+    "INSERT OR IGNORE INTO agent_budgets \
+     (agent_id, total_allocated, total_spent, \
+      budget_remaining, created_at, updated_at) \
      VALUES (?, ?, 0, ?, ?, ?)",
   )
   .bind(agent_id)
@@ -522,7 +544,10 @@ async fn test_handshake_no_assigned_key_returns_403() {
   .unwrap();
 
   sqlx::query(
-    "INSERT OR IGNORE INTO usage_limits (user_id, max_cost_microdollars_per_month, current_cost_microdollars_this_month, created_at, updated_at)
+    "INSERT OR IGNORE INTO usage_limits \
+     (user_id, max_cost_microdollars_per_month, \
+      current_cost_microdollars_this_month, \
+      created_at, updated_at) \
      VALUES (?, ?, 0, ?, ?)",
   )
   .bind("owner_h3")

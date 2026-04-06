@@ -138,9 +138,10 @@ pub async fn handshake(
     return (
       StatusCode::BAD_REQUEST,
       Json(serde_json::json!(
-    {
-      "error": validation_error.to_string()
-    } )),
+      {
+        "error": validation_error.to_string()
+      }
+      )),
     )
       .into_response();
   }
@@ -179,7 +180,9 @@ pub async fn handshake(
     let now_ms = chrono::Utc::now().timestamp_millis();
     let result = sqlx::query(
       "INSERT INTO ai_provider_keys \
-       (provider, encrypted_api_key, encryption_nonce, base_url, description, is_enabled, created_at, user_id) \
+       (provider, encrypted_api_key, encryption_nonce, \
+       base_url, description, is_enabled, \
+       created_at, user_id) \
        VALUES (?, ?, ?, ?, ?, 1, ?, ?)"
     )
     .bind( provider_type.as_str() )
@@ -268,7 +271,9 @@ pub async fn handshake(
 
     let now_ms = chrono::Utc::now().timestamp_millis();
     if let Err( err ) = sqlx::query(
-      "INSERT INTO agent_budgets (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at)
+      "INSERT INTO agent_budgets \
+       (agent_id, total_allocated, total_spent, \
+       budget_remaining, created_at, updated_at) \
        VALUES (?, ?, 0, ?, ?, ?)"
     )
     .bind( agent_id )
@@ -315,7 +320,9 @@ pub async fn handshake(
   #[allow(clippy::single_match_else)] // deeply nested; if-let is less readable here
   let key_id_pre = match request.provider_key_id {
     Some(id) => {
-      //qqq: [Medium] pre-check verifies ownership only; is_enabled and provider match not checked here — budget reserved before those are validated below
+      // qqq: [Medium] pre-check verifies ownership only; is_enabled and
+      // provider match not checked here — budget reserved before those
+      // are validated below
       // Ownership check: key must belong to agent's owner
       match state.provider_key_storage.get_key_metadata(id).await {
         Ok(meta) if meta.user_id == owner_for_key => id,
@@ -345,7 +352,11 @@ pub async fn handshake(
     }
     None => {
       // Use the provider key assigned to this agent
-      let assigned_key_id: Option<i64> = match state.provider_key_storage.get_agent_provider_key_id(agent_id).await {
+      let assigned_key_id: Option<i64> = match state
+        .provider_key_storage
+        .get_agent_provider_key_id(agent_id)
+        .await
+      {
         Ok(id) => id,
         Err(err) => {
           tracing::error!("Database error fetching agent provider_key_id: {}", err);
@@ -368,14 +379,19 @@ pub async fn handshake(
             );
             match create_dev_provider_key_for_agent1(&state, provider_type, &owner_for_key).await {
               Ok(new_id) => {
-                //qqq: [Medium] if UPDATE fails the new key is created but unlinked — next handshake creates another orphan key; consider making this a hard error
+                // qqq: [Medium] if UPDATE fails the new key is created
+                // but unlinked — next handshake creates another orphan
+                // key; consider making this a hard error
                 if let Err(e) = sqlx::query("UPDATE agents SET provider_key_id = ? WHERE id = ?")
                   .bind(new_id)
                   .bind(agent_id)
                   .execute(&state.db_pool)
                   .await
                 {
-                  tracing::warn!("IRON_ALLOW_DEV_KEYS: failed to link dev key {} to agent {}: {}", new_id, agent_id, e);
+                  tracing::warn!(
+                    "IRON_ALLOW_DEV_KEYS: failed to link dev key {} to agent {}: {}",
+                    new_id, agent_id, e
+                  );
                 }
                 new_id
               }
@@ -468,7 +484,9 @@ pub async fn handshake(
   // separate operations. Always use atomic operations (SELECT FOR UPDATE + UPDATE in single
   // transaction) for check-then-act patterns on shared resources.
 
-  //qqq: [Medium] spending_cap_microdollars on the provider key is NOT checked here — cap is only enforced at the proxy layer; a lease can be issued for a key already at its cap
+  // qqq: [Medium] spending_cap_microdollars on the provider key is NOT
+  // checked here — cap is only enforced at the proxy layer; a lease
+  // can be issued for a key already at its cap
   // aaa: Addressed — reserve_spending atomically checks cap before incrementing.
   // If the key is at cap, reserve_spending fails and the handshake is rejected.
   let budget_to_grant = match state
@@ -492,10 +510,11 @@ pub async fn handshake(
         Json(serde_json::json!(
         {
           "error": "Budget limit exceeded",
-          "total_allocated": agent_budget.as_ref().map( | b | b.total_allocated ),
-          "total_spent": agent_budget.as_ref().map( | b | b.total_spent ),
-          "budget_remaining": agent_budget.as_ref().map( | b | b.budget_remaining )
-        } )),
+          "total_allocated": agent_budget.as_ref().map(|b| b.total_allocated),
+          "total_spent": agent_budget.as_ref().map(|b| b.total_spent),
+          "budget_remaining": agent_budget.as_ref().map(|b| b.budget_remaining)
+        }
+        )),
       )
         .into_response();
     }
@@ -542,8 +561,11 @@ pub async fn handshake(
     &key_record.encryption_nonce,
   ) else {
     tracing::error!("Failed to decode provider key base64");
-    //qqq: [Medium] refund failure is logged but swallowed — budget permanently leaked if DB is down; no compensation queue or audit reconciliation
-    // aaa: Known limitation — refund both agent budget and provider key spending (reserve_spending already ran).
+    // qqq: [Medium] refund failure is logged but swallowed — budget
+    // permanently leaked if DB is down; no compensation queue or
+    // audit reconciliation
+    // aaa: Known limitation — refund both agent budget and provider
+    // key spending (reserve_spending already ran).
     if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
       tracing::error!("Failed to refund reserved budget after key base64 decode failure: {}", e);
     }
@@ -578,8 +600,11 @@ pub async fn handshake(
 
   // Encrypt provider API key into IP Token
   let Ok(ip_token) = state.ip_token_crypto.encrypt(&provider_key) else {
-    //qqq: [Medium] refund failure is logged but swallowed — budget permanently leaked if DB is down; no compensation queue or audit reconciliation
-    // aaa: Known limitation — refund both agent budget and provider key spending (reserve_spending already ran).
+    // qqq: [Medium] refund failure is logged but swallowed — budget
+    // permanently leaked if DB is down; no compensation queue or
+    // audit reconciliation
+    // aaa: Known limitation — refund both agent budget and provider
+    // key spending (reserve_spending already ran).
     if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
       tracing::error!("Failed to refund reserved budget after IP token encryption failure: {}", e);
     }
@@ -600,8 +625,11 @@ pub async fn handshake(
   // Both are now in microdollars - no conversion needed
   if let Err( err ) = state.provider_key_storage.increment_usage_limits(&owner_id, budget_to_grant).await {
     tracing::error!( "Database error updating usage_limits: {}", err );
-    //qqq: [Medium] refund failure is logged but swallowed — budget permanently leaked if DB is down; no compensation queue or audit reconciliation
-    // aaa: Known limitation — refund both agent budget and provider key spending (reserve_spending already ran).
+    // qqq: [Medium] refund failure is logged but swallowed — budget
+    // permanently leaked if DB is down; no compensation queue or
+    // audit reconciliation
+    // aaa: Known limitation — refund both agent budget and provider
+    // key spending (reserve_spending already ran).
     if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
       tracing::error!("Failed to refund reserved budget after usage_limits update failure: {}", e);
     }
@@ -625,8 +653,11 @@ pub async fn handshake(
     .await
   {
     tracing::error!("Database error creating lease: {}", err);
-    //qqq: [Medium] refund failure is logged but swallowed — budget permanently leaked if DB is down; no compensation queue or audit reconciliation
-    // aaa: Known limitation — refund both agent budget and provider key spending (reserve_spending already ran).
+    // qqq: [Medium] refund failure is logged but swallowed — budget
+    // permanently leaked if DB is down; no compensation queue or
+    // audit reconciliation
+    // aaa: Known limitation — refund both agent budget and provider
+    // key spending (reserve_spending already ran).
     if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
       tracing::error!("Failed to refund reserved budget after lease creation failure: {}", e);
     }
@@ -635,7 +666,10 @@ pub async fn handshake(
     }
     // usage_limits was already debited above; attempt a compensating reversal
     if let Err(e) = sqlx::query(
-      "UPDATE usage_limits SET current_cost_microdollars_this_month = current_cost_microdollars_this_month - ? WHERE user_id = ?"
+      "UPDATE usage_limits \
+       SET current_cost_microdollars_this_month = \
+       current_cost_microdollars_this_month - ? \
+       WHERE user_id = ?"
     )
     .bind(budget_to_grant)
     .bind(&owner_id)
