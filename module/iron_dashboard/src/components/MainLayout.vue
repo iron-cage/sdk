@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { useAuthStore } from '../stores/auth'
+import { useAuthStore } from '@/stores/auth'
 import AvatarInitial from './AvatarInitial.vue'
 import IconX from './icons/IconX.vue'
 import IconHome from './icons/IconHome.vue'

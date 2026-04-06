@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
-import { useApi, type ProviderKey, type ProviderType } from '../composables/useApi'
+import { useApi, type ProviderKey, type ProviderType } from '@/composables/useApi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -41,7 +41,7 @@ import IconEdit from '@/components/icons/IconEdit.vue'
 import PageLayout from '@/components/PageLayout.vue'
 import DataTable from '@/components/DataTable.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
-import Switch from '@/components/ui/switch/Switch.vue'
+import { Switch } from '@/components/ui/switch'
 
 const api = useApi()
 const queryClient = useQueryClient()

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
-import { useApi, type AnalyticsPeriod, type AnalyticsEvent, type AgentSpending } from '../composables/useApi'
+import { useApi, type AnalyticsPeriod, type AnalyticsEvent, type AgentSpending } from '@/composables/useApi'
 import IconChip from '@/components/icons/IconChip.vue'
 import { Button } from '@/components/ui/button'
 import {

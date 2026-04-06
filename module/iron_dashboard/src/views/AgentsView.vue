@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/vue-query'
-import { useApi, type Agent, type IcTokenStatus } from '../composables/useApi'
+import { useApi, type Agent, type IcTokenStatus } from '@/composables/useApi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -29,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useAuthStore } from '../stores/auth'
+import { useAuthStore } from '@/stores/auth'
 import { formatTimestamp } from '@/lib/formatters'
 import { useConfirm } from '@/composables/useConfirm'
 import StatusBadge from '@/components/StatusBadge.vue'

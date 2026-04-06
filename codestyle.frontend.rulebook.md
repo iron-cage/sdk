@@ -1088,9 +1088,9 @@ const router = createRouter({
 
 ### Routing & Navigation Guards : Route Meta for Auth and Role Gating
 
-**Description:** Every route **must** declare `requiresAuth` in its `meta` object. Admin-only routes **must** additionally declare `requiresAdmin: true`. It is **strictly forbidden** to implement auth or role checks inside individual view components — all access control **must** be handled by the centralized navigation guard.
+**Description:** Every route **must** declare `requiresAuth` in its `meta` object. Admin-only routes **must** additionally declare `requiresAdmin: true`. Page-level access control **must** be handled by the centralized navigation guard, not by individual view components. However, conditional UI rendering based on role (e.g., `v-if="authStore.isAdmin"` to show/hide a button) is permitted within views — this is presentation logic, not access control.
 
-**Rationale:** Declarative route meta makes access requirements visible at the route definition level and centralizes enforcement in a single guard.
+**Rationale:** Declarative route meta makes access requirements visible at the route definition level and centralizes enforcement in a single guard. Role-based UI visibility within an already-authorized page is a normal presentation concern.
 
 > Good
 
