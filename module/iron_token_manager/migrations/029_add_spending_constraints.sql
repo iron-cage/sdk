@@ -9,7 +9,7 @@ BEGIN
   SELECT RAISE(ABORT, 'spending_used_microdollars cannot be negative');
 END;
 
-CREATE TABLE IF NOT EXISTS _migration_026_completed (applied_at INTEGER NOT NULL);
-INSERT INTO _migration_026_completed (applied_at) VALUES (strftime('%s', 'now') * 1000);
+CREATE TABLE IF NOT EXISTS _migration_029_completed (applied_at INTEGER NOT NULL);
+INSERT INTO _migration_029_completed (applied_at) VALUES (strftime('%s', 'now') * 1000);
 
 COMMIT;

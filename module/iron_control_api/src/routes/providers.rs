@@ -382,66 +382,27 @@ pub async fn create_provider_key(
       }
     })?;
 
+  // If a spending cap was requested, set it atomically as part of creation.
+  // This eliminates the uncapped window that would exist if the caller had to
+  // make a separate PUT request after creating the key.
+  if let Some(cap_usd) = request.spending_cap_usd {
+    let cap_microdollars = validate_and_convert_spending_cap(cap_usd)
+      .map_err(|msg| ApiError::BadRequest(msg.to_string()))?;
+    state
+      .storage
+      .set_spending_cap(key_id, Some(cap_microdollars))
+      .await
+      .map_err(|_| ApiError::Internal("Failed to set spending cap".into()))?;
+  }
+
+  // Get metadata for response (after spending cap is set, so response reflects it)
   let metadata = state
     .storage
     .get_key_metadata(key_id)
     .await
     .map_err(|_| ApiError::Internal("Failed to retrieve provider key metadata".into()))?;
 
-  // Get metadata for response
-  let Ok(metadata) = state.storage.get_key_metadata(key_id).await else {
-    return (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json(serde_json::json!({
-        "error": "Failed to retrieve provider key metadata"
-      })),
-    )
-      .into_response();
-  };
-
-  (
-  // If a spending cap was requested, set it atomically as part of creation.
-  // This eliminates the uncapped window that would exist if the caller had to
-  // make a separate PUT request after creating the key.
-  if let Some(cap_usd) = request.spending_cap_usd {
-    let cap_microdollars = match validate_and_convert_spending_cap(cap_usd) {
-      Ok(v) => v,
-      Err(msg) => {
-        return (
-          StatusCode::BAD_REQUEST,
-          Json(serde_json::json!({ "error": msg })),
-        )
-          .into_response();
-      }
-    };
-    if state
-      .storage
-      .set_spending_cap(key_id, Some(cap_microdollars))
-      .await
-      .is_err()
-    {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({
-          "error": "Failed to set spending cap"
-        })),
-      )
-        .into_response();
-    }
-  }
-
-  // Get metadata for response
-  let Ok(metadata) = state.storage.get_key_metadata(key_id).await else {
-    return (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json(serde_json::json!({
-        "error": "Failed to retrieve provider key metadata"
-      })),
-    )
-      .into_response();
-  };
-
-  (
+  Ok((
     StatusCode::CREATED,
     Json(ProviderKeyResponse::from_metadata(metadata, masked_key, vec![])),
   ))
@@ -584,56 +545,41 @@ pub async fn update_provider_key(
     }
   }
 
-  // Apply all field updates atomically in a single transaction.
+  // Apply all field updates atomically via update_key_fields.
   // description is Option<Option<String>>: None = skip, Some(None) = clear, Some(Some(s)) = set.
   let description = request.description.as_ref().map(|opt| opt.as_deref());
   //qqq: [Low] empty string is a sentinel to clear base_url — undocumented and inconsistent with description field semantics
   let base_url = request.base_url.as_deref().map(|u| if u.is_empty() { None } else { Some(u) });
-  let spending_cap = request
-    .spending_cap_usd
-    .map(|cap| cap.map(usd_to_microdollars));
 
-  if let Some(is_enabled) = request.is_enabled {
-    if state.storage.set_enabled(key_id, is_enabled).await.is_err() {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({
-          "error": "Failed to update is_enabled"
-        })),
-      )
-        .into_response();
-    }
-  }
+  // Validate and convert spending cap: None = skip, Some(None) = remove, Some(Some(v)) = set.
+  let spending_cap = match request.spending_cap_usd {
+    None => None,
+    Some(None) => Some(None),
+    Some(Some(usd)) => match validate_and_convert_spending_cap(usd) {
+      Ok(v) => Some(Some(v)),
+      Err(msg) => {
+        return (
+          StatusCode::BAD_REQUEST,
+          Json(serde_json::json!({ "error": msg })),
+        )
+          .into_response();
+      }
+    },
+  };
 
-  if let Some(spending_cap) = request.spending_cap_usd {
-    // Validate the cap value before converting; None means "remove the cap".
-    let cap_microdollars = match spending_cap {
-      None => None,
-      Some(usd) => match validate_and_convert_spending_cap(usd) {
-        Ok(v) => Some(v),
-        Err(msg) => {
-          return (
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({ "error": msg })),
-          )
-            .into_response();
-        }
-      },
-    };
-    if state
-      .storage
-      .set_spending_cap(key_id, cap_microdollars)
-      .await
-      .is_err()
-    {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({
-          "error": "Failed to update spending_cap"
-        })),
-      )
-        .into_response();
-    }
+  if state
+    .storage
+    .update_key_fields(key_id, description, base_url, request.is_enabled, spending_cap)
+    .await
+    .is_err()
+  {
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json(serde_json::json!({
+        "error": "Failed to update provider key"
+      })),
+    )
+      .into_response();
   }
 
   // Get updated metadata

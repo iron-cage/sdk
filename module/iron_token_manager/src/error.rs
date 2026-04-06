@@ -22,11 +22,10 @@ pub enum TokenError {
   NotFound,
   /// Database error preserving sqlx details for FK constraint detection
   Database(sqlx::Error),
-  /// Spending cap would be exceeded
+  /// Operation would exceed the spending cap
+  //qqq: [Info] callers in handshake.rs currently hit a wildcard Err arm — consider explicit match arm returning 402 Payment Required
   SpendingCapExceeded,
-  /// Resource not found
-  NotFound,
-  /// Key quota exceeded
+  /// Key creation would exceed the per-user per-provider quota
   KeyQuotaExceeded,
   /// Validation error with specific field and reason
   Validation {
@@ -35,11 +34,6 @@ pub enum TokenError {
     /// Reason for validation failure
     reason: String,
   },
-  //qqq: [Info] callers in handshake.rs currently hit a wildcard Err arm — consider explicit match arm returning 402 Payment Required
-  /// Operation would exceed the spending cap
-  SpendingCapExceeded,
-  /// Key creation would exceed the per-user per-provider quota
-  KeyQuotaExceeded,
 }
 
 impl core::fmt::Display for TokenError {
@@ -49,11 +43,8 @@ impl core::fmt::Display for TokenError {
       Self::NotFound => write!(f, "Resource not found"),
       Self::Database(e) => write!(f, "Database error: {e}"),
       Self::SpendingCapExceeded => write!(f, "Spending cap exceeded"),
-      Self::NotFound => write!(f, "Not found"),
       Self::KeyQuotaExceeded => write!(f, "Key quota exceeded"),
       Self::Validation { field, reason } => write!(f, "Validation error: {field} - {reason}"),
-      Self::SpendingCapExceeded => write!(f, "Spending cap exceeded"),
-      Self::KeyQuotaExceeded => write!(f, "Key quota exceeded"),
     }
   }
 }
