@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
+
 import { useAuthStore } from '@/stores/auth'
+
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { toast } from 'vue-sonner'
 import IconLogIn from '@/components/icons/IconLogIn.vue'
 
 const router = useRouter()

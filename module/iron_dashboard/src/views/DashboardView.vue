@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { formatTimestamp, formatCostUsd, formatNumber } from '@/lib/formatters'
 import { useRouter } from 'vue-router'
 import { useQuery } from '@tanstack/vue-query'
+
 import { useApi } from '@/composables/useApi'
 import { useAuthStore } from '@/stores/auth'
+import { formatTimestamp, formatCostUsd, formatNumber } from '@/lib/formatters'
+
 import StatCard from '@/components/cards/StatCard.vue'
+import PageLayout from '@/components/PageLayout.vue'
 import IconCoin from '@/components/icons/IconCoin.vue'
 import IconBarChart from '@/components/icons/IconBarChart.vue'
 import IconCheckCircle from '@/components/icons/IconCheckCircle.vue'
@@ -13,7 +16,6 @@ import IconCog from '@/components/icons/IconCog.vue'
 import IconServer from '@/components/icons/IconServer.vue'
 import IconUsers from '@/components/icons/IconUsers.vue'
 import IconChevronRight from '@/components/icons/IconChevronRight.vue'
-import PageLayout from '@/components/PageLayout.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()

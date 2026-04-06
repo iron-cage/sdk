@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/vue-query'
-import { useApi, type Agent, type IcTokenStatus } from '@/composables/useApi'
+import { toast } from 'vue-sonner'
+
+import { useApi } from '@/composables/useApi'
+import { useAuthStore } from '@/stores/auth'
+import { useConfirm } from '@/composables/useConfirm'
+import { formatTimestamp } from '@/lib/formatters'
+
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-
 import {
   Dialog,
   DialogContent,
@@ -21,7 +26,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { toast } from 'vue-sonner'
 import {
   Select,
   SelectContent,
@@ -29,9 +33,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useAuthStore } from '@/stores/auth'
-import { formatTimestamp } from '@/lib/formatters'
-import { useConfirm } from '@/composables/useConfirm'
+import PageLayout from '@/components/PageLayout.vue'
+import DataTable from '@/components/DataTable.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
 import IconX from '@/components/icons/IconX.vue'
@@ -43,9 +47,8 @@ import IconRefresh from '@/components/icons/IconRefresh.vue'
 import IconKey from '@/components/icons/IconKey.vue'
 import IconBan from '@/components/icons/IconBan.vue'
 import IconCopy from '@/components/icons/IconCopy.vue'
-import PageLayout from '@/components/PageLayout.vue'
-import DataTable from '@/components/DataTable.vue'
-import ConfirmDialog from '@/components/ConfirmDialog.vue'
+
+import type { Agent, IcTokenStatus } from '@/composables/useApi'
 
 const api = useApi()
 const queryClient = useQueryClient()
@@ -250,76 +253,86 @@ function getIcTokenStatus(agentId: number): IcTokenStatus | undefined {
   return getIcTokenStatusFromQuery(agentId)
 }
 
-async function handleGenerateIcToken(agent: Agent) {
-  tokenActionLoadingId.value = agent.id
-  try {
-    const response = await api.generateIcToken(agent.id)
-    queryClient.setQueryData(['ic-token-status', agent.id], {
-      agent_id: agent.id,
+const generateIcTokenMutation = useMutation({
+  mutationFn: (agentId: number) => api.generateIcToken(agentId),
+  onMutate: (agentId) => { tokenActionLoadingId.value = agentId },
+  onSuccess: (response, agentId) => {
+    queryClient.setQueryData(['ic-token-status', agentId], {
+      agent_id: agentId,
       has_ic_token: true,
       created_at: response.created_at,
     })
-    tokenDialogAgentName.value = agent.name
+    const agent = agents.value?.find(a => a.id === agentId)
+    tokenDialogAgentName.value = agent?.name ?? ''
     tokenDialogValue.value = response.ic_token
     tokenDialogWarning.value = response.warning
     copyMessage.value = ''
     showTokenDialog.value = true
-  } catch (err) {
+  },
+  onError: (err) => {
     toast.error(err instanceof Error ? err.message : 'Failed to generate IC token')
-  } finally {
-    tokenActionLoadingId.value = null
-  }
+  },
+  onSettled: () => { tokenActionLoadingId.value = null },
+})
+
+const regenerateIcTokenMutation = useMutation({
+  mutationFn: (agentId: number) => api.regenerateIcToken(agentId),
+  onMutate: (agentId) => { tokenActionLoadingId.value = agentId },
+  onSuccess: (response, agentId) => {
+    queryClient.setQueryData(['ic-token-status', agentId], {
+      agent_id: agentId,
+      has_ic_token: true,
+      created_at: response.created_at,
+    })
+    const agent = agents.value?.find(a => a.id === agentId)
+    tokenDialogAgentName.value = agent?.name ?? ''
+    tokenDialogValue.value = response.ic_token
+    tokenDialogWarning.value = response.warning || 'Old IC token is now invalid.'
+    copyMessage.value = ''
+    showTokenDialog.value = true
+  },
+  onError: (err) => {
+    toast.error(err instanceof Error ? err.message : 'Failed to regenerate IC token')
+  },
+  onSettled: () => { tokenActionLoadingId.value = null },
+})
+
+const revokeIcTokenMutation = useMutation({
+  mutationFn: (agentId: number) => api.revokeIcToken(agentId),
+  onMutate: (agentId) => { tokenActionLoadingId.value = agentId },
+  onSuccess: (_data, agentId) => {
+    queryClient.setQueryData(['ic-token-status', agentId], {
+      agent_id: agentId,
+      has_ic_token: false,
+      created_at: null,
+    })
+  },
+  onError: (err) => {
+    toast.error(err instanceof Error ? err.message : 'Failed to revoke IC token')
+  },
+  onSettled: () => { tokenActionLoadingId.value = null },
+})
+
+function handleGenerateIcToken(agent: Agent) {
+  generateIcTokenMutation.mutate(agent.id)
 }
 
-async function handleRegenerateIcToken(agent: Agent) {
+function handleRegenerateIcToken(agent: Agent) {
   openConfirm(
     'Regenerate IC Token',
     `Regenerate IC token for ${agent.name}? The current token will be invalidated immediately.`,
     'Regenerate',
-    async () => {
-      tokenActionLoadingId.value = agent.id
-      try {
-        const response = await api.regenerateIcToken(agent.id)
-        queryClient.setQueryData(['ic-token-status', agent.id], {
-          agent_id: agent.id,
-          has_ic_token: true,
-          created_at: response.created_at,
-        })
-        tokenDialogAgentName.value = agent.name
-        tokenDialogValue.value = response.ic_token
-        tokenDialogWarning.value = response.warning || 'Old IC token is now invalid.'
-        copyMessage.value = ''
-        showTokenDialog.value = true
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Failed to regenerate IC token')
-      } finally {
-        tokenActionLoadingId.value = null
-      }
-    },
+    () => { regenerateIcTokenMutation.mutate(agent.id) },
     'destructive',
   )
 }
 
-async function handleRevokeIcToken(agent: Agent) {
+function handleRevokeIcToken(agent: Agent) {
   openConfirm(
     'Revoke IC Token',
     `Revoke IC token for ${agent.name}? Agents using this token will stop working until a new one is generated.`,
     'Revoke',
-    async () => {
-      tokenActionLoadingId.value = agent.id
-      try {
-        await api.revokeIcToken(agent.id)
-        queryClient.setQueryData(['ic-token-status', agent.id], {
-          agent_id: agent.id,
-          has_ic_token: false,
-          created_at: null,
-        })
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Failed to revoke IC token')
-      } finally {
-        tokenActionLoadingId.value = null
-      }
-    },
+    () => { revokeIcTokenMutation.mutate(agent.id) },
     'destructive',
   )
 }

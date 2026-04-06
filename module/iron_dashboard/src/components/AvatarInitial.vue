@@ -1,19 +1,25 @@
 <script setup lang="ts">
+import { cn } from '@/lib/utils'
+
 const props = defineProps<{ name: string }>()
 
-const AVATAR_COLORS = ['#5E6AD2', '#26B5CE', '#4CB782', '#F2994A']
+const AVATAR_VARIANTS = [
+  'bg-accent text-accent-foreground',
+  'bg-chart-2 text-primary-foreground',
+  'bg-success text-primary-foreground',
+  'bg-chart-5 text-primary-foreground',
+]
 
-function avatarColor(name: string): string {
+function avatarVariant(name: string): string {
   let hash = 0
   for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0
-  return AVATAR_COLORS[hash % AVATAR_COLORS.length]!
+  return AVATAR_VARIANTS[hash % AVATAR_VARIANTS.length]!
 }
 </script>
 
 <template>
   <span
-    class="w-6 h-6 rounded-[6px] flex items-center justify-center text-xs font-semibold text-white flex-shrink-0"
-    :style="{ backgroundColor: avatarColor(props.name) }"
+    :class="cn('w-6 h-6 rounded-[6px] flex items-center justify-center text-xs font-semibold flex-shrink-0', avatarVariant(props.name))"
   >
     {{ props.name[0]?.toUpperCase() ?? '?' }}
   </span>

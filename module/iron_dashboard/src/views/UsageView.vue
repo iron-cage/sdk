@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
-import { useApi, type AnalyticsPeriod, type AnalyticsEvent, type AgentSpending } from '@/composables/useApi'
-import IconChip from '@/components/icons/IconChip.vue'
+
+import { useApi } from '@/composables/useApi'
+import { formatCostUsd, formatMicrodollars, formatNumber, formatTimestamp } from '@/lib/formatters'
+import { getProviderLabel } from '@/lib/providers'
+import { cn } from '@/lib/utils'
+
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -11,11 +15,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { formatCostUsd, formatMicrodollars, formatNumber, formatTimestamp } from '@/lib/formatters'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import PageLayout from '@/components/PageLayout.vue'
 import StatCard from '@/components/cards/StatCard.vue'
 import PercentBar from '@/components/PercentBar.vue'
 import DataTable from '@/components/DataTable.vue'
+import TrendBadge from '@/components/TrendBadge.vue'
+import IconChip from '@/components/icons/IconChip.vue'
 import IconChevronUp from '@/components/icons/IconChevronUp.vue'
 import IconChevronDown from '@/components/icons/IconChevronDown.vue'
 import IconChevronLeft from '@/components/icons/IconChevronLeft.vue'
@@ -31,15 +42,8 @@ import IconGrid from '@/components/icons/IconGrid.vue'
 import IconClipboard from '@/components/icons/IconClipboard.vue'
 import IconUsers from '@/components/icons/IconUsers.vue'
 import IconExternalLink from '@/components/icons/IconExternalLink.vue'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {cn} from "@/lib/utils"
-import TrendBadge from '@/components/TrendBadge.vue'
-import { getProviderLabel } from '@/lib/providers'
+
+import type { AnalyticsPeriod, AnalyticsEvent, AgentSpending } from '@/composables/useApi'
 
 const api = useApi()
 

@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+
 import { useAuthStore } from '@/stores/auth'
+import { cn } from '@/lib/utils'
+
 import AvatarInitial from './AvatarInitial.vue'
 import IconX from './icons/IconX.vue'
 import IconHome from './icons/IconHome.vue'
@@ -37,12 +40,10 @@ function isActive(path: string): boolean {
 }
 
 function navLinkClass(path: string): string {
-  let base = 'flex items-center px-3 py-1.5 text-base rounded-[8px]'
-  
-  if (isActive(path)) {
-    return `${base} bg-border/80 text-tertiary font-medium`
-  }
-  return `${base} text-tertiary hover:bg-border/50`
+  return cn(
+    'flex items-center px-3 py-1.5 text-base rounded-[8px] text-tertiary',
+    isActive(path) ? 'bg-border/80 font-medium' : 'hover:bg-border/50',
+  )
 }
 
 function handleNavClick() {

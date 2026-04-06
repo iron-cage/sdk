@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
-import { useApi, type BudgetStatus } from '@/composables/useApi'
+import { toast } from 'vue-sonner'
+
+import { useApi } from '@/composables/useApi'
 import { useAuthStore } from '@/stores/auth'
+import { cn } from '@/lib/utils'
+
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -15,21 +19,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { toast } from 'vue-sonner'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import PageLayout from '@/components/PageLayout.vue'
+import DataTable from '@/components/DataTable.vue'
+import PercentBar from '@/components/PercentBar.vue'
 import IconX from '@/components/icons/IconX.vue'
 import IconCheck from '@/components/icons/IconCheck.vue'
 import IconDotsHorizontal from '@/components/icons/IconDotsHorizontal.vue'
 import IconEdit from '@/components/icons/IconEdit.vue'
 import IconRefresh from '@/components/icons/IconRefresh.vue'
-import PageLayout from '@/components/PageLayout.vue'
-import DataTable from '@/components/DataTable.vue'
-import PercentBar from '@/components/PercentBar.vue'
+
+import type { BudgetStatus } from '@/composables/useApi'
 
 const api = useApi()
 const authStore = useAuthStore()
@@ -202,7 +207,7 @@ function riskBadgeVariant(risk: string) {
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap ">
           <span class="capitalize text-sm flex gap-2 items-center">
-            <span :class="`rounded-full h-2 w-2 inline-block ${riskBadgeVariant(row.risk_level)}`"></span>
+            <span :class="cn('rounded-full h-2 w-2 inline-block', riskBadgeVariant(row.risk_level))"></span>
             {{ row.risk_level }}
           </span>
         </td>

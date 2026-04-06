@@ -2,9 +2,13 @@
 import { ref, watch, computed } from 'vue'
 import { refDebounced } from '@vueuse/core'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
-import { useApi, type CreateUserRequest, type User } from '@/composables/useApi'
-import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import { toast } from 'vue-sonner'
+
+import { useApi } from '@/composables/useApi'
+import { useAuthStore } from '@/stores/auth'
 import { useConfirm } from '@/composables/useConfirm'
+import { formatTimestamp } from '@/lib/formatters'
+
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -25,7 +29,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { toast } from 'vue-sonner'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,9 +37,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import PageLayout from '@/components/PageLayout.vue'
-import { formatTimestamp } from '@/lib/formatters'
-import { useAuthStore } from '@/stores/auth'
 import DataTable from '@/components/DataTable.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import AvatarInitial from '@/components/AvatarInitial.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
@@ -49,6 +51,8 @@ import IconBan from '@/components/icons/IconBan.vue'
 import IconEdit from '@/components/icons/IconEdit.vue'
 import IconChevronLeft from '@/components/icons/IconChevronLeft.vue'
 import IconChevronRight from '@/components/icons/IconChevronRight.vue'
+
+import type { CreateUserRequest, User } from '@/composables/useApi'
 
 
 const api = useApi()

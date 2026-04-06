@@ -1,10 +1,17 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
-import { useApi, type ProviderKey, type ProviderType } from '@/composables/useApi'
+import { toast } from 'vue-sonner'
+
+import { useApi } from '@/composables/useApi'
+import { useConfirm } from '@/composables/useConfirm'
+import { formatTimestamp, formatCostUsd } from '@/lib/formatters'
+import { getProviderLabel, getProviderKeyPlaceholder } from '@/lib/providers'
+
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import {
   Dialog,
   DialogContent,
@@ -20,7 +27,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { toast } from 'vue-sonner'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,9 +34,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { formatTimestamp, formatCostUsd } from '@/lib/formatters'
-import { getProviderLabel, getProviderKeyPlaceholder } from '@/lib/providers'
-import { useConfirm } from '@/composables/useConfirm'
+import PageLayout from '@/components/PageLayout.vue'
+import DataTable from '@/components/DataTable.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import ProviderBadge from '@/components/ProviderBadge.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
 import IconX from '@/components/icons/IconX.vue'
@@ -38,10 +44,8 @@ import IconCheck from '@/components/icons/IconCheck.vue'
 import IconDotsHorizontal from '@/components/icons/IconDotsHorizontal.vue'
 import IconTrash from '@/components/icons/IconTrash.vue'
 import IconEdit from '@/components/icons/IconEdit.vue'
-import PageLayout from '@/components/PageLayout.vue'
-import DataTable from '@/components/DataTable.vue'
-import ConfirmDialog from '@/components/ConfirmDialog.vue'
-import { Switch } from '@/components/ui/switch'
+
+import type { ProviderKey, ProviderType } from '@/composables/useApi'
 
 const api = useApi()
 const queryClient = useQueryClient()
