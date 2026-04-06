@@ -800,9 +800,29 @@ pub async fn unassign_provider_from_project(
       .into_response();
   }
 
-  // qqq: BOLA — no project ownership check (same as assign_provider_to_project).
-  // Both Admin and Manager have ManageProviderKeys. Add ownership guard
-  // once projects are first-class entities.
+  // Verify project ownership — return 404 to avoid leaking project existence
+  match state.storage.verify_project_owner(&project_id, &claims.sub).await {
+    Ok(true) => {}
+    Ok(false) => {
+      return (
+        StatusCode::NOT_FOUND,
+        Json(serde_json::json!({
+          "error": "Project not found"
+        })),
+      )
+        .into_response();
+    }
+    Err(_) => {
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(serde_json::json!({
+          "error": "Failed to verify project ownership"
+        })),
+      )
+        .into_response();
+    }
+  }
+
   match state
     .storage
     .unassign_from_project(provider_key_id, &project_id)

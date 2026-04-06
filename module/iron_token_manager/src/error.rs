@@ -27,6 +27,8 @@ pub enum TokenError {
   SpendingCapExceeded,
   /// Key creation would exceed the per-user per-provider quota
   KeyQuotaExceeded,
+  /// Unrecognised provider string from the database
+  UnknownProvider(String),
   /// Validation error with specific field and reason
   Validation {
     /// Field that failed validation
@@ -44,6 +46,7 @@ impl core::fmt::Display for TokenError {
       Self::Database(e) => write!(f, "Database error: {e}"),
       Self::SpendingCapExceeded => write!(f, "Spending cap exceeded"),
       Self::KeyQuotaExceeded => write!(f, "Key quota exceeded"),
+      Self::UnknownProvider(s) => write!(f, "Unknown provider: {s}"),
       Self::Validation { field, reason } => write!(f, "Validation error: {field} - {reason}"),
     }
   }

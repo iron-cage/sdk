@@ -308,28 +308,6 @@ impl ProviderKeyStorage {
     Ok(())
   }
 
-  /// Check whether `user_id` owns the given `project_id`.
-  ///
-  /// Ownership is determined by the presence of at least one `api_tokens` row
-  /// with matching `user_id` and `project_id`.  Returns `Ok(true)` when the
-  /// caller owns the project, `Ok(false)` when no such token exists (which
-  /// callers should map to 404 to avoid revealing project existence).
-  ///
-  /// # Errors
-  ///
-  /// Returns error if the database query fails
-  pub async fn verify_project_owner(&self, project_id: &str, user_id: &str) -> Result<bool> {
-    let exists: bool = sqlx::query_scalar(
-      "SELECT EXISTS(SELECT 1 FROM api_tokens WHERE project_id = $1 AND user_id = $2)",
-    )
-    .bind(project_id)
-    .bind(user_id)
-    .fetch_one(&self.pool)
-    .await
-    .map_err(TokenError::Database)?;
-    Ok(exists)
-  }
-
   /// Atomically create a provider key within the per-user per-provider quota.
   ///
   /// Runs the COUNT check and the INSERT inside a single `BEGIN IMMEDIATE`
@@ -529,6 +507,27 @@ impl ProviderKeyStorage {
     .map_err(TokenError::Database)?;
 
     Ok(rows.into_iter().map(|r| r.0).collect())
+  }
+
+  /// Verify that a user owns a project by checking the `api_tokens` table.
+  ///
+  /// Returns `true` if a row exists in `api_tokens` for the given project and user,
+  /// `false` otherwise.
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database query fails
+  pub async fn verify_project_owner(&self, project_id: &str, user_id: &str) -> Result<bool> {
+    let exists: bool = sqlx::query_scalar(
+      "SELECT EXISTS(SELECT 1 FROM api_tokens WHERE project_id = $1 AND user_id = $2)",
+    )
+    .bind(project_id)
+    .bind(user_id)
+    .fetch_one(&self.pool)
+    .await
+    .map_err(TokenError::Database)?;
+
+    Ok(exists)
   }
 
   /// Get all project assignments for multiple keys in a single query
@@ -882,6 +881,32 @@ impl ProviderKeyStorage {
     Ok(())
   }
 
+  /// Get the `owner_id` for an agent by its database ID
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database query fails
+  pub async fn get_agent_owner_id(&self, agent_id: i64) -> Result<Option<String>> {
+    sqlx::query_scalar("SELECT owner_id FROM agents WHERE id = ?")
+      .bind(agent_id)
+      .fetch_optional(&self.pool)
+      .await
+      .map_err(TokenError::Database)
+  }
+
+  /// Get the `provider_key_id` assigned to an agent
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database query fails
+  pub async fn get_agent_provider_key_id(&self, agent_id: i64) -> Result<Option<i64>> {
+    sqlx::query_scalar("SELECT provider_key_id FROM agents WHERE id = ?")
+      .bind(agent_id)
+      .fetch_one(&self.pool)
+      .await
+      .map_err(TokenError::Database)
+  }
+
   /// Get spending summary for a provider key
   ///
   /// # Errors
@@ -905,6 +930,46 @@ impl ProviderKeyStorage {
       None => Err(TokenError::NotFound),
     }
   }
+
+  /// Fetch a user's usage limits (monthly cap and current spend).
+  ///
+  /// Returns `None` if no `usage_limits` row exists for the user.
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database query fails
+  pub async fn get_usage_limits(
+    &self,
+    user_id: &str,
+  ) -> Result<Option<(Option<i64>, Option<i64>)>> {
+    sqlx::query_as(
+      "SELECT max_cost_microdollars_per_month, current_cost_microdollars_this_month \
+       FROM usage_limits WHERE user_id = ? LIMIT 1",
+    )
+    .bind(user_id)
+    .fetch_optional(&self.pool)
+    .await
+    .map_err(TokenError::Database)
+  }
+
+  /// Increment the current monthly spend in `usage_limits` for a user.
+  ///
+  /// # Errors
+  ///
+  /// Returns error if database update fails
+  pub async fn increment_usage_limits(&self, user_id: &str, amount: i64) -> Result<()> {
+    sqlx::query(
+      "UPDATE usage_limits \
+       SET current_cost_microdollars_this_month = current_cost_microdollars_this_month + ? \
+       WHERE user_id = ?",
+    )
+    .bind(amount)
+    .bind(user_id)
+    .execute(&self.pool)
+    .await
+    .map_err(TokenError::Database)?;
+    Ok(())
+  }
 }
 
 /// Get current time in milliseconds since UNIX epoch
@@ -920,7 +985,7 @@ fn row_to_metadata(row: &SqliteRow) -> Result<ProviderKeyMetadata> {
   let provider_str: String = row.get("provider");
   Ok(ProviderKeyMetadata {
     id: row.get("id"),
-    provider: ProviderType::parse_str(&provider_str).ok_or(TokenError::Generic)?,
+    provider: ProviderType::parse_str(&provider_str).ok_or_else(|| TokenError::UnknownProvider(provider_str.clone()))?,
     base_url: row.get("base_url"),
     description: row.get("description"),
     is_enabled: row.get("is_enabled"),
@@ -939,7 +1004,7 @@ fn row_to_record(row: &SqliteRow) -> Result<ProviderKeyRecord> {
   Ok(ProviderKeyRecord {
     metadata: ProviderKeyMetadata {
       id: row.get("id"),
-      provider: ProviderType::parse_str(&provider_str).ok_or(TokenError::Generic)?,
+      provider: ProviderType::parse_str(&provider_str).ok_or_else(|| TokenError::UnknownProvider(provider_str.clone()))?,
       base_url: row.get("base_url"),
       description: row.get("description"),
       is_enabled: row.get("is_enabled"),

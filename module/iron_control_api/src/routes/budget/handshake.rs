@@ -197,23 +197,17 @@ pub async fn handshake(
   }
 
   // Get agent's owner_id to look up usage_limits
-  //qqq: [High] bypasses storage abstraction — direct SQL against agents table
-  let owner_id: Option<String> =
-    match sqlx::query_scalar("SELECT owner_id FROM agents WHERE id = ?")
-      .bind(agent_id)
-      .fetch_optional(&state.db_pool)
-      .await
-    {
-      Ok(owner) => owner,
-      Err(err) => {
-        tracing::error!("Database error fetching agent owner: {}", err);
-        return (
-          StatusCode::INTERNAL_SERVER_ERROR,
-          Json(serde_json::json!({ "error": "Database error" })),
-        )
-          .into_response();
-      }
-    };
+  let owner_id: Option<String> = match state.provider_key_storage.get_agent_owner_id(agent_id).await {
+    Ok(owner) => owner,
+    Err(err) => {
+      tracing::error!("Database error fetching agent owner: {}", err);
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(serde_json::json!({ "error": "Database error" })),
+      )
+        .into_response();
+    }
+  };
 
   let Some(owner_id) = owner_id else {
     // Security: Use generic error to prevent agent enumeration attacks
@@ -240,17 +234,12 @@ pub async fn handshake(
     .is_none()
   {
     // Fetch owner's usage limit to seed a budget cap if available
-    let limit_row: Option<(Option<i64>, Option<i64>)> = sqlx::query_as(
-      "SELECT max_cost_microdollars_per_month, current_cost_microdollars_this_month
-       FROM usage_limits
-       WHERE user_id = ?
-       LIMIT 1",
-    )
-    .bind(&owner_id)
-    .fetch_optional(&state.db_pool)
-    .await
-    .ok()
-    .flatten();
+    let limit_row: Option<(Option<i64>, Option<i64>)> = state
+      .provider_key_storage
+      .get_usage_limits(&owner_id)
+      .await
+      .ok()
+      .flatten();
 
     // Determine seed budget based on owner's usage limits:
     // - No record in usage_limits → block (owner must configure limits first)
@@ -355,15 +344,8 @@ pub async fn handshake(
       }
     }
     None => {
-      //qqq: [High] bypasses storage abstraction — raw SQL against agents table; schema changes here won't be caught at compile time
       // Use the provider key assigned to this agent
-      let assigned_key_id: Option<i64> = match sqlx::query_scalar(
-        "SELECT provider_key_id FROM agents WHERE id = ?",
-      )
-      .bind(agent_id)
-      .fetch_one(&state.db_pool)
-      .await
-      {
+      let assigned_key_id: Option<i64> = match state.provider_key_storage.get_agent_provider_key_id(agent_id).await {
         Ok(id) => id,
         Err(err) => {
           tracing::error!("Database error fetching agent provider_key_id: {}", err);
@@ -418,6 +400,64 @@ pub async fn handshake(
     }
   };
 
+  // Use requested_budget if provided, otherwise use default
+  let budget_requested = request
+    .requested_budget
+    .unwrap_or(HandshakeRequest::DEFAULT_HANDSHAKE_BUDGET);
+
+  let key_id = key_id_pre;
+
+  // Validate the provider key BEFORE reserving budget, so that requests against
+  // disabled or mismatched keys never temporarily deplete budget for legitimate requests.
+
+  // Fetch full key record (encrypted)
+  let key_record = match state.provider_key_storage.get_key(key_id).await {
+    Ok(record) => record,
+    Err(TokenError::NotFound) => {
+      return (
+        StatusCode::NOT_FOUND,
+        Json(serde_json::json!({ "error": "Provider key not found" })),
+      )
+        .into_response();
+    }
+    Err(err) => {
+      tracing::error!("Database error fetching provider key: {}", err);
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(serde_json::json!({ "error": "Key storage unavailable" })),
+      )
+        .into_response();
+    }
+  };
+
+  // TOCTOU re-validation: re-check ownership on the freshly-fetched record to close
+  // any race between the initial ownership check and the actual key use.
+  if key_record.metadata.user_id != owner_for_key {
+    return (
+      StatusCode::FORBIDDEN,
+      Json(serde_json::json!({ "error": "UNAUTHORIZED_KEY_ACCESS" })),
+    )
+      .into_response();
+  }
+
+  // Validate provider key matches requested provider
+  if key_record.metadata.provider != provider_type {
+    return (
+      StatusCode::FORBIDDEN,
+      Json(serde_json::json!({ "error": "Provider key does not match requested provider" })),
+    )
+      .into_response();
+  }
+
+  // Validate provider key is enabled
+  if !key_record.metadata.is_enabled {
+    return (
+      StatusCode::FORBIDDEN,
+      Json(serde_json::json!({ "error": "Provider key is disabled" })),
+    )
+      .into_response();
+  }
+
   // Fix(issue-budget-006): Atomically check and reserve budget to prevent TOCTOU race
   //
   // Root cause: get_budget_status() and record_spending() were separate operations,
@@ -428,13 +468,8 @@ pub async fn handshake(
   // separate operations. Always use atomic operations (SELECT FOR UPDATE + UPDATE in single
   // transaction) for check-then-act patterns on shared resources.
 
-  // Use requested_budget if provided, otherwise use default
-  let budget_requested = request
-    .requested_budget
-    .unwrap_or(HandshakeRequest::DEFAULT_HANDSHAKE_BUDGET);
-
   //qqq: [Medium] spending_cap_microdollars on the provider key is NOT checked here — cap is only enforced at the proxy layer; a lease can be issued for a key already at its cap
-  // aaa: Addressed — reserve_spending (line 543) atomically checks cap before incrementing.
+  // aaa: Addressed — reserve_spending atomically checks cap before incrementing.
   // If the key is at cap, reserve_spending fails and the handshake is rejected.
   let budget_to_grant = match state
     .agent_budget_manager
@@ -473,81 +508,6 @@ pub async fn handshake(
         .into_response();
     }
   };
-
-  let key_id = key_id_pre;
-
-  // Fetch full key record (encrypted) — TOCTOU re-validation follows immediately
-  let key_record = match state.provider_key_storage.get_key(key_id).await {
-    Ok(record) => record,
-    Err(TokenError::NotFound) => {
-      //qqq: [Medium] refund failure is logged but swallowed — budget permanently leaked if DB is down; no compensation queue or audit reconciliation
-      // aaa: Known limitation — refund agent budget only; reserve_spending has not run yet, so no provider key reversal needed.
-      if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
-        tracing::error!("Failed to refund reserved budget after key-not-found for agent {}: {}", agent_id, e);
-      }
-      return (
-        StatusCode::NOT_FOUND,
-        Json(serde_json::json!({ "error": "Provider key not found" })),
-      )
-        .into_response();
-    }
-    Err(err) => {
-      tracing::error!("Database error fetching provider key: {}", err);
-      //qqq: [Medium] refund failure is logged but swallowed — budget permanently leaked if DB is down; no compensation queue or audit reconciliation
-      // aaa: Known limitation — refund agent budget only; reserve_spending has not run yet, so no provider key reversal needed.
-      if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
-        tracing::error!("Failed to refund reserved budget after key fetch DB error: {}", e);
-      }
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({ "error": "Key storage unavailable" })),
-      )
-        .into_response();
-    }
-  };
-
-  // TOCTOU re-validation: re-check ownership on the freshly-fetched record to close
-  // any race between the initial ownership check and the actual key use.
-  if key_record.metadata.user_id != owner_for_key {
-    //qqq: [Medium] refund failure is logged but swallowed — budget permanently leaked if DB is down; no compensation queue or audit reconciliation
-    // aaa: Known limitation — refund agent budget only; reserve_spending has not run yet, so no provider key reversal needed.
-    if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
-      tracing::error!("Failed to refund reserved budget after ownership mismatch for agent {}: {}", agent_id, e);
-    }
-    return (
-      StatusCode::FORBIDDEN,
-      Json(serde_json::json!({ "error": "UNAUTHORIZED_KEY_ACCESS" })),
-    )
-      .into_response();
-  }
-
-  // Validate provider key matches requested provider
-  if key_record.metadata.provider != provider_type {
-    //qqq: [Medium] refund failure is logged but swallowed — budget permanently leaked if DB is down; no compensation queue or audit reconciliation
-    // aaa: Known limitation — refund agent budget only; reserve_spending has not run yet, so no provider key reversal needed.
-    if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
-      tracing::error!("Failed to refund reserved budget after provider mismatch for agent {}: {}", agent_id, e);
-    }
-    return (
-      StatusCode::FORBIDDEN,
-      Json(serde_json::json!({ "error": "Provider key does not match requested provider" })),
-    )
-      .into_response();
-  }
-
-  // Validate provider key is enabled
-  if !key_record.metadata.is_enabled {
-    //qqq: [Medium] refund failure is logged but swallowed — budget permanently leaked if DB is down; no compensation queue or audit reconciliation
-    // aaa: Known limitation — refund agent budget only; reserve_spending has not run yet, so no provider key reversal needed.
-    if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
-      tracing::error!("Failed to refund reserved budget after disabled-key check for agent {}: {}", agent_id, e);
-    }
-    return (
-      StatusCode::FORBIDDEN,
-      Json(serde_json::json!({ "error": "Provider key is disabled" })),
-    )
-      .into_response();
-  }
 
   // Check and reserve provider key spending cap before issuing the IP Token
   if let Err(e) = state.provider_key_storage.reserve_spending(key_id, budget_to_grant).await {
@@ -638,15 +598,7 @@ pub async fn handshake(
   // Deduct lease amount from usage_limits (the "bank") BEFORE creating the lease so that
   // a failure here leaves no orphaned lease that the caller can never reclaim.
   // Both are now in microdollars - no conversion needed
-  //qqq: [High] bypasses storage abstraction — direct SQL against usage_limits table
-  if let Err( err ) = sqlx::query(
-    "UPDATE usage_limits SET current_cost_microdollars_this_month = current_cost_microdollars_this_month + ? WHERE user_id = ?"
-  )
-  .bind( budget_to_grant )
-  .bind( &owner_id )
-  .execute( &state.db_pool )
-  .await
-  {
+  if let Err( err ) = state.provider_key_storage.increment_usage_limits(&owner_id, budget_to_grant).await {
     tracing::error!( "Database error updating usage_limits: {}", err );
     //qqq: [Medium] refund failure is logged but swallowed — budget permanently leaked if DB is down; no compensation queue or audit reconciliation
     // aaa: Known limitation — refund both agent budget and provider key spending (reserve_spending already ran).
