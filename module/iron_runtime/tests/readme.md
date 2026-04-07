@@ -12,6 +12,8 @@ Tests for iron_runtime LLM router and translation layer.
 | `llm_router_translator_response_test.rs` | Test Anthropic to OpenAI response translation | Anthropic format → OpenAI format validation | NOT request translation (translator_request_test.rs), NOT routing (llm_router_test.rs) |
 | `pyo3_string_safety_test.rs` | Test PyO3 buffer overflow vulnerability fix (RUSTSEC-2025-0020) | Security scenarios → Vulnerability prevention | NOT routing (llm_router_test.rs), NOT translation (translator tests) |
 | `runtime_test.rs` | Test Runtime creation and configuration | Runtime setup → Initialization validation | NOT routing (llm_router_test.rs), NOT integration (llm_router_integration_test.rs) |
+| `key_fetcher_test.rs` | Test KeyFetcher IP Token decryption path with mock HTTP server | Encrypted server response → Plaintext provider key | NOT router lifecycle (llm_router_integration_test.rs), NOT translation (translator tests) |
+| `proxy_test.rs` | Test proxy startup validation guard when IP_TOKEN_KEY is absent | Misconfigured ProxyConfig → Err before TCP bind | NOT key decryption (key_fetcher_test.rs), NOT translation (translator tests) |
 
 ## Test Categories
 

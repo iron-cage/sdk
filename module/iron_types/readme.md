@@ -51,7 +51,7 @@ let json = serde_json::to_string(&config)?;
 <summary>Scope & Boundaries</summary>
 
 **Responsibilities:**
-Defines shared types, traits, and error types used across all iron_cage crates as foundation layer. Provides type-safe builders for configuration, comprehensive error handling with error_tools integration, and Serde serialization support. Requires Rust 1.75+, all platforms supported, serves as dependency for all other workspace crates.
+Defines shared types, traits, and error types used across all iron_cage crates as foundation layer. Provides type-safe builders for configuration, comprehensive error handling with thiserror, and Serde serialization support. Requires Rust 1.75+, all platforms supported, serves as dependency for all other workspace crates.
 
 **In Scope:**
 - Common configuration types (SafetyConfig, CostConfig, ReliabilityConfig)
@@ -78,6 +78,7 @@ Defines shared types, traits, and error types used across all iron_cage crates a
 |------|----------------|
 | lib.rs | Foundational types and type-safe identifiers for Iron Runtime |
 | ids.rs | Type-safe entity identifiers with validation |
+| role.rs | RBAC role enum (Admin, Manager, Developer) with string parsing. |
 
 **Notes:**
 - Entries marked 'TBD' require manual documentation

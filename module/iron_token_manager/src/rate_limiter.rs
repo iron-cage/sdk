@@ -3,10 +3,10 @@
 //!
 //! Token bucket algorithm for request rate limiting per user/project.
 
-use governor::{ Quota, RateLimiter as GovernorRateLimiter };
-use governor::clock::DefaultClock;
 use core::num::NonZeroU32;
 use core::time::Duration;
+use governor::clock::DefaultClock;
+use governor::{Quota, RateLimiter as GovernorRateLimiter};
 use std::sync::Arc;
 
 /// Rate limiter key (`user_id` or `user_id:project_id`)
@@ -15,34 +15,29 @@ type LimiterKey = String;
 /// Keyed rate limiter type (uses Governor's default keyed state store)
 type KeyedLimiter = GovernorRateLimiter<
   LimiterKey,
-  governor::state::keyed::DefaultKeyedStateStore< LimiterKey >,
+  governor::state::keyed::DefaultKeyedStateStore<LimiterKey>,
   DefaultClock,
 >;
 
 /// Rate limiter
 ///
 /// Uses token bucket algorithm for per-user/per-project rate limiting.
-pub struct RateLimiter
-{
-  limiter: Option< Arc< KeyedLimiter > >,
+pub struct RateLimiter {
+  limiter: Option<Arc<KeyedLimiter>>,
   max_burst: u32,
 }
 
-impl core::fmt::Debug for RateLimiter
-{
-  fn fmt( &self, f: &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result
-  {
-    f.debug_struct( "RateLimiter" )
-      .field( "max_burst", &self.max_burst )
-      .field( "enabled", &self.limiter.is_some() )
+impl core::fmt::Debug for RateLimiter {
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    f.debug_struct("RateLimiter")
+      .field("max_burst", &self.max_burst)
+      .field("enabled", &self.limiter.is_some())
       .finish()
   }
 }
 
-impl Clone for RateLimiter
-{
-  fn clone( &self ) -> Self
-  {
+impl Clone for RateLimiter {
+  fn clone(&self) -> Self {
     Self {
       limiter: self.limiter.clone(),
       max_burst: self.max_burst,
@@ -50,8 +45,7 @@ impl Clone for RateLimiter
   }
 }
 
-impl RateLimiter
-{
+impl RateLimiter {
   /// Create new rate limiter
   ///
   /// # Arguments
@@ -76,18 +70,18 @@ impl RateLimiter
   /// // 100 requests per second
   /// let limiter = RateLimiter::new( 100, Duration::from_secs( 1 ) );
   /// ```
-  #[ must_use ]
-  pub fn new( requests_per_period: u32, period: Duration ) -> Self
-  {
+  #[must_use]
+  pub fn new(requests_per_period: u32, period: Duration) -> Self {
     let limiter = if requests_per_period == 0 {
       // Zero quota = always reject
       None
     } else {
-      let max_burst = NonZeroU32::new( requests_per_period ).expect( "LOUD FAILURE: Should be non-zero" );
-      let quota = Quota::with_period( period )
-        .expect( "LOUD FAILURE: Period must be valid" )
-        .allow_burst( max_burst );
-      Some( Arc::new( GovernorRateLimiter::keyed( quota ) ) )
+      let max_burst =
+        NonZeroU32::new(requests_per_period).expect("LOUD FAILURE: Should be non-zero");
+      let quota = Quota::with_period(period)
+        .expect("LOUD FAILURE: Period must be valid")
+        .allow_burst(max_burst);
+      Some(Arc::new(GovernorRateLimiter::keyed(quota)))
     };
 
     Self {
@@ -97,10 +91,9 @@ impl RateLimiter
   }
 
   /// Create rate limiter key
-  fn make_key( user_id: &str, project_id: Option< &str > ) -> LimiterKey
-  {
+  fn make_key(user_id: &str, project_id: Option<&str>) -> LimiterKey {
     match project_id {
-      Some( proj ) => format!( "{user_id}:{proj}" ),
+      Some(proj) => format!("{user_id}:{proj}"),
       None => user_id.to_string(),
     }
   }
@@ -115,16 +108,15 @@ impl RateLimiter
   /// # Returns
   ///
   /// True if request is allowed, false if rate limited
-  #[ must_use ]
-  pub fn check_rate_limit( &self, user_id: &str, project_id: Option< &str > ) -> bool
-  {
-    let Some( ref limiter ) = self.limiter else {
+  #[must_use]
+  pub fn check_rate_limit(&self, user_id: &str, project_id: Option<&str>) -> bool {
+    let Some(ref limiter) = self.limiter else {
       // Zero quota - always reject
       return false;
     };
 
-    let key = Self::make_key( user_id, project_id );
-    limiter.check_key( &key ).is_ok()
+    let key = Self::make_key(user_id, project_id);
+    limiter.check_key(&key).is_ok()
   }
 
   /// Get remaining requests in current window
@@ -137,21 +129,20 @@ impl RateLimiter
   /// # Returns
   ///
   /// Number of requests remaining before rate limit
-  #[ must_use ]
-  pub fn get_remaining_requests( &self, user_id: &str, project_id: Option< &str > ) -> u32
-  {
-    let Some( ref limiter ) = self.limiter else {
+  #[must_use]
+  pub fn get_remaining_requests(&self, user_id: &str, project_id: Option<&str>) -> u32 {
+    let Some(ref limiter) = self.limiter else {
       // Zero quota - no remaining
       return 0;
     };
 
-    let key = Self::make_key( user_id, project_id );
+    let key = Self::make_key(user_id, project_id);
 
     // Governor doesn't expose direct remaining count
     // We estimate by checking without consuming
     let mut remaining = 0;
     for _ in 0..self.max_burst {
-      if limiter.check_key( &key ).is_ok() {
+      if limiter.check_key(&key).is_ok() {
         remaining += 1;
       } else {
         break;

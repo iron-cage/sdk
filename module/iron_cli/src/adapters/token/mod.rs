@@ -1,6 +1,6 @@
 //! Token Manager API adapters
 //!
-//! HTTP adapters for Token Manager API (iron_token_manager).
+//! HTTP adapters for Token Manager API (`iron_token_manager`).
 //!
 //! ## Architecture
 //!
@@ -30,4 +30,4 @@ mod config;
 mod http_client;
 
 pub use config::TokenApiConfig;
-pub use http_client::{ TokenApiClient, TokenApiError };
+pub use http_client::{TokenApiClient, TokenApiError};

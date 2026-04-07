@@ -46,130 +46,128 @@
 //! **Resource Limits:** Not applicable (in-memory token bucket, bounded by configuration)
 //! **Precondition Violations:** Not applicable (`RateLimiter` validates configuration, handles zero quota gracefully)
 
-use iron_token_manager::rate_limiter::RateLimiter;
 use core::time::Duration;
+use iron_token_manager::rate_limiter::RateLimiter;
 
-#[ tokio::test ]
-async fn test_allow_requests_within_rate()
-{
+#[tokio::test]
+async fn test_allow_requests_within_rate() {
   // 10 requests per second
-  let limiter = RateLimiter::new( 10, Duration::from_secs( 1 ) );
+  let limiter = RateLimiter::new(10, Duration::from_secs(1));
 
   // First 10 requests should succeed
   for _ in 0..10 {
-    let allowed = limiter.check_rate_limit( "user_001", None );
-    assert!( allowed, "Should allow requests within rate limit" );
+    let allowed = limiter.check_rate_limit("user_001", None);
+    assert!(allowed, "Should allow requests within rate limit");
   }
 }
 
-#[ tokio::test ]
-async fn test_reject_requests_exceeding_rate()
-{
+#[tokio::test]
+async fn test_reject_requests_exceeding_rate() {
   // 5 requests per second
-  let limiter = RateLimiter::new( 5, Duration::from_secs( 1 ) );
+  let limiter = RateLimiter::new(5, Duration::from_secs(1));
 
   // First 5 should succeed
   for _ in 0..5 {
-    assert!( limiter.check_rate_limit( "user_002", None ) );
+    assert!(limiter.check_rate_limit("user_002", None));
   }
 
   // 6th should fail
-  let allowed = limiter.check_rate_limit( "user_002", None );
-  assert!( !allowed, "Should reject request exceeding rate limit" );
+  let allowed = limiter.check_rate_limit("user_002", None);
+  assert!(!allowed, "Should reject request exceeding rate limit");
 }
 
-#[ tokio::test ]
-async fn test_rate_limit_recovery_over_time()
-{
+#[tokio::test]
+async fn test_rate_limit_recovery_over_time() {
   // 2 requests per 100ms
-  let limiter = RateLimiter::new( 2, Duration::from_millis( 100 ) );
+  let limiter = RateLimiter::new(2, Duration::from_millis(100));
 
   // Use both requests
-  assert!( limiter.check_rate_limit( "user_003", None ) );
-  assert!( limiter.check_rate_limit( "user_003", None ) );
+  assert!(limiter.check_rate_limit("user_003", None));
+  assert!(limiter.check_rate_limit("user_003", None));
 
   // Should be exhausted
-  assert!( !limiter.check_rate_limit( "user_003", None ) );
+  assert!(!limiter.check_rate_limit("user_003", None));
 
   // Wait for replenishment
-  tokio::time::sleep( Duration::from_millis( 150 ) ).await;
+  tokio::time::sleep(Duration::from_millis(150)).await;
 
   // Should allow again
-  let allowed = limiter.check_rate_limit( "user_003", None );
-  assert!( allowed, "Rate limit should recover over time" );
+  let allowed = limiter.check_rate_limit("user_003", None);
+  assert!(allowed, "Rate limit should recover over time");
 }
 
-#[ tokio::test ]
-async fn test_per_user_isolation()
-{
+#[tokio::test]
+async fn test_per_user_isolation() {
   // 3 requests per second
-  let limiter = RateLimiter::new( 3, Duration::from_secs( 1 ) );
+  let limiter = RateLimiter::new(3, Duration::from_secs(1));
 
   // User 1 exhausts their quota
   for _ in 0..3 {
-    assert!( limiter.check_rate_limit( "user_004", None ) );
+    assert!(limiter.check_rate_limit("user_004", None));
   }
-  assert!( !limiter.check_rate_limit( "user_004", None ) );
+  assert!(!limiter.check_rate_limit("user_004", None));
 
   // User 2 should have independent quota
-  let allowed = limiter.check_rate_limit( "user_005", None );
-  assert!( allowed, "Different users should have independent rate limits" );
+  let allowed = limiter.check_rate_limit("user_005", None);
+  assert!(
+    allowed,
+    "Different users should have independent rate limits"
+  );
 }
 
-#[ tokio::test ]
-async fn test_project_level_rate_limiting()
-{
+#[tokio::test]
+async fn test_project_level_rate_limiting() {
   // 5 requests per second
-  let limiter = RateLimiter::new( 5, Duration::from_secs( 1 ) );
+  let limiter = RateLimiter::new(5, Duration::from_secs(1));
 
   // Same user, different projects should have independent limits
   for _ in 0..5 {
-    assert!( limiter.check_rate_limit( "user_006", Some( "project_alpha" ) ) );
+    assert!(limiter.check_rate_limit("user_006", Some("project_alpha")));
   }
-  assert!( !limiter.check_rate_limit( "user_006", Some( "project_alpha" ) ) );
+  assert!(!limiter.check_rate_limit("user_006", Some("project_alpha")));
 
   // Different project should still have quota
-  let allowed = limiter.check_rate_limit( "user_006", Some( "project_beta" ) );
-  assert!( allowed, "Different projects should have independent rate limits" );
+  let allowed = limiter.check_rate_limit("user_006", Some("project_beta"));
+  assert!(
+    allowed,
+    "Different projects should have independent rate limits"
+  );
 }
 
-#[ tokio::test ]
-async fn test_get_remaining_quota()
-{
+#[tokio::test]
+async fn test_get_remaining_quota() {
   // 10 requests per second
-  let limiter = RateLimiter::new( 10, Duration::from_secs( 1 ) );
+  let limiter = RateLimiter::new(10, Duration::from_secs(1));
 
   // Use 3 requests
   for _ in 0..3 {
-    let _ = limiter.check_rate_limit( "user_007", None );
+    let _ = limiter.check_rate_limit("user_007", None);
   }
 
-  let remaining = limiter.get_remaining_requests( "user_007", None );
-  assert_eq!( remaining, 7, "Should have 7 requests remaining" );
+  let remaining = limiter.get_remaining_requests("user_007", None);
+  assert_eq!(remaining, 7, "Should have 7 requests remaining");
 }
 
-#[ tokio::test ]
-async fn test_burst_handling()
-{
+#[tokio::test]
+async fn test_burst_handling() {
   // 10 requests per second with burst capacity
-  let limiter = RateLimiter::new( 10, Duration::from_secs( 1 ) );
+  let limiter = RateLimiter::new(10, Duration::from_secs(1));
 
   // Should allow burst of 10 requests immediately
   for i in 0..10 {
-    let allowed = limiter.check_rate_limit( "user_008", None );
-    assert!( allowed, "Should allow burst request {i}" );
+    let allowed = limiter.check_rate_limit("user_008", None);
+    assert!(allowed, "Should allow burst request {i}");
   }
 
   // 11th should fail (burst exhausted)
-  assert!( !limiter.check_rate_limit( "user_008", None ) );
+  assert!(!limiter.check_rate_limit("user_008", None));
 }
 
-#[ tokio::test ]
-async fn test_zero_quota_always_rejects()
-{
+#[tokio::test]
+async fn test_zero_quota_always_rejects() {
   // 0 requests per second (disabled)
-  let limiter = RateLimiter::new( 0, Duration::from_secs( 1 ) );
+  let limiter = RateLimiter::new(0, Duration::from_secs(1));
 
-  let allowed = limiter.check_rate_limit( "user_009", None );
-  assert!( !allowed, "Zero quota should always reject" );
+  let allowed = limiter.check_rate_limit("user_009", None);
+  assert!(!allowed, "Zero quota should always reject");
 }

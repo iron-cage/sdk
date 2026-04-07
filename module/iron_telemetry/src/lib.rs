@@ -177,27 +177,27 @@
 #![cfg_attr(not(feature = "enabled"), allow(unused_variables, dead_code))]
 
 #[cfg(feature = "enabled")]
-mod implementation
-{
+mod implementation {
   use tracing::level_filters::LevelFilter;
 
   /// Log level configuration
   #[derive(Debug, Clone, Copy)]
-  pub enum LogLevel
-  {
+  pub enum LogLevel {
+    /// Extremely verbose tracing output.
     Trace,
+    /// Debug-level messages for development.
     Debug,
+    /// Informational messages about normal operation.
     Info,
+    /// Warnings about unexpected but non-fatal conditions.
     Warn,
+    /// Critical errors that require attention.
     Error,
   }
 
-  impl From<LogLevel> for LevelFilter
-  {
-    fn from(level: LogLevel) -> Self
-    {
-      match level
-      {
+  impl From<LogLevel> for LevelFilter {
+    fn from(level: LogLevel) -> Self {
+      match level {
         LogLevel::Trace => LevelFilter::TRACE,
         LogLevel::Debug => LevelFilter::DEBUG,
         LogLevel::Info => LevelFilter::INFO,
@@ -207,12 +207,9 @@ mod implementation
     }
   }
 
-  impl LogLevel
-  {
-    fn as_str(&self) -> &'static str
-    {
-      match self
-      {
+  impl LogLevel {
+    fn as_str(self) -> &'static str {
+      match self {
         LogLevel::Trace => "trace",
         LogLevel::Debug => "debug",
         LogLevel::Info => "info",
@@ -226,8 +223,11 @@ mod implementation
   ///
   /// Sets up tracing subscriber with specified log level.
   /// Call this once at application startup.
-  pub fn init_logging(level: LogLevel) -> Result<(), Box<dyn std::error::Error>>
-  {
+  ///
+  /// # Errors
+  ///
+  /// Returns an error if a global tracing subscriber has already been set.
+  pub fn init_logging(level: LogLevel) -> Result<(), Box<dyn core::error::Error>> {
     use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
     // Honor RUST_LOG if set; otherwise default to provided level.
@@ -249,8 +249,7 @@ mod implementation
   }
 
   /// Log an agent lifecycle event
-  pub fn log_agent_event(agent_id: &str, event: &str)
-  {
+  pub fn log_agent_event(agent_id: &str, event: &str) {
     tracing::info!(
       agent_id = %agent_id,
       event = %event,
@@ -259,8 +258,7 @@ mod implementation
   }
 
   /// Log a PII detection event
-  pub fn log_pii_detection(agent_id: &str, pii_type: &str, location: usize)
-  {
+  pub fn log_pii_detection(agent_id: &str, pii_type: &str, location: usize) {
     tracing::warn!(
       agent_id = %agent_id,
       pii_type = %pii_type,
@@ -270,8 +268,7 @@ mod implementation
   }
 
   /// Log a budget warning
-  pub fn log_budget_warning(agent_id: &str, spent: f64, limit: f64)
-  {
+  pub fn log_budget_warning(agent_id: &str, spent: f64, limit: f64) {
     tracing::warn!(
       agent_id = %agent_id,
       spent = spent,
@@ -286,12 +283,11 @@ mod implementation
 pub use implementation::*;
 
 #[cfg(not(feature = "enabled"))]
-mod stub
-{
+mod stub {
   /// Stub log level for disabled feature
   #[derive(Debug, Clone, Copy)]
-  pub enum LogLevel
-  {
+  pub enum LogLevel {
+    Trace,
     Debug,
     Info,
     Warn,
@@ -299,8 +295,7 @@ mod stub
   }
 
   /// Stub init function
-  pub fn init_logging(_level: LogLevel) -> Result<(), Box<dyn std::error::Error>>
-  {
+  pub fn init_logging(_level: LogLevel) -> Result<(), Box<dyn core::error::Error>> {
     Ok(())
   }
 

@@ -31,61 +31,56 @@
 
 mod common;
 
-use axum::
-{
+use std::sync::Arc;
+
+use axum::{
   body::Body,
-  http::{ Request, StatusCode },
+  http::{Request, StatusCode},
   Router,
 };
-use iron_control_api::
-{
-  ic_token::{ IcTokenClaims, IcTokenManager },
-  routes::budget::{ BudgetState, handshake, report_usage, refresh_budget },
-};
-use iron_token_manager::lease_manager::LeaseManager;
 use serde_json::json;
 use sqlx::SqlitePool;
-use std::sync::Arc;
 use tower::ServiceExt;
 
+use iron_control_api::{
+  ic_token::{IcTokenClaims, IcTokenManager, IcTokenRateLimiter},
+  ip_token::IpTokenCrypto,
+  jwt_auth::JwtSecret,
+  routes::budget::{handshake, refresh_budget, report_usage, BudgetState},
+};
+use iron_secrets::{crypto::CryptoService, ip_token::IpTokenKey};
+use iron_token_manager::{
+  agent_budget::AgentBudgetManager, lease_manager::LeaseManager,
+  provider_key_storage::ProviderKeyStorage,
+};
+
 /// Helper: Create test database with all migrations
-async fn setup_test_db() -> SqlitePool
-{
-  let pool = SqlitePool::connect( "sqlite::memory:" ).await.unwrap();
-  iron_token_manager::migrations::apply_all_migrations( &pool )
+async fn setup_test_db() -> SqlitePool {
+  let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+  iron_token_manager::migrations::apply_all_migrations(&pool)
     .await
     .expect("LOUD FAILURE: Failed to apply migrations");
   pool
 }
 
-/// Helper: Create test BudgetState
-async fn create_test_budget_state( pool: SqlitePool ) -> BudgetState
-{
+/// Helper: Create test `BudgetState`
+#[allow(clippy::unused_async)]
+async fn create_test_budget_state(pool: SqlitePool) -> BudgetState {
   let ic_token_secret = "test_secret_key_12345".to_string();
-  let ip_token_key : [ u8; 32 ] = [ 0u8; 32 ];
-  let provider_key_master : [ u8; 32 ] = [ 42u8; 32 ];
+  let ip_token_key: [u8; 32] = [0u8; 32];
+  let ip_token_key_typed = IpTokenKey::try_from(ip_token_key).unwrap();
+  let provider_key_master: [u8; 32] = [42u8; 32];
 
-  let ic_token_manager = Arc::new( IcTokenManager::new( ic_token_secret ) );
-  let ip_token_crypto = Arc::new(
-    iron_control_api::ip_token::IpTokenCrypto::new( &ip_token_key ).unwrap()
-  );
-  let provider_key_crypto = Arc::new(
-    iron_secrets::crypto::CryptoService::new( &provider_key_master ).unwrap()
-  );
-  let crypto_service = Arc::new(
-    iron_secrets::crypto::CryptoService::new( &provider_key_master ).unwrap()
-  );
-  let lease_manager = Arc::new( LeaseManager::from_pool( pool.clone() ) );
-  let agent_budget_manager = Arc::new(
-    iron_token_manager::agent_budget::AgentBudgetManager::from_pool( pool.clone() )
-  );
-  let provider_key_storage = Arc::new(
-    iron_token_manager::provider_key_storage::ProviderKeyStorage::new( pool.clone() )
-  );
-  let jwt_secret = Arc::new( iron_control_api::jwt_auth::JwtSecret::new( "test_jwt_secret".to_string() ) );
+  let ic_token_manager = Arc::new(IcTokenManager::new(ic_token_secret));
+  let ip_token_crypto = Arc::new(IpTokenCrypto::new(&ip_token_key_typed).unwrap());
+  let provider_key_crypto = Arc::new(CryptoService::new(&provider_key_master).unwrap());
+  let crypto_service = Arc::new(CryptoService::new(&provider_key_master).unwrap());
+  let lease_manager = Arc::new(LeaseManager::from_pool(pool.clone()));
+  let agent_budget_manager = Arc::new(AgentBudgetManager::from_pool(pool.clone()));
+  let provider_key_storage = Arc::new(ProviderKeyStorage::new(pool.clone()));
+  let jwt_secret = Arc::new(JwtSecret::new("test_jwt_secret".to_string()));
 
-  BudgetState
-  {
+  BudgetState {
     ic_token_manager,
     ip_token_crypto,
     lease_manager,
@@ -94,58 +89,70 @@ async fn create_test_budget_state( pool: SqlitePool ) -> BudgetState
     provider_key_crypto,
     db_pool: pool,
     jwt_secret,
-    crypto_service: Some( crypto_service ),
+    crypto_service: Some(crypto_service),
+    ic_token_rate_limiter: IcTokenRateLimiter::new(),
   }
 }
 
 /// Helper: Generate IC Token for test agent
-fn create_ic_token( agent_id: i64, manager: &IcTokenManager ) -> String
-{
+async fn create_ic_token(
+  pool: &sqlx::SqlitePool,
+  agent_id: i64,
+  manager: &IcTokenManager,
+) -> String {
   let claims = IcTokenClaims::new(
-    format!( "agent_{}", agent_id ),
-    format!( "budget_{}", agent_id ),
-    vec![ "llm:call".to_string() ],
-    None, // No expiration
+    format!("agent_{agent_id}"),
+    format!("budget_{agent_id}"),
+    vec!["llm:call".to_string()],
+    None,
   );
-
-  manager.generate_token( &claims ).expect("LOUD FAILURE: Should generate IC Token")
+  let token = manager
+    .generate_token(&claims)
+    .expect("LOUD FAILURE: Should generate IC Token");
+  let token_hash = iron_control_api::ic_token::sha256_hash(&token);
+  sqlx::query("UPDATE agents SET ic_token_hash = ? WHERE id = ?")
+    .bind(&token_hash)
+    .bind(agent_id)
+    .execute(pool)
+    .await
+    .expect("LOUD FAILURE: Failed to store ic_token_hash");
+  token
 }
 
 /// Helper: Seed agent with specific budget and provider key
 ///
 /// # Fix(issue-database-state-unique-001)
-/// Root cause: Hardcoded agent_id=1 and provider_key id=1 conflicted with migration 017 seeded data
-/// Pitfall: Always use unique IDs for test data; use agent_id > 100 and provider_key id = agent_id * 1000 to avoid conflicts
-async fn seed_agent_with_budget( pool: &SqlitePool, agent_id: i64, budget_microdollars: i64 )
-{
+/// Root cause: Hardcoded `agent_id=1` and `provider_key` id=1 conflicted with migration 017 seeded data
+/// Pitfall: Always use unique IDs for test data; use `agent_id` > 100 and `provider_key` id = `agent_id` * 1000 to avoid conflicts
+async fn seed_agent_with_budget(pool: &SqlitePool, agent_id: i64, budget_microdollars: i64) {
   let now_ms = chrono::Utc::now().timestamp_millis();
 
   // Create test user if it doesn't exist (required for owner_id foreign key)
   sqlx::query(
     "INSERT OR IGNORE INTO users (id, username, password_hash, email, role, is_active, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)"
+     VALUES (?, ?, ?, ?, ?, ?, ?)",
   )
-  .bind( "test_user" )
-  .bind( "test_username" )
-  .bind( "$2b$12$test_password_hash" )
-  .bind( "test@example.com" )
-  .bind( "admin" )
-  .bind( 1 )
-  .bind( now_ms )
-  .execute( pool )
+  .bind("test_user")
+  .bind("test_username")
+  .bind("$2b$12$test_password_hash")
+  .bind("test@example.com")
+  .bind("admin")
+  .bind(1)
+  .bind(now_ms)
+  .execute(pool)
   .await
   .unwrap();
 
   // Insert agent with owner_id
   sqlx::query(
-    "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)"
+    "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)",
   )
-  .bind( agent_id )
-  .bind( format!( "test_agent_{}", agent_id ) )
-  .bind( serde_json::to_string( &vec![ "openai" ] ).unwrap() )
-  .bind( now_ms )
-  .bind( "test_user" )
-  .execute( pool )
+  .bind(agent_id)
+  .bind(format!("test_agent_{agent_id}"))
+  .bind(serde_json::to_string(&vec!["openai"]).unwrap())
+  .bind(now_ms)
+  .bind("test_user")
+  .execute(pool)
   .await
   .unwrap();
 
@@ -166,12 +173,13 @@ async fn seed_agent_with_budget( pool: &SqlitePool, agent_id: i64, budget_microd
   // Insert into ai_provider_keys (actual table name from migration 004)
   // Use unique provider key ID based on agent_id to avoid conflicts between tests
   // Create real encrypted provider key for testing
-  let test_provider_key = format!( "sk-test_key_for_agent_{}", agent_id );
-  let provider_key_master : [ u8; 32 ] = [ 42u8; 32 ]; // Test master key (must match create_test_budget_state)
-  let crypto_service = iron_secrets::crypto::CryptoService::new( &provider_key_master )
-    .expect( "LOUD FAILURE: Should create crypto service" );
-  let encrypted = crypto_service.encrypt( &test_provider_key )
-    .expect( "LOUD FAILURE: Should encrypt provider key" );
+  let test_provider_key = format!("sk-test_key_for_agent_{agent_id}");
+  let provider_key_master: [u8; 32] = [42u8; 32]; // Test master key (must match create_test_budget_state)
+  let crypto_service = iron_secrets::crypto::CryptoService::new(&provider_key_master)
+    .expect("LOUD FAILURE: Should create crypto service");
+  let encrypted = crypto_service
+    .encrypt(&test_provider_key)
+    .expect("LOUD FAILURE: Should encrypt provider key");
 
   sqlx::query(
     "INSERT INTO ai_provider_keys (id, provider, encrypted_api_key, encryption_nonce, is_enabled, created_at, user_id)
@@ -203,7 +211,6 @@ async fn seed_agent_with_budget( pool: &SqlitePool, agent_id: i64, budget_microd
   .unwrap();
 }
 
-
 // ============================================================================
 // TEST 1: Handshake with Non-Existent Agent
 // ============================================================================
@@ -212,7 +219,7 @@ async fn seed_agent_with_budget( pool: &SqlitePool, agent_id: i64, budget_microd
 ///
 /// # Corner Case
 ///
-/// IC Token contains agent_id that doesnt exist in database
+/// IC Token contains `agent_id` that doesnt exist in database
 ///
 /// # Expected Behavior
 ///
@@ -225,25 +232,24 @@ async fn seed_agent_with_budget( pool: &SqlitePool, agent_id: i64, budget_microd
 /// for non-existent agents and potentially access provider keys without budget tracking.
 ///
 /// **Prevention**: Database lookup MUST occur before any budget operations.
-#[ tokio::test ]
-async fn test_handshake_with_nonexistent_agent()
-{
+#[tokio::test]
+async fn test_handshake_with_nonexistent_agent() {
   let pool = setup_test_db().await;
 
   // Create test user and provider key for testing (agent 999 won't exist)
   let now_ms = chrono::Utc::now().timestamp_millis();
   sqlx::query(
     "INSERT OR IGNORE INTO users (id, username, password_hash, email, role, is_active, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)"
+     VALUES (?, ?, ?, ?, ?, ?, ?)",
   )
-  .bind( "test_user" )
-  .bind( "test_username" )
-  .bind( "$2b$12$test_password_hash" )
-  .bind( "test@example.com" )
-  .bind( "admin" )
-  .bind( 1 )
-  .bind( now_ms )
-  .execute( &pool )
+  .bind("test_user")
+  .bind("test_username")
+  .bind("$2b$12$test_password_hash")
+  .bind("test@example.com")
+  .bind("admin")
+  .bind(1)
+  .bind(now_ms)
+  .execute(&pool)
   .await
   .unwrap();
 
@@ -251,7 +257,7 @@ async fn test_handshake_with_nonexistent_agent()
     "INSERT INTO ai_provider_keys (id, provider, encrypted_api_key, encryption_nonce, is_enabled, created_at, user_id)
      VALUES (?, ?, ?, ?, ?, ?, ?)"
   )
-  .bind( 999000i64 )
+  .bind( 999_000_i64 )
   .bind( "openai" )
   .bind( "encrypted_test_key_base64" )
   .bind( "test_nonce_base64" )
@@ -262,31 +268,31 @@ async fn test_handshake_with_nonexistent_agent()
   .await
   .unwrap();
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state(pool.clone()).await;
 
   // Create IC Token for agent that doesnt exist (agent_id = 999)
-  let ic_token = create_ic_token( 999, &state.ic_token_manager );
+  let ic_token = create_ic_token(&pool, 999, &state.ic_token_manager).await;
 
   // Build handshake request
   let request_body = json!(
   {
     "ic_token": ic_token,
     "provider": "openai",
-    "provider_key_id": 999000
+    "provider_key_id": 999_000
   } );
 
   let app = Router::new()
-    .route( "/api/budget/handshake", axum::routing::post( handshake ) )
-    .with_state( state );
+    .route("/api/budget/handshake", axum::routing::post(handshake))
+    .with_state(state);
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(serde_json::to_string(&request_body).unwrap()))
     .unwrap();
 
-  let response = app.oneshot( request ).await.unwrap();
+  let response = app.oneshot(request).await.unwrap();
 
   // Assert: HTTP 401 Unauthorized (generic error to prevent agent enumeration)
   assert_eq!(
@@ -295,13 +301,14 @@ async fn test_handshake_with_nonexistent_agent()
     "Handshake with non-existent agent should return 401 Unauthorized (security: prevent enumeration)"
   );
 
-  let body = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let body_str = String::from_utf8( body.to_vec() ).unwrap();
+  let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let body_str = String::from_utf8(body.to_vec()).unwrap();
 
   assert!(
-    body_str.contains( "Invalid IC Token" ),
-    "Error message should be generic to prevent agent enumeration: {}",
-    body_str
+    body_str.contains("Invalid IC Token"),
+    "Error message should be generic to prevent agent enumeration: {body_str}"
   );
 }
 
@@ -313,7 +320,7 @@ async fn test_handshake_with_nonexistent_agent()
 ///
 /// # Corner Case
 ///
-/// Agent exists in database but budget.remaining_micros = 0
+/// Agent exists in database but `budget.remaining_micros` = 0
 ///
 /// # Expected Behavior
 ///
@@ -326,36 +333,35 @@ async fn test_handshake_with_nonexistent_agent()
 /// enforcement if not explicitly checked.
 ///
 /// **Prevention**: Budget check MUST use `<` not `<=` to reject zero budgets.
-#[ tokio::test ]
-async fn test_handshake_with_zero_agent_budget()
-{
+#[tokio::test]
+async fn test_handshake_with_zero_agent_budget() {
   let pool = setup_test_db().await;
 
   // Seed agent with exactly $0.00 budget
-  seed_agent_with_budget( &pool, 114, 0 ).await;
+  seed_agent_with_budget(&pool, 114, 0).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( 114, &state.ic_token_manager );
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, 114, &state.ic_token_manager).await;
 
   let request_body = json!(
   {
     "ic_token": ic_token,
     "provider": "openai",
-    "provider_key_id": 114000
+    "provider_key_id": 114_000
   } );
 
   let app = Router::new()
-    .route( "/api/budget/handshake", axum::routing::post( handshake ) )
-    .with_state( state );
+    .route("/api/budget/handshake", axum::routing::post(handshake))
+    .with_state(state);
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(serde_json::to_string(&request_body).unwrap()))
     .unwrap();
 
-  let response = app.oneshot( request ).await.unwrap();
+  let response = app.oneshot(request).await.unwrap();
 
   // Assert: HTTP 403 Forbidden
   assert_eq!(
@@ -364,13 +370,14 @@ async fn test_handshake_with_zero_agent_budget()
     "Handshake with zero budget should return 403 Forbidden"
   );
 
-  let body = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let body_str = String::from_utf8( body.to_vec() ).unwrap();
+  let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let body_str = String::from_utf8(body.to_vec()).unwrap();
 
   assert!(
-    body_str.contains( "Budget limit exceeded" ),
-    "Error message should indicate budget limit exceeded: {}",
-    body_str
+    body_str.contains("Budget limit exceeded"),
+    "Error message should indicate budget limit exceeded: {body_str}"
   );
 }
 
@@ -387,7 +394,7 @@ async fn test_handshake_with_zero_agent_budget()
 /// # Expected Behavior
 ///
 /// - HTTP 200 OK with granted budget = $5.00
-/// - Implementation grants min(default_lease, remaining_budget) to allow partial leases
+/// - Implementation grants `min(default_lease, remaining_budget)` to allow partial leases
 ///
 /// # Root Cause Prevention
 ///
@@ -395,36 +402,35 @@ async fn test_handshake_with_zero_agent_budget()
 /// is less than default lease amount, enabling multiple concurrent leases.
 ///
 /// **Prevention**: Ensures implementation uses min(default, remaining) formula correctly.
-#[ tokio::test ]
-async fn test_handshake_with_insufficient_budget_for_lease()
-{
+#[tokio::test]
+async fn test_handshake_with_insufficient_budget_for_lease() {
   let pool = setup_test_db().await;
 
   // Seed agent with $5.00 (less than $10.00 default lease)
-  seed_agent_with_budget( &pool, 115, 5_000_000 ).await;
+  seed_agent_with_budget(&pool, 115, 5_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
-  let ic_token = create_ic_token( 115, &state.ic_token_manager );
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, 115, &state.ic_token_manager).await;
 
   let request_body = json!(
   {
     "ic_token": ic_token,
     "provider": "openai",
-    "provider_key_id": 115000
+    "provider_key_id": 115_000
   } );
 
   let app = Router::new()
-    .route( "/api/budget/handshake", axum::routing::post( handshake ) )
-    .with_state( state );
+    .route("/api/budget/handshake", axum::routing::post(handshake))
+    .with_state(state);
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/handshake" )
-    .header( "content-type", "application/json" )
-    .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+    .method("POST")
+    .uri("/api/budget/handshake")
+    .header("content-type", "application/json")
+    .body(Body::from(serde_json::to_string(&request_body).unwrap()))
     .unwrap();
 
-  let response = app.oneshot( request ).await.unwrap();
+  let response = app.oneshot(request).await.unwrap();
 
   // Assert: HTTP 200 OK (partial lease granted)
   assert_eq!(
@@ -433,15 +439,16 @@ async fn test_handshake_with_insufficient_budget_for_lease()
     "Handshake should succeed with partial lease when budget < default"
   );
 
-  let body = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let response_json: serde_json::Value = serde_json::from_slice( &body ).unwrap();
+  let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let response_json: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
   // Verify partial lease granted (should be min($10, $5) = $5)
-  let granted = response_json[ "budget_granted" ].as_i64().unwrap();
+  let granted = response_json["budget_granted"].as_i64().unwrap();
   assert_eq!(
     granted, 5_000_000,
-    "Should grant partial lease of $5, got {} microdollars",
-    granted
+    "Should grant partial lease of $5, got {granted} microdollars"
   );
 }
 
@@ -466,15 +473,18 @@ async fn test_handshake_with_insufficient_budget_for_lease()
 /// on fake leases to manipulate budget accounting.
 ///
 /// **Prevention**: Lease lookup MUST occur before any usage accounting.
-#[ tokio::test ]
-async fn test_report_usage_with_nonexistent_lease()
-{
+#[tokio::test]
+async fn test_report_usage_with_nonexistent_lease() {
   let pool = setup_test_db().await;
-  let state = create_test_budget_state( pool.clone() ).await;
+  seed_agent_with_budget(&pool, 119, 100_000_000).await;
+
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, 119, &state.ic_token_manager).await;
 
   // Create usage report for non-existent lease
   let request_body = json!(
   {
+    "ic_token": ic_token,
     "lease_id": "lease_00000000-0000-0000-0000-000000000000",
     "request_id": "req_12345",
     "tokens": 1000,
@@ -484,17 +494,17 @@ async fn test_report_usage_with_nonexistent_lease()
   } );
 
   let app = Router::new()
-    .route( "/api/budget/report", axum::routing::post( report_usage ) )
-    .with_state( state );
+    .route("/api/budget/report", axum::routing::post(report_usage))
+    .with_state(state);
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/report" )
-    .header( "content-type", "application/json" )
-    .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+    .method("POST")
+    .uri("/api/budget/report")
+    .header("content-type", "application/json")
+    .body(Body::from(serde_json::to_string(&request_body).unwrap()))
     .unwrap();
 
-  let response = app.oneshot( request ).await.unwrap();
+  let response = app.oneshot(request).await.unwrap();
 
   // Assert: HTTP 404 Not Found
   assert_eq!(
@@ -503,13 +513,14 @@ async fn test_report_usage_with_nonexistent_lease()
     "Report usage with non-existent lease should return 404 Not Found"
   );
 
-  let body = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let body_str = String::from_utf8( body.to_vec() ).unwrap();
+  let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let body_str = String::from_utf8(body.to_vec()).unwrap();
 
   assert!(
-    body_str.contains( "Lease not found" ) || body_str.contains( "not found" ),
-    "Error message should indicate lease not found: {}",
-    body_str
+    body_str.contains("Lease not found") || body_str.contains("not found"),
+    "Error message should indicate lease not found: {body_str}"
   );
 }
 
@@ -521,7 +532,7 @@ async fn test_report_usage_with_nonexistent_lease()
 ///
 /// # Corner Case
 ///
-/// Lease exists but expires_at < current_time
+/// Lease exists but `expires_at` < `current_time`
 ///
 /// # Expected Behavior
 ///
@@ -540,28 +551,29 @@ async fn test_report_usage_with_nonexistent_lease()
 /// This test exposes a bug in the current implementation: `report_usage` endpoint
 /// (budget.rs:575-656) does NOT check lease expiry before accepting usage reports.
 /// The implementation only checks if lease exists (line 590-610), not if its expired.
-#[ tokio::test ]
-async fn test_report_usage_on_expired_lease()
-{
+#[tokio::test]
+async fn test_report_usage_on_expired_lease() {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 116, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, 116, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, 116, &state.ic_token_manager).await;
 
   // Create lease that expired 1 hour ago
   let now_ms = chrono::Utc::now().timestamp_millis();
-  let one_hour_ago = now_ms - ( 60 * 60 * 1000 );
+  let one_hour_ago = now_ms - (60 * 60 * 1000);
   let lease_id = "lease_expired_test";
 
   state
     .lease_manager
-    .create_lease( lease_id, 116, 116, 10_000_000, Some( one_hour_ago ) ) // $10
+    .create_lease(lease_id, 116, 116, 10_000_000, Some(one_hour_ago)) // $10
     .await
     .unwrap();
 
   // Try to report usage on expired lease
   let request_body = json!(
   {
+    "ic_token": ic_token,
     "lease_id": lease_id,
     "request_id": "req_12345",
     "tokens": 1000,
@@ -571,17 +583,17 @@ async fn test_report_usage_on_expired_lease()
   } );
 
   let app = Router::new()
-    .route( "/api/budget/report", axum::routing::post( report_usage ) )
-    .with_state( state );
+    .route("/api/budget/report", axum::routing::post(report_usage))
+    .with_state(state);
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/report" )
-    .header( "content-type", "application/json" )
-    .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+    .method("POST")
+    .uri("/api/budget/report")
+    .header("content-type", "application/json")
+    .body(Body::from(serde_json::to_string(&request_body).unwrap()))
     .unwrap();
 
-  let response = app.oneshot( request ).await.unwrap();
+  let response = app.oneshot(request).await.unwrap();
 
   // Assert: HTTP 403 Forbidden (lease expired)
   // NOTE: This assertion will FAIL, exposing the bug
@@ -592,13 +604,14 @@ async fn test_report_usage_on_expired_lease()
      but implementation at budget.rs:590-610 doesnt check expiry"
   );
 
-  let body = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let body_str = String::from_utf8( body.to_vec() ).unwrap();
+  let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let body_str = String::from_utf8(body.to_vec()).unwrap();
 
   assert!(
-    body_str.contains( "expired" ) || body_str.contains( "Lease expired" ),
-    "Error message should indicate lease expired: {}",
-    body_str
+    body_str.contains("expired") || body_str.contains("Lease expired"),
+    "Error message should indicate lease expired: {body_str}"
   );
 }
 
@@ -680,7 +693,7 @@ async fn test_report_usage_on_expired_lease()
 ///
 /// # Corner Case
 ///
-/// Lease budget_granted = $1.00, budget_spent = $0.90, usage report cost = $0.50
+/// Lease `budget_granted` = $1.00, `budget_spent` = $0.90, usage report cost = $0.50
 /// Remaining = $0.10, but trying to spend $0.50
 ///
 /// # Expected Behavior
@@ -693,35 +706,40 @@ async fn test_report_usage_on_expired_lease()
 /// **Why This Test Exists**: This is the PRIMARY budget enforcement mechanism.
 /// Without this check, agents could exceed lease budgets indefinitely.
 ///
-/// **Prevention**: Lease budget check MUST occur BEFORE updating budget_spent.
+/// **Prevention**: Lease budget check MUST occur BEFORE updating `budget_spent`.
 ///
 /// # Bug Reproducer
 ///
 /// This test exposes a CRITICAL bug: `report_usage` endpoint (budget.rs:612-624)
 /// does NOT check if lease has sufficient remaining budget before recording usage.
-/// It blindly calls `record_usage()` which just adds to budget_spent unconditionally.
-#[ tokio::test ]
-async fn test_report_usage_exceeding_lease_budget()
-{
+/// It blindly calls `record_usage()` which just adds to `budget_spent` unconditionally.
+#[tokio::test]
+async fn test_report_usage_exceeding_lease_budget() {
   let pool = setup_test_db().await;
-  seed_agent_with_budget( &pool, 117, 100_000_000 ).await;
+  seed_agent_with_budget(&pool, 117, 100_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state(pool.clone()).await;
+  let ic_token = create_ic_token(&pool, 117, &state.ic_token_manager).await;
 
   // Create lease with $1.00 budget
   let lease_id = "lease_budget_test";
   state
     .lease_manager
-    .create_lease( lease_id, 117, 117, 1_000_000, None ) // $1.00
+    .create_lease(lease_id, 117, 117, 1_000_000, None) // $1.00
     .await
     .unwrap();
 
   // Record $0.90 usage (leaving $0.10 remaining)
-  state.lease_manager.record_usage( lease_id, 900_000 ).await.unwrap(); // $0.90
+  state
+    .lease_manager
+    .record_usage(lease_id, 900_000)
+    .await
+    .unwrap(); // $0.90
 
   // Try to report $0.50 usage (exceeds remaining $0.10)
   let request_body = json!(
   {
+    "ic_token": ic_token,
     "lease_id": lease_id,
     "request_id": "req_12345",
     "tokens": 5000,
@@ -731,17 +749,17 @@ async fn test_report_usage_exceeding_lease_budget()
   } );
 
   let app = Router::new()
-    .route( "/api/budget/report", axum::routing::post( report_usage ) )
-    .with_state( state );
+    .route("/api/budget/report", axum::routing::post(report_usage))
+    .with_state(state);
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/report" )
-    .header( "content-type", "application/json" )
-    .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+    .method("POST")
+    .uri("/api/budget/report")
+    .header("content-type", "application/json")
+    .body(Body::from(serde_json::to_string(&request_body).unwrap()))
     .unwrap();
 
-  let response = app.oneshot( request ).await.unwrap();
+  let response = app.oneshot(request).await.unwrap();
 
   // Assert: HTTP 403 Forbidden (insufficient lease budget)
   // NOTE: This assertion will FAIL, exposing CRITICAL bug
@@ -752,13 +770,14 @@ async fn test_report_usage_exceeding_lease_budget()
      but implementation at budget.rs:612-624 doesnt check lease remaining budget"
   );
 
-  let body = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let body_str = String::from_utf8( body.to_vec() ).unwrap();
+  let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let body_str = String::from_utf8(body.to_vec()).unwrap();
 
   assert!(
-    body_str.contains( "Insufficient" ) || body_str.contains( "budget" ),
-    "Error message should indicate insufficient budget: {}",
-    body_str
+    body_str.contains("Insufficient") || body_str.contains("budget"),
+    "Error message should indicate insufficient budget: {body_str}"
   );
 }
 
@@ -869,7 +888,7 @@ async fn test_report_usage_exceeding_lease_budget()
 ///
 /// # Expected Behavior
 ///
-/// - HTTP 200 OK with status="denied" and reason="insufficient_budget"
+/// - HTTP 200 OK with status="denied" and `reason="insufficient_budget"`
 /// - Prevents lease refresh when agent cannot afford it
 ///
 /// # Root Cause Prevention
@@ -884,24 +903,23 @@ async fn test_report_usage_exceeding_lease_budget()
 /// Based on budget.rs:737-748, the refresh endpoint DOES check agent budget
 /// and returns status="denied" (HTTP 200 with denial) when insufficient.
 /// This test verifies the check works correctly.
-#[ tokio::test ]
-async fn test_refresh_with_insufficient_agent_budget()
-{
+#[tokio::test]
+async fn test_refresh_with_insufficient_agent_budget() {
   let pool = setup_test_db().await;
 
   // Seed agent with $5.00 (insufficient for $10.00 default refresh)
-  seed_agent_with_budget( &pool, 118, 5_000_000 ).await;
+  seed_agent_with_budget(&pool, 118, 5_000_000).await;
 
-  let state = create_test_budget_state( pool.clone() ).await;
+  let state = create_test_budget_state(pool.clone()).await;
 
   // Generate IC Token for agent 118
-  let ic_token = create_ic_token( 118, &state.ic_token_manager );
+  let ic_token = create_ic_token(&pool, 118, &state.ic_token_manager).await;
 
   // Create active lease
   let lease_id = "lease_refresh_test";
   state
     .lease_manager
-    .create_lease( lease_id, 118, 118, 10_000_000, None ) // $10
+    .create_lease(lease_id, 118, 118, 10_000_000, None) // $10
     .await
     .unwrap();
 
@@ -914,26 +932,22 @@ async fn test_refresh_with_insufficient_agent_budget()
   } );
 
   // Create valid JWT token for authorization (GAP-003: refresh endpoint requires JWT)
-  let access_token = common::create_test_access_token(
-    "test_user",
-    "test@example.com",
-    "admin",
-    "test_jwt_secret"
-  );
+  let access_token =
+    common::create_test_access_token("test_user", "test@example.com", "admin", "test_jwt_secret");
 
   let app = Router::new()
-    .route( "/api/budget/refresh", axum::routing::post( refresh_budget ) )
-    .with_state( state );
+    .route("/api/budget/refresh", axum::routing::post(refresh_budget))
+    .with_state(state);
 
   let request = Request::builder()
-    .method( "POST" )
-    .uri( "/api/budget/refresh" )
-    .header( "content-type", "application/json" )
-    .header( "authorization", format!( "Bearer {}", access_token ) )
-    .body( Body::from( serde_json::to_string( &request_body ).unwrap() ) )
+    .method("POST")
+    .uri("/api/budget/refresh")
+    .header("content-type", "application/json")
+    .header("authorization", format!("Bearer {access_token}"))
+    .body(Body::from(serde_json::to_string(&request_body).unwrap()))
     .unwrap();
 
-  let response = app.oneshot( request ).await.unwrap();
+  let response = app.oneshot(request).await.unwrap();
 
   // Assert: HTTP 200 OK (refresh endpoint returns 200 even for denials)
   assert_eq!(
@@ -942,12 +956,14 @@ async fn test_refresh_with_insufficient_agent_budget()
     "Refresh request should return 200 OK"
   );
 
-  let body = axum::body::to_bytes( response.into_body(), usize::MAX ).await.unwrap();
-  let body_str = String::from_utf8( body.to_vec() ).unwrap();
+  let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+    .await
+    .unwrap();
+  let body_str = String::from_utf8(body.to_vec()).unwrap();
 
   // Parse JSON response
-  let response_json: serde_json::Value = serde_json::from_str( &body_str )
-    .expect("LOUD FAILURE: Response should be valid JSON");
+  let response_json: serde_json::Value =
+    serde_json::from_str(&body_str).expect("LOUD FAILURE: Response should be valid JSON");
 
   // Fix(issue-budget-008): Refresh now reserves budget via check_and_reserve_budget
   //
@@ -960,21 +976,21 @@ async fn test_refresh_with_insufficient_agent_budget()
 
   // Assert: Status is "approved" (partial grant)
   assert_eq!(
-    response_json[ "status" ].as_str().unwrap(),
+    response_json["status"].as_str().unwrap(),
     "approved",
     "Refresh with partial budget should return status='approved' (partial grant)"
   );
 
   // Assert: budget_granted is $5 (partial grant, not full $10)
   assert_eq!(
-    response_json[ "budget_granted" ].as_i64().unwrap(),
+    response_json["budget_granted"].as_i64().unwrap(),
     5_000_000,
     "Partial grant should provide available budget ($5, not requested $10)"
   );
 
   // Assert: Reason is None (approved, not denied)
   assert!(
-    response_json[ "reason" ].is_null(),
+    response_json["reason"].is_null(),
     "Approved refresh should have no denial reason"
   );
 }

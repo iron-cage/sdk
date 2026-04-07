@@ -1,12 +1,11 @@
 //! Output format enum and parsing
 
-use std::fmt;
-use std::str::FromStr;
+use core::fmt;
+use core::str::FromStr;
 
 /// Output format for CLI responses
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum OutputFormat
-{
+pub enum OutputFormat {
   /// Compact tabular view (default)
   #[default]
   Table,
@@ -18,14 +17,11 @@ pub enum OutputFormat
   Yaml,
 }
 
-impl FromStr for OutputFormat
-{
+impl FromStr for OutputFormat {
   type Err = InvalidFormat;
 
-  fn from_str(s: &str) -> Result<Self, Self::Err>
-  {
-    match s.to_lowercase().as_str()
-    {
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
+    match s.to_lowercase().as_str() {
       "table" => Ok(Self::Table),
       "expanded" => Ok(Self::Expanded),
       "json" => Ok(Self::Json),
@@ -39,10 +35,8 @@ impl FromStr for OutputFormat
 #[derive(Debug, Clone)]
 pub struct InvalidFormat(String);
 
-impl fmt::Display for InvalidFormat
-{
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
-  {
+impl fmt::Display for InvalidFormat {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(
       f,
       "Invalid output format '{}'. Valid formats: table, expanded, json, yaml",
@@ -51,4 +45,4 @@ impl fmt::Display for InvalidFormat
   }
 }
 
-impl std::error::Error for InvalidFormat {}
+impl core::error::Error for InvalidFormat {}

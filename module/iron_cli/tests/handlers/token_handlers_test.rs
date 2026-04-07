@@ -7,19 +7,18 @@
 //!
 //! ## Test Strategy
 //!
-//! Pure function testing: HashMap → Result<String>
+//! Pure function testing: `HashMap` → `Result<String>`
 //! No mocking - handlers have no I/O to mock.
 
+use iron_cli::handlers::{token_handlers::*, CliError};
 use std::collections::HashMap;
-use iron_cli::handlers::{ token_handlers::*, CliError };
 
 // ============================================================================
 // .tokens.generate tests (8 tests)
 // ============================================================================
 
 #[test]
-fn test_generate_token_handler_success()
-{
+fn test_generate_token_handler_success() {
   let mut params = HashMap::new();
   params.insert("name".into(), "my-token".into());
   params.insert("scope".into(), "read:tokens".into());
@@ -30,26 +29,23 @@ fn test_generate_token_handler_success()
 }
 
 #[test]
-fn test_generate_token_handler_missing_name()
-{
+fn test_generate_token_handler_missing_name() {
   let mut params = HashMap::new();
   params.insert("scope".into(), "read:tokens".into());
 
   let result = generate_token_handler(&params);
 
   assert!(result.is_err(), "Should fail without name");
-  match result.unwrap_err()
-  {
+  match result.unwrap_err() {
     CliError::MissingParameter(name) => assert_eq!(name, "name"),
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
 #[test]
-fn test_generate_token_handler_empty_name()
-{
+fn test_generate_token_handler_empty_name() {
   let mut params = HashMap::new();
-  params.insert("name".into(), "".into());
+  params.insert("name".into(), String::new());
   params.insert("scope".into(), "read:tokens".into());
 
   let result = generate_token_handler(&params);
@@ -58,24 +54,21 @@ fn test_generate_token_handler_empty_name()
 }
 
 #[test]
-fn test_generate_token_handler_missing_scope()
-{
+fn test_generate_token_handler_missing_scope() {
   let mut params = HashMap::new();
   params.insert("name".into(), "my-token".into());
 
   let result = generate_token_handler(&params);
 
   assert!(result.is_err(), "Should fail without scope");
-  match result.unwrap_err()
-  {
+  match result.unwrap_err() {
     CliError::MissingParameter(name) => assert_eq!(name, "scope"),
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
 #[test]
-fn test_generate_token_handler_invalid_scope_format()
-{
+fn test_generate_token_handler_invalid_scope_format() {
   let mut params = HashMap::new();
   params.insert("name".into(), "my-token".into());
   params.insert("scope".into(), "invalid".into());
@@ -86,8 +79,7 @@ fn test_generate_token_handler_invalid_scope_format()
 }
 
 #[test]
-fn test_generate_token_handler_with_ttl()
-{
+fn test_generate_token_handler_with_ttl() {
   let mut params = HashMap::new();
   params.insert("name".into(), "my-token".into());
   params.insert("scope".into(), "read:tokens".into());
@@ -99,8 +91,7 @@ fn test_generate_token_handler_with_ttl()
 }
 
 #[test]
-fn test_generate_token_handler_boundary_ttl_min()
-{
+fn test_generate_token_handler_boundary_ttl_min() {
   let mut params = HashMap::new();
   params.insert("name".into(), "my-token".into());
   params.insert("scope".into(), "read:tokens".into());
@@ -112,8 +103,7 @@ fn test_generate_token_handler_boundary_ttl_min()
 }
 
 #[test]
-fn test_generate_token_handler_boundary_ttl_max()
-{
+fn test_generate_token_handler_boundary_ttl_max() {
   let mut params = HashMap::new();
   params.insert("name".into(), "my-token".into());
   params.insert("scope".into(), "read:tokens".into());
@@ -129,8 +119,7 @@ fn test_generate_token_handler_boundary_ttl_max()
 // ============================================================================
 
 #[test]
-fn test_list_tokens_handler_success_empty()
-{
+fn test_list_tokens_handler_success_empty() {
   let params = HashMap::new();
 
   let result = list_tokens_handler(&params);
@@ -139,8 +128,7 @@ fn test_list_tokens_handler_success_empty()
 }
 
 #[test]
-fn test_list_tokens_handler_success_multiple()
-{
+fn test_list_tokens_handler_success_multiple() {
   let params = HashMap::new();
 
   let result = list_tokens_handler(&params);
@@ -149,8 +137,7 @@ fn test_list_tokens_handler_success_multiple()
 }
 
 #[test]
-fn test_list_tokens_handler_format_table()
-{
+fn test_list_tokens_handler_format_table() {
   let mut params = HashMap::new();
   params.insert("format".into(), "table".into());
 
@@ -160,8 +147,7 @@ fn test_list_tokens_handler_format_table()
 }
 
 #[test]
-fn test_list_tokens_handler_format_json()
-{
+fn test_list_tokens_handler_format_json() {
   let mut params = HashMap::new();
   params.insert("format".into(), "json".into());
 
@@ -171,8 +157,7 @@ fn test_list_tokens_handler_format_json()
 }
 
 #[test]
-fn test_list_tokens_handler_with_filter()
-{
+fn test_list_tokens_handler_with_filter() {
   let mut params = HashMap::new();
   params.insert("filter".into(), "active".into());
 
@@ -182,8 +167,7 @@ fn test_list_tokens_handler_with_filter()
 }
 
 #[test]
-fn test_list_tokens_handler_with_sort()
-{
+fn test_list_tokens_handler_with_sort() {
   let mut params = HashMap::new();
   params.insert("sort".into(), "created_at".into());
 
@@ -197,8 +181,7 @@ fn test_list_tokens_handler_with_sort()
 // ============================================================================
 
 #[test]
-fn test_get_token_handler_success()
-{
+fn test_get_token_handler_success() {
   let mut params = HashMap::new();
   params.insert("token_id".into(), "tok_abc123".into());
 
@@ -208,25 +191,22 @@ fn test_get_token_handler_success()
 }
 
 #[test]
-fn test_get_token_handler_missing_token_id()
-{
+fn test_get_token_handler_missing_token_id() {
   let params = HashMap::new();
 
   let result = get_token_handler(&params);
 
   assert!(result.is_err(), "Should fail without token_id");
-  match result.unwrap_err()
-  {
+  match result.unwrap_err() {
     CliError::MissingParameter(name) => assert_eq!(name, "token_id"),
-    other => panic!("Wrong error type: {:?}", other),
+    other => panic!("Wrong error type: {other:?}"),
   }
 }
 
 #[test]
-fn test_get_token_handler_empty_token_id()
-{
+fn test_get_token_handler_empty_token_id() {
   let mut params = HashMap::new();
-  params.insert("token_id".into(), "".into());
+  params.insert("token_id".into(), String::new());
 
   let result = get_token_handler(&params);
 
@@ -234,8 +214,7 @@ fn test_get_token_handler_empty_token_id()
 }
 
 #[test]
-fn test_get_token_handler_invalid_token_id_format()
-{
+fn test_get_token_handler_invalid_token_id_format() {
   let mut params = HashMap::new();
   params.insert("token_id".into(), "invalid@format".into());
 
@@ -245,8 +224,7 @@ fn test_get_token_handler_invalid_token_id_format()
 }
 
 #[test]
-fn test_get_token_handler_format_expanded()
-{
+fn test_get_token_handler_format_expanded() {
   let mut params = HashMap::new();
   params.insert("token_id".into(), "tok_abc123".into());
   params.insert("format".into(), "expanded".into());
@@ -257,8 +235,7 @@ fn test_get_token_handler_format_expanded()
 }
 
 #[test]
-fn test_get_token_handler_format_json()
-{
+fn test_get_token_handler_format_json() {
   let mut params = HashMap::new();
   params.insert("token_id".into(), "tok_abc123".into());
   params.insert("format".into(), "json".into());
@@ -269,8 +246,7 @@ fn test_get_token_handler_format_json()
 }
 
 #[test]
-fn test_get_token_handler_format_yaml()
-{
+fn test_get_token_handler_format_yaml() {
   let mut params = HashMap::new();
   params.insert("token_id".into(), "tok_abc123".into());
   params.insert("format".into(), "yaml".into());
@@ -285,8 +261,7 @@ fn test_get_token_handler_format_yaml()
 // ============================================================================
 
 #[test]
-fn test_rotate_token_handler_success()
-{
+fn test_rotate_token_handler_success() {
   let mut params = HashMap::new();
   params.insert("token_id".into(), "tok_abc123".into());
 
@@ -296,8 +271,7 @@ fn test_rotate_token_handler_success()
 }
 
 #[test]
-fn test_rotate_token_handler_missing_token_id()
-{
+fn test_rotate_token_handler_missing_token_id() {
   let params = HashMap::new();
 
   let result = rotate_token_handler(&params);
@@ -306,10 +280,9 @@ fn test_rotate_token_handler_missing_token_id()
 }
 
 #[test]
-fn test_rotate_token_handler_empty_token_id()
-{
+fn test_rotate_token_handler_empty_token_id() {
   let mut params = HashMap::new();
-  params.insert("token_id".into(), "".into());
+  params.insert("token_id".into(), String::new());
 
   let result = rotate_token_handler(&params);
 
@@ -317,8 +290,7 @@ fn test_rotate_token_handler_empty_token_id()
 }
 
 #[test]
-fn test_rotate_token_handler_invalid_format()
-{
+fn test_rotate_token_handler_invalid_format() {
   let mut params = HashMap::new();
   params.insert("token_id".into(), "invalid@format".into());
 
@@ -328,8 +300,7 @@ fn test_rotate_token_handler_invalid_format()
 }
 
 #[test]
-fn test_rotate_token_handler_with_ttl_change()
-{
+fn test_rotate_token_handler_with_ttl_change() {
   let mut params = HashMap::new();
   params.insert("token_id".into(), "tok_abc123".into());
   params.insert("ttl".into(), "7200".into());
@@ -340,8 +311,7 @@ fn test_rotate_token_handler_with_ttl_change()
 }
 
 #[test]
-fn test_rotate_token_handler_preserve_scope()
-{
+fn test_rotate_token_handler_preserve_scope() {
   let mut params = HashMap::new();
   params.insert("token_id".into(), "tok_abc123".into());
 
@@ -351,19 +321,17 @@ fn test_rotate_token_handler_preserve_scope()
 }
 
 #[test]
-fn test_rotate_token_handler_all_formats()
-{
+fn test_rotate_token_handler_all_formats() {
   let formats = vec!["table", "json", "yaml"];
 
-  for format in formats
-  {
+  for format in formats {
     let mut params = HashMap::new();
     params.insert("token_id".into(), "tok_abc123".into());
     params.insert("format".into(), format.into());
 
     let result = rotate_token_handler(&params);
 
-    assert!(result.is_ok(), "Should succeed with format '{}'", format);
+    assert!(result.is_ok(), "Should succeed with format '{format}'");
   }
 }
 
@@ -372,8 +340,7 @@ fn test_rotate_token_handler_all_formats()
 // ============================================================================
 
 #[test]
-fn test_revoke_token_handler_success()
-{
+fn test_revoke_token_handler_success() {
   let mut params = HashMap::new();
   params.insert("token_id".into(), "tok_abc123".into());
 
@@ -383,8 +350,7 @@ fn test_revoke_token_handler_success()
 }
 
 #[test]
-fn test_revoke_token_handler_missing_token_id()
-{
+fn test_revoke_token_handler_missing_token_id() {
   let params = HashMap::new();
 
   let result = revoke_token_handler(&params);
@@ -393,10 +359,9 @@ fn test_revoke_token_handler_missing_token_id()
 }
 
 #[test]
-fn test_revoke_token_handler_empty_token_id()
-{
+fn test_revoke_token_handler_empty_token_id() {
   let mut params = HashMap::new();
-  params.insert("token_id".into(), "".into());
+  params.insert("token_id".into(), String::new());
 
   let result = revoke_token_handler(&params);
 
@@ -404,8 +369,7 @@ fn test_revoke_token_handler_empty_token_id()
 }
 
 #[test]
-fn test_revoke_token_handler_with_reason()
-{
+fn test_revoke_token_handler_with_reason() {
   let mut params = HashMap::new();
   params.insert("token_id".into(), "tok_abc123".into());
   params.insert("reason".into(), "compromised".into());
@@ -416,11 +380,10 @@ fn test_revoke_token_handler_with_reason()
 }
 
 #[test]
-fn test_revoke_token_handler_empty_reason()
-{
+fn test_revoke_token_handler_empty_reason() {
   let mut params = HashMap::new();
   params.insert("token_id".into(), "tok_abc123".into());
-  params.insert("reason".into(), "".into());
+  params.insert("reason".into(), String::new());
 
   let result = revoke_token_handler(&params);
 
@@ -428,8 +391,7 @@ fn test_revoke_token_handler_empty_reason()
 }
 
 #[test]
-fn test_revoke_token_handler_confirmation()
-{
+fn test_revoke_token_handler_confirmation() {
   let mut params = HashMap::new();
   params.insert("token_id".into(), "tok_abc123".into());
 
@@ -441,18 +403,16 @@ fn test_revoke_token_handler_confirmation()
 }
 
 #[test]
-fn test_revoke_token_handler_all_formats()
-{
+fn test_revoke_token_handler_all_formats() {
   let formats = vec!["table", "json", "yaml"];
 
-  for format in formats
-  {
+  for format in formats {
     let mut params = HashMap::new();
     params.insert("token_id".into(), "tok_abc123".into());
     params.insert("format".into(), format.into());
 
     let result = revoke_token_handler(&params);
 
-    assert!(result.is_ok(), "Should succeed with format '{}'", format);
+    assert!(result.is_ok(), "Should succeed with format '{format}'");
   }
 }

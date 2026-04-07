@@ -16,6 +16,9 @@ members = [
   # Configuration
   "module/iron_config_loader",
 
+  # Shared LLM routing core
+  "module/iron_llm_core",
+
   # Feature layer
   "module/iron_safety",
   "module/iron_reliability",
@@ -29,17 +32,38 @@ members = [
 
   # Application layer
   "module/iron_cli",
+  "module/iron_server_proxy",
 
   # NOTE: Non-Rust modules (not in Cargo workspace):
   # Python: iron_cli_py, iron_testing
   # Frontend: iron_dashboard (Vue.js)
   # iron_control_schema: Removed (spec-only, no implementation, zero dependents)
 ]
+# Default build set: excludes iron_sdk (requires maturin for PyO3 linking).
+# To build iron_sdk explicitly: `cargo build -p iron_sdk --features pyo3`
+default-members = [
+  "module/iron_types",
+  "module/iron_cost",
+  "module/iron_telemetry",
+  "module/iron_runtime_analytics",
+  "module/iron_runtime_state",
+  "module/iron_test_db",
+  "module/iron_config_loader",
+  "module/iron_llm_core",
+  "module/iron_server_proxy",
+  "module/iron_safety",
+  "module/iron_reliability",
+  "module/iron_secrets",
+  "module/iron_token_manager",
+  "module/iron_control_api",
+  "module/iron_runtime",
+  "module/iron_cli",
+]
 
 [workspace.package]
 version = "0.2.0"
 edition = "2021"
-rust-version = "1.70"
+rust-version = "1.85"
 authors = ["iron_cage contributors"]
 license = "MIT"
 
@@ -104,11 +128,10 @@ mod_module_files = "allow"
 missing_docs_in_private_items = "allow"
 # Don't require inline in public items (too restrictive for this use case)
 missing_inline_in_public_items = "allow"
-
-## Error Handling - MUST use error_tools per rulebook
-
-[workspace.dependencies.error_tools]
-version = "0.35"
+# Allow long functions - API handlers naturally exceed 100 lines due to validation, auth, SQL
+too_many_lines = "allow"
+# CLI adapters accept caller-supplied HashMap values; generic BuildHasher bound adds no safety benefit
+implicit_hasher = "allow"
 
 ## Serialization
 
@@ -119,10 +142,10 @@ features = ["derive"]
 ## Web Framework Dependencies
 
 [workspace.dependencies.axum]
-version = "0.7"
+version = "0.8"
 
 [workspace.dependencies.axum-extra]
-version = "0.9"
+version = "0.12"
 features = ["typed-header"]
 
 [workspace.dependencies.tower]
@@ -144,7 +167,7 @@ version = "0.1"
 ## Concurrency & State
 
 [workspace.dependencies.dashmap]
-version = "5.5"
+version = "6.1"
 
 ## Persistence
 
@@ -159,7 +182,7 @@ features = ["tokio-comp", "connection-manager"]
 ## Additional Error Handling
 
 [workspace.dependencies.thiserror]
-version = "1.0"
+version = "2.0"
 
 [workspace.dependencies.anyhow]
 version = "1.0"
@@ -173,7 +196,7 @@ version = "1.0"
 version = "0.9"
 
 [workspace.dependencies.toml]
-version = "0.8"
+version = "1.0.2"
 
 ## Logging & Tracing
 
@@ -201,7 +224,7 @@ version = "4.0"
 features = ["derive"]
 
 [workspace.dependencies.rand]
-version = "0.8"
+version = "0.10"
 
 ## Workspace Management
 
@@ -214,8 +237,14 @@ features = ["serde", "secrets", "secure", "testing"]
 [workspace.dependencies.sha2]
 version = "0.10"
 
+## Hex encoding/decoding
+
+[workspace.dependencies.hex]
+version = "0.4"
+
 [workspace.dependencies.aes-gcm]
 version = "0.10"
+features = ["zeroize"]
 
 [workspace.dependencies.argon2]
 version = "0.5"
@@ -223,13 +252,17 @@ version = "0.5"
 [workspace.dependencies.zeroize]
 version = "1"
 
+[workspace.dependencies.secrecy]
+version = "0.10"
+
 ## Authentication & Rate Limiting
 
 [workspace.dependencies.jsonwebtoken]
-version = "9.0"
+version = "10.3"
+features = ["rust_crypto"]
 
 [workspace.dependencies.governor]
-version = "0.7"
+version = "0.10"
 
 [workspace.dependencies.nonzero_ext]
 version = "0.3"
@@ -240,10 +273,22 @@ version = "0.22"
 [workspace.dependencies.headers]
 version = "0.4"
 
+[workspace.dependencies.tree_fmt]
+version = "0.9"
+
+[workspace.dependencies.keyring]
+version = "3.6"
+
+[workspace.dependencies.dirs]
+version = "6.0"
+
+[workspace.dependencies.unilang]
+version = "0.48"
+
 ## Modularity
 
 [workspace.dependencies.mod_interface]
-version = "0.54"
+version = "0.58"
 
 ## PyO3 for Python Bindings
 ## Fix(pyo3-buffer-overflow): Updated to 0.24.1+ for RUSTSEC-2025-0020
@@ -302,6 +347,10 @@ path = "module/iron_test_db"
 version = "0.4.0"
 path = "module/iron_config_loader"
 
+[workspace.dependencies.iron_llm_core]
+version = "0.2.0"
+path = "module/iron_llm_core"
+
 [workspace.dependencies.iron_safety]
 version = "0.3.0"
 path = "module/iron_safety"
@@ -340,7 +389,7 @@ path = "module/iron_sdk"
 ## HTTP Client
 
 [workspace.dependencies.reqwest]
-version = "0.12"
+version = "0.13"
 features = ["json"]
 
 ## Environment Loading
@@ -351,12 +400,23 @@ version = "0.15"
 ## Password Hashing
 
 [workspace.dependencies.bcrypt]
-version = "0.16"
+version = "0.18"
+
+[workspace.dependencies.subtle]
+version = "2.6"
+
+## Build Dependencies
+
+[workspace.dependencies.vergen]
+version = "9.1"
+
+[workspace.dependencies.vergen-gitcl]
+version = "9.1"
 
 ## Dev Dependencies
 
 [workspace.dependencies.tempfile]
-version = "3.0"
+version = "3.8"
 
 [workspace.dependencies.hyper]
 version = "1.5"
@@ -373,3 +433,23 @@ version = "0.8.4"
 
 [workspace.dependencies.wiremock]
 version = "0.6.5"
+
+[workspace.dependencies.tokio-test]
+version = "0.4"
+
+[workspace.dependencies.serial_test]
+version = "3.2"
+
+[workspace.dependencies.walkdir]
+version = "2.4"
+
+[workspace.dependencies.criterion]
+version = "0.8"
+
+[workspace.dependencies.futures-util]
+version = "0.3"
+default-features = false
+features = ["alloc"]
+
+[workspace.dependencies.lru]
+version = "0.12"

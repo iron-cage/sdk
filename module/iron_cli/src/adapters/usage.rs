@@ -4,16 +4,16 @@
 //!
 //! ## Flow
 //!
-//! 1. Extract parameters from VerifiedCommand
+//! 1. Extract parameters from `VerifiedCommand`
 //! 2. Call handler for validation (pure, sync)
-//! 3. Perform async I/O via UsageService
+//! 3. Perform async I/O via `UsageService`
 //! 4. Format output
 
-use super::AdapterError;
-use super::services::UsageService;
 use super::auth::HasParams;
-use crate::handlers::usage_handlers;
+use super::services::UsageService;
+use super::AdapterError;
 use crate::formatting::TreeFmtFormatter;
+use crate::handlers::usage_handlers;
 use std::collections::HashMap;
 
 /// Extract parameters from command
@@ -25,6 +25,10 @@ where
 }
 
 /// Show usage adapter
+///
+/// # Errors
+///
+/// Returns [`AdapterError`] if handler validation or service call fails.
 pub async fn show_usage_adapter<T, S>(
   command: &T,
   usage_service: S,
@@ -35,42 +39,41 @@ where
   S: UsageService,
 {
   // Extract parameters
-  let params = extract_params( command );
+  let params = extract_params(command);
 
   // Call handler for validation (pure, sync)
-  let _ = usage_handlers::show_usage_handler( &params )?;
+  let _ = usage_handlers::show_usage_handler(&params)?;
 
   // Extract date range parameters
-  let start_date = params.get( "start_date" ).map( |s| s.as_str() );
-  let end_date = params.get( "end_date" ).map( |s| s.as_str() );
+  let start_date = params.get("start_date").map(String::as_str);
+  let end_date = params.get("end_date").map(String::as_str);
 
   // Perform async usage retrieval
-  let records = usage_service.get_usage( start_date, end_date ).await?;
+  let records = usage_service.get_usage(start_date, end_date).await?;
 
   // Format output
   let mut output_data = HashMap::new();
-  output_data.insert( "status".to_string(), "usage retrieved".to_string() );
-  output_data.insert( "record_count".to_string(), records.len().to_string() );
+  output_data.insert("status".to_string(), "usage retrieved".to_string());
+  output_data.insert("record_count".to_string(), records.len().to_string());
 
-  if let (Some(start), Some(end)) = (start_date, end_date)
-  {
-    output_data.insert( "date_range".to_string(), format!( "{} to {}", start, end ) );
-  }
-  else if let Some(start) = start_date
-  {
-    output_data.insert( "date_range".to_string(), format!( "from {}", start ) );
-  }
-  else
-  {
-    output_data.insert( "date_range".to_string(), "all time".to_string() );
+  if let (Some(start), Some(end)) = (start_date, end_date) {
+    output_data.insert("date_range".to_string(), format!("{start} to {end}"));
+  } else if let Some(start) = start_date {
+    output_data.insert("date_range".to_string(), format!("from {start}"));
+  } else {
+    output_data.insert("date_range".to_string(), "all time".to_string());
   }
 
-  let output = formatter.format_single( &output_data );
+  let output = formatter.format_single(&output_data);
 
-  Ok( output )
+  Ok(output)
 }
 
 /// Usage by project adapter
+///
+/// # Errors
+///
+/// Returns [`AdapterError`] if handler validation, parameter extraction, or service call fails.
 pub async fn usage_by_project_adapter<T, S>(
   command: &T,
   usage_service: S,
@@ -81,33 +84,39 @@ where
   S: UsageService,
 {
   // Extract parameters
-  let params = extract_params( command );
+  let params = extract_params(command);
 
   // Call handler for validation (pure, sync)
-  let _ = usage_handlers::usage_by_project_handler( &params )?;
+  let _ = usage_handlers::usage_by_project_handler(&params)?;
 
   // Extract validated parameters
-  let project_id = params.get( "project_id" ).ok_or_else( || {
-    AdapterError::ExtractionError( "project_id missing after validation".to_string() )
+  let project_id = params.get("project_id").ok_or_else(|| {
+    AdapterError::ExtractionError("project_id missing after validation".to_string())
   })?;
 
-  let start_date = params.get( "start_date" ).map( |s| s.as_str() );
+  let start_date = params.get("start_date").map(String::as_str);
 
   // Perform async usage retrieval
-  let records = usage_service.get_usage_by_project( project_id, start_date ).await?;
+  let records = usage_service
+    .get_usage_by_project(project_id, start_date)
+    .await?;
 
   // Format output
   let mut output_data = HashMap::new();
-  output_data.insert( "status".to_string(), "success".to_string() );
-  output_data.insert( "project_id".to_string(), project_id.clone() );
-  output_data.insert( "record_count".to_string(), records.len().to_string() );
+  output_data.insert("status".to_string(), "success".to_string());
+  output_data.insert("project_id".to_string(), project_id.clone());
+  output_data.insert("record_count".to_string(), records.len().to_string());
 
-  let output = formatter.format_single( &output_data );
+  let output = formatter.format_single(&output_data);
 
-  Ok( output )
+  Ok(output)
 }
 
 /// Usage by provider adapter
+///
+/// # Errors
+///
+/// Returns [`AdapterError`] if handler validation, parameter extraction, or service call fails.
 pub async fn usage_by_provider_adapter<T, S>(
   command: &T,
   usage_service: S,
@@ -118,38 +127,43 @@ where
   S: UsageService,
 {
   // Extract parameters
-  let params = extract_params( command );
+  let params = extract_params(command);
 
   // Call handler for validation (pure, sync)
-  let _ = usage_handlers::usage_by_provider_handler( &params )?;
+  let _ = usage_handlers::usage_by_provider_handler(&params)?;
 
   // Extract validated parameters
-  let provider = params.get( "provider" ).ok_or_else( || {
-    AdapterError::ExtractionError( "provider missing after validation".to_string() )
+  let provider = params.get("provider").ok_or_else(|| {
+    AdapterError::ExtractionError("provider missing after validation".to_string())
   })?;
 
-  let aggregation = params.get( "aggregation" ).map( |s| s.as_str() );
+  let aggregation = params.get("aggregation").map(String::as_str);
 
   // Perform async usage retrieval
-  let records = usage_service.get_usage_by_provider( provider, aggregation ).await?;
+  let records = usage_service
+    .get_usage_by_provider(provider, aggregation)
+    .await?;
 
   // Format output
   let mut output_data = HashMap::new();
-  output_data.insert( "status".to_string(), "success".to_string() );
-  output_data.insert( "provider".to_string(), provider.clone() );
-  output_data.insert( "record_count".to_string(), records.len().to_string() );
+  output_data.insert("status".to_string(), "success".to_string());
+  output_data.insert("provider".to_string(), provider.clone());
+  output_data.insert("record_count".to_string(), records.len().to_string());
 
-  if let Some(agg) = aggregation
-  {
-    output_data.insert( "aggregation".to_string(), agg.to_string() );
+  if let Some(agg) = aggregation {
+    output_data.insert("aggregation".to_string(), agg.to_string());
   }
 
-  let output = formatter.format_single( &output_data );
+  let output = formatter.format_single(&output_data);
 
-  Ok( output )
+  Ok(output)
 }
 
 /// Export usage adapter
+///
+/// # Errors
+///
+/// Returns [`AdapterError`] if handler validation, parameter extraction, or service call fails.
 pub async fn export_usage_adapter<T, S>(
   command: &T,
   usage_service: S,
@@ -160,28 +174,28 @@ where
   S: UsageService,
 {
   // Extract parameters
-  let params = extract_params( command );
+  let params = extract_params(command);
 
   // Call handler for validation (pure, sync)
-  let _ = usage_handlers::export_usage_handler( &params )?;
+  let _ = usage_handlers::export_usage_handler(&params)?;
 
   // Extract validated parameters
-  let output_path = params.get( "output" ).ok_or_else( || {
-    AdapterError::ExtractionError( "output missing after validation".to_string() )
-  })?;
+  let output_path = params
+    .get("output")
+    .ok_or_else(|| AdapterError::ExtractionError("output missing after validation".to_string()))?;
 
-  let format = params.get( "format" ).map( |s| s.as_str() ).unwrap_or( "json" );
+  let format = params.get("format").map_or("json", String::as_str);
 
   // Perform async export
-  usage_service.export_usage( output_path, format ).await?;
+  usage_service.export_usage(output_path, format).await?;
 
   // Format output
   let mut output_data = HashMap::new();
-  output_data.insert( "status".to_string(), "exported".to_string() );
-  output_data.insert( "output".to_string(), output_path.clone() );
-  output_data.insert( "format".to_string(), format.to_string() );
+  output_data.insert("status".to_string(), "exported".to_string());
+  output_data.insert("output".to_string(), output_path.clone());
+  output_data.insert("format".to_string(), format.to_string());
 
-  let output = formatter.format_single( &output_data );
+  let output = formatter.format_single(&output_data);
 
-  Ok( output )
+  Ok(output)
 }

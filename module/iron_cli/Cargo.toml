@@ -1,29 +1,47 @@
 [package]
 name = "iron_cli"
-version= "0.4.0"
-edition.workspace = true
-rust-version.workspace = true
-license.workspace = true
+version = "0.4.0"
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
 description = "Command-line interface for Iron Cage agent management"
 repository = "https://github.com/.../iron_runtime"
 readme = "readme.md"
 keywords = ["cli", "agent", "management", "command-line"]
 categories = ["command-line-utilities"]
 
+[lints]
+workspace = true
+
 [features]
 default = ["full"]
 enabled = [
-    "dep:tokio",
-    "dep:serde",
-    "dep:serde_json",
-    "dep:serde_yaml",
-    "dep:reqwest",
-    "dep:unilang",
-    "dep:async-trait",
-    "dep:dirs",
-    "dep:keyring",
+  "dep:tokio",
+  "dep:serde",
+  "dep:serde_json",
+  "dep:serde_yaml",
+  "dep:reqwest",
+  "dep:unilang",
+  "dep:async-trait",
+  "dep:dirs",
+  "dep:keyring",
+  "dep:regex",
+  "dep:base64",
+  "dep:tree_fmt",
 ]
 full = ["enabled"]
+# init-admin: Enables the iron-init-admin binary (direct DB access)
+init-admin = [
+  "dep:iron_token_manager",
+  "dep:sqlx",
+  "dep:bcrypt",
+  "dep:clap",
+  "dep:rand",
+  "dep:uuid",
+  "dep:chrono",
+  "dep:anyhow",
+  "dep:tokio",
+]
 # test-adapter: Enables InMemoryAdapter for integration tests
 # (compile_error! prevents production use)
 test-adapter = []
@@ -31,34 +49,43 @@ test-adapter = []
 [dependencies]
 # Core dependencies
 iron_config_loader = { workspace = true }
-tokio = { workspace = true, features = ["full"], optional = true }
-reqwest = { version = "0.11", features = ["json"], optional = true }
-serde = { version = "1.0", features = ["derive"], optional = true }
-serde_json = { version = "1.0", optional = true }
+iron_types = { workspace = true, features = ["enabled"] }
+tokio = { workspace = true, optional = true, features = ["full"] }
+reqwest = { workspace = true, optional = true, features = ["json", "query"] }
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
 serde_yaml = { workspace = true, optional = true }
-unilang = { version = "0.44.0", features = ["default"], optional = true }
-async-trait = { version = "0.1", optional = true }
-dirs = { version = "5.0", optional = true }
-keyring = { version = "2.3", optional = true }
-regex = { version = "1.10" }
-base64 = { version = "0.22" }
-tree_fmt = { version = "0.7.0", features = ["table_plain", "expanded_postgres", "format_json", "format_yaml"] }
+unilang = { workspace = true, optional = true, features = ["default"] }
+async-trait = { workspace = true, optional = true }
+dirs = { workspace = true, optional = true }
+keyring = { workspace = true, optional = true }
+regex = { workspace = true, optional = true }
+base64 = { workspace = true, optional = true }
+tree_fmt = { workspace = true, optional = true, features = ["table_plain", "expanded_postgres", "format_json", "format_yaml"] }
+
+# init-admin binary dependencies
+iron_token_manager = { workspace = true, optional = true }
+anyhow = { workspace = true, optional = true }
+bcrypt = { workspace = true, optional = true }
+chrono = { workspace = true, optional = true }
+clap = { workspace = true, optional = true, features = ["env"] }
+rand = { workspace = true, optional = true }
+sqlx = { workspace = true, optional = true }
+uuid = { workspace = true, optional = true }
 
 [build-dependencies]
-serde_yaml.workspace = true
+serde_yaml = { workspace = true }
 
 [dev-dependencies]
 # Test dependencies automatically enable test-adapter feature
 iron_cli = { path = ".", features = ["test-adapter"] }
+iron_test_db = { path = "../iron_test_db" }
 
 # Test infrastructure dependencies (real implementations, no mocking)
-axum = { version = "0.7" }
-tower = { version = "0.4" }
-iron_test_db = { path = "../iron_test_db" }
-iron_control_api = { path = "../iron_control_api", features = ["enabled"] }
-reqwest = { version = "0.11", features = ["json"] }
-sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio-rustls"] }
-criterion = { version = "0.5", features = ["html_reports"] }
+axum = { workspace = true }
+reqwest = { workspace = true, features = ["json"] }
+sqlx = { workspace = true, features = ["sqlite", "runtime-tokio-rustls"] }
+criterion = { workspace = true, features = ["html_reports"] }
 
 [[bin]]
 name = "iron-token"
@@ -71,3 +98,8 @@ path = "src/bin/iron_control_unilang.rs"
 [[bench]]
 name = "formatting_benchmarks"
 harness = false
+
+[[bin]]
+name = "iron-init-admin"
+path = "src/bin/init_admin.rs"
+required-features = ["init-admin"]

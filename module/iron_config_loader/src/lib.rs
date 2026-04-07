@@ -64,13 +64,13 @@
 //! debug = true
 //! ```
 
-#![ warn( missing_docs ) ]
+#![warn(missing_docs)]
 
 pub mod error;
 pub mod layer;
 pub mod loader;
 
 // Re-exports
-pub use error::{ ConfigError, Result };
-pub use layer::{ ConfigLayer, ConfigValue, EnvLayer, LayersBuilder };
+pub use error::{ConfigError, Result};
+pub use layer::{ConfigLayer, ConfigValue, EnvLayer, LayersBuilder};
 pub use loader::ConfigLoader;

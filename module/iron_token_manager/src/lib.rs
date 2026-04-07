@@ -15,7 +15,7 @@
 //!
 //! ```rust,ignore
 //! use iron_token_manager::TokenManager;
-//! 
+//!
 //! let manager = TokenManager::new("db.sqlite").await?;
 //!
 //! // Generate token for user/project
@@ -76,26 +76,26 @@
 
 #![warn(missing_docs)]
 
-pub mod error;
-pub mod token_generator;
-pub mod usage_tracker;
-pub mod limit_enforcer;
-pub mod storage;
-pub mod migrations;
-pub mod config;
-pub mod seed;
-pub mod provider_adapter;
-pub mod rate_limiter;
-pub mod cost_calculator;
-pub mod trace_storage;
-pub mod provider_key_storage;
-pub mod user_service;
-pub mod lease_manager;
 pub mod agent_budget;
 pub mod budget_request;
+pub mod config;
+pub mod cost_calculator;
+pub mod error;
+pub mod lease_manager;
+pub mod limit_enforcer;
+pub mod migrations;
+pub mod provider_adapter;
+pub mod provider_key_storage;
+pub mod rate_limiter;
+pub mod seed;
+pub mod storage;
+pub mod token_generator;
+pub mod trace_storage;
+pub mod usage_tracker;
+pub mod user_service;
 
 // Re-exports for convenient access
 pub use config::Config;
 pub use migrations::apply_all_migrations;
-pub use provider_key_storage::{ ProviderKeyStorage, ProviderType };
-pub use seed::{ wipe_database, seed_all, seed_users };
+pub use provider_key_storage::{ProviderKeyStorage, ProviderType, SpendingSummary};
+pub use seed::{seed_all, seed_users, wipe_database};

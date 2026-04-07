@@ -1,21 +1,26 @@
 [package]
 name = "iron_sdk"
-version.workspace = true
-edition.workspace = true
-rust-version.workspace = true
-license.workspace = true
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
 description = "Python SDK for Iron Cage AI agent protection - PyO3 bindings"
 repository = "https://github.com/.../iron_sdk"
 readme = "readme.md"
 keywords = ["sdk", "python", "pyo3", "ai-agent", "llm"]
 categories = ["api-bindings"]
 
+[lints]
+workspace = true
+
 [lib]
 name = "iron_cage"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["full"]
+# PyO3 cdylib requires Python linkage, so `cargo build` compiles this as a no-op.
+# Use `maturin develop --features full` to build the actual Python extension.
+default = []
 enabled = [
   "dep:pyo3",
   "dep:iron_runtime",
@@ -23,7 +28,7 @@ enabled = [
   "dep:serde_json",
 ]
 analytics = ["iron_runtime/analytics"]
-full = ["enabled", "analytics"]
+full = ["analytics", "enabled"]
 
 [dependencies]
 # PyO3 for Python bindings

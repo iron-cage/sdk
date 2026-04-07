@@ -8,7 +8,8 @@
 # 2. Database must have 3-8 test tokens (bash seed: 3, Rust seed: 8)
 # 3. Database must have usage records (at least 7 total)
 # 4. Database must have exactly 3 usage limits
-# 5. Core test users must exist (admin, developer, viewer; optionally tester, guest)
+# 5. Core test users must exist (admin, demo, viewer; optionally tester, guest)
+#    Roles: admin=admin, demo=manager, viewer=developer, tester=manager, guest=manager
 #
 # Usage:
 #   ./scripts/validate_seed_data.sh [database_path]
@@ -104,34 +105,34 @@ else
   ((USER_VIOLATIONS++))
 fi
 
-# Check for developer user
-PM_EXISTS=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM users WHERE username='developer' AND role='user' AND is_active=1;")
+# Check for demo user
+PM_EXISTS=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM users WHERE username='demo' AND role='manager' AND is_active=1;")
 if [ "$PM_EXISTS" -eq 1 ]; then
-  log_success "Test user exists: developer (role=user, active=1)"
+  log_success "Test user exists: demo (role=manager, active=1)"
 else
-  log_error "Test user missing or incorrect: developer"
+  log_error "Test user missing or incorrect: demo"
   ((USER_VIOLATIONS++))
 fi
 
 # Check for viewer user
-VIEWER_EXISTS=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM users WHERE username='viewer' AND role='user' AND is_active=0;")
+VIEWER_EXISTS=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM users WHERE username='viewer' AND role='developer' AND is_active=0;")
 if [ "$VIEWER_EXISTS" -eq 1 ]; then
-  log_success "Test user exists: viewer (role=user, active=0)"
+  log_success "Test user exists: viewer (role=developer, active=0)"
 else
   log_error "Test user missing or incorrect: viewer"
   ((USER_VIOLATIONS++))
 fi
 
 # Check for tester user (optional - only in Rust seed)
-TESTER_EXISTS=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM users WHERE username='tester' AND role='user' AND is_active=1;")
+TESTER_EXISTS=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM users WHERE username='tester' AND role='manager' AND is_active=1;")
 if [ "$TESTER_EXISTS" -eq 1 ]; then
-  log_success "Test user exists: tester (role=user, active=1) [Rust seed]"
+  log_success "Test user exists: tester (role=manager, active=1) [Rust seed]"
 fi
 
 # Check for guest user (optional - only in Rust seed)
-GUEST_EXISTS=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM users WHERE username='guest' AND role='user' AND is_active=1;")
+GUEST_EXISTS=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM users WHERE username='guest' AND role='manager' AND is_active=1;")
 if [ "$GUEST_EXISTS" -eq 1 ]; then
-  log_success "Test user exists: guest (role=user, active=1) [Rust seed]"
+  log_success "Test user exists: guest (role=manager, active=1) [Rust seed]"
 fi
 
 if [ $USER_VIOLATIONS -gt 0 ]; then
@@ -162,7 +163,7 @@ log_info "Rule 4: Checking token user assignments..."
 TOKEN_VIOLATIONS=0
 
 # Check admin token (at least 1 active)
-ADMIN_TOKEN=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM api_tokens WHERE user_id='admin' AND is_active=1;")
+ADMIN_TOKEN=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM api_tokens WHERE user_id='user_admin' AND is_active=1;")
 if [ "$ADMIN_TOKEN" -ge 1 ]; then
   log_success "Admin has at least 1 active token ($ADMIN_TOKEN)"
 else
@@ -170,17 +171,17 @@ else
   ((TOKEN_VIOLATIONS++))
 fi
 
-# Check developer tokens (at least 1 active)
-PM_TOKEN=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM api_tokens WHERE user_id='developer' AND is_active=1;")
+# Check demo user tokens (at least 1 active)
+PM_TOKEN=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM api_tokens WHERE user_id='user_demo' AND is_active=1;")
 if [ "$PM_TOKEN" -ge 1 ]; then
-  log_success "Developer has at least 1 active token ($PM_TOKEN)"
+  log_success "Demo user has at least 1 active token ($PM_TOKEN)"
 else
-  log_error "Developer token missing or inactive"
+  log_error "Demo user token missing or inactive"
   ((TOKEN_VIOLATIONS++))
 fi
 
 # Check viewer tokens (at least 1, any state)
-VIEWER_TOKEN=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM api_tokens WHERE user_id='viewer';")
+VIEWER_TOKEN=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM api_tokens WHERE user_id='user_viewer';")
 if [ "$VIEWER_TOKEN" -ge 1 ]; then
   log_success "Viewer has at least 1 token ($VIEWER_TOKEN)"
 else
@@ -190,7 +191,7 @@ fi
 
 # Check tester tokens (optional - only in Rust seed)
 if [ "$TESTER_EXISTS" -eq 1 ]; then
-  TESTER_TOKEN=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM api_tokens WHERE user_id='tester' AND is_active=1;")
+  TESTER_TOKEN=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM api_tokens WHERE user_id='user_tester' AND is_active=1;")
   if [ "$TESTER_TOKEN" -ge 1 ]; then
     log_success "Tester has at least 1 active token ($TESTER_TOKEN) [Rust seed]"
   else
@@ -201,7 +202,7 @@ fi
 
 # Check guest has NO tokens (optional - only in Rust seed)
 if [ "$GUEST_EXISTS" -eq 1 ]; then
-  GUEST_TOKEN=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM api_tokens WHERE user_id='guest';")
+  GUEST_TOKEN=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM api_tokens WHERE user_id='user_guest';")
   if [ "$GUEST_TOKEN" -eq 0 ]; then
     log_success "Guest has no tokens (edge case verified) [Rust seed]"
   else
@@ -253,7 +254,7 @@ log_info "Rule 7: Checking usage limit assignments..."
 LIMIT_VIOLATIONS=0
 
 # Check admin limit
-ADMIN_LIMIT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM usage_limits WHERE user_id='admin';")
+ADMIN_LIMIT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM usage_limits WHERE user_id='user_admin';")
 if [ "$ADMIN_LIMIT" -eq 1 ]; then
   log_success "Admin usage limit exists"
 else
@@ -261,17 +262,17 @@ else
   ((LIMIT_VIOLATIONS++))
 fi
 
-# Check developer limit
-PM_LIMIT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM usage_limits WHERE user_id='developer';")
+# Check demo user limit
+PM_LIMIT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM usage_limits WHERE user_id='user_demo';")
 if [ "$PM_LIMIT" -eq 1 ]; then
-  log_success "Developer usage limit exists"
+  log_success "Demo user usage limit exists"
 else
-  log_error "Developer usage limit missing"
+  log_error "Demo user usage limit missing"
   ((LIMIT_VIOLATIONS++))
 fi
 
 # Check viewer limit
-VIEWER_LIMIT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM usage_limits WHERE user_id='viewer';")
+VIEWER_LIMIT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM usage_limits WHERE user_id='user_viewer';")
 if [ "$VIEWER_LIMIT" -eq 1 ]; then
   log_success "Viewer usage limit exists"
 else
@@ -294,10 +295,10 @@ if [ $VIOLATIONS -eq 0 ]; then
   log_success "All seed data validations passed!"
   echo ""
   log_info "Seed data summary:"
-  echo "  - Users:        $USER_COUNT (core: admin, developer, viewer)"
+  echo "  - Users:        $USER_COUNT (core: admin, demo, viewer)"
   echo "  - Tokens:       $TOKEN_COUNT"
   echo "  - Usage:        $USAGE_COUNT records"
-  echo "  - Limits:       $LIMIT_COUNT (admin, developer, viewer)"
+  echo "  - Limits:       $LIMIT_COUNT (admin, demo, viewer)"
   echo ""
   log_info "Core test tokens for manual testing:"
   echo "  - Admin:      iron_dev_admin_token_001"

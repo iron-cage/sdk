@@ -60,10 +60,19 @@
 //! 4. Audit log entries for accidental leaks
 
 #![warn(missing_docs)]
+#![cfg_attr(not(feature = "enabled"), allow(unused_variables, dead_code))]
 
+#[cfg(feature = "enabled")]
 /// Cryptographic operations for secret encryption/decryption
 ///
 /// Provides AES-256-GCM encryption for API keys and secrets.
 /// This is the only implemented module - other features (secrets manager,
 /// audit, access control, storage) are planned for future development.
 pub mod crypto;
+
+#[cfg(feature = "enabled")]
+/// IP Token encryption/decryption for provider API keys in transit
+///
+/// Shared between server (encrypt) and client (decrypt) crates.
+/// Uses AES-256-GCM with format: `AES256:{IV}:{ciphertext}:{tag}`
+pub mod ip_token;

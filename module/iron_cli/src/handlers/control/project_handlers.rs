@@ -3,9 +3,9 @@
 //! Pure functions for project access operations (read-only in Pilot).
 //! No I/O - all external operations handled by adapter layer.
 
-use std::collections::HashMap;
-use crate::handlers::CliError;
 use crate::handlers::validation::validate_non_empty;
+use crate::handlers::CliError;
+use std::collections::HashMap;
 
 /// Handle .project.list command
 ///
@@ -15,16 +15,14 @@ use crate::handlers::validation::validate_non_empty;
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn list_projects_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if validation fails.
+pub fn list_projects_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+  let format = params.get("format").map_or("table", String::as_str);
 
-  Ok(format!(
-    "Project list parameters valid\nFormat: {}",
-    format
-  ))
+  Ok(format!("Project list parameters valid\nFormat: {format}"))
 }
 
 /// Handle .project.get command
@@ -38,21 +36,19 @@ pub fn list_projects_handler(
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn get_project_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn get_project_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameter
-  let id = params
-    .get("id")
-    .ok_or(CliError::MissingParameter("id"))?;
+  let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
   validate_non_empty(id, "id")?;
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Get project parameters valid\nID: {}\nFormat: {}",
-    id, format
+    "Get project parameters valid\nID: {id}\nFormat: {format}"
   ))
 }

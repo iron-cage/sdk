@@ -24,3 +24,4 @@ CREATE INDEX IF NOT EXISTS idx_agent_budgets_updated ON agent_budgets( updated_a
 
 -- Create guard table to prevent re-running this migration
 CREATE TABLE IF NOT EXISTS _migration_010_completed ( id INTEGER PRIMARY KEY );
+INSERT INTO _migration_010_completed ( id ) VALUES ( 1 );

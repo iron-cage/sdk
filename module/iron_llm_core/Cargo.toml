@@ -1,0 +1,42 @@
+[package]
+name = "iron_llm_core"
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+description = "Shared LLM routing core: provider detection, request/response translation, and forwarding"
+keywords = ["llm", "proxy", "openai", "anthropic", "routing"]
+categories = ["web-programming::http-client"]
+
+[lints]
+workspace = true
+
+[features]
+default = ["enabled"]
+# Only enable in test builds; allows http:// localhost/loopback base URLs for wiremock.
+# NEVER enable in production builds — it bypasses SSRF protection.
+allow-insecure-base-urls = []
+enabled = [
+  "dep:iron_cost",
+  "dep:iron_secrets",
+  "dep:reqwest",
+  "dep:secrecy",
+  "dep:serde",
+  "dep:serde_json",
+  "dep:tracing",
+]
+full = ["enabled"]
+
+[dependencies]
+iron_cost = { workspace = true, optional = true, features = ["enabled"] }
+iron_secrets = { workspace = true, optional = true }
+
+reqwest = { workspace = true, optional = true, features = ["json"] }
+secrecy = { workspace = true, optional = true }
+serde = { workspace = true, optional = true, features = ["derive"] }
+serde_json = { workspace = true, optional = true }
+tracing = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+iron_cost = { workspace = true, features = ["enabled"] }

@@ -52,7 +52,7 @@ tests/
 
 ## Responsibility Table
 
-| Entity | Responsibility | Input→Output | Out of Scope |
+| File | Responsibility | Input→Output | Out of Scope |
 |--------|----------------|--------------|--------------|
 | `tokens/` | Test Protocol 014 API token endpoints including validate | Token scenarios → Test results | NOT auth flows (auth/), NOT agents (agents/), NOT analytics (analytics/), NOT usage (usage/), NOT limits (limits/) |
 | `agents/` | Test Protocol 010 agent CRUD endpoints and budgets | Agent scenarios → Test results | NOT tokens (tokens/), NOT auth (auth/), NOT analytics (analytics/), NOT usage (usage/), NOT limits (limits/) |
@@ -74,10 +74,17 @@ tests/
 | `budget_concurrency.rs` | Test Protocol 005 concurrent access scenarios | Concurrent requests → Race condition prevention | NOT database state (budget_database_state.rs), NOT input validation (budget_corner_cases.rs), NOT security (budget_security.rs), NOT types/crypto (budget_routes.rs) |
 | `budget_corner_cases.rs` | Test Protocol 005 input validation edge cases | Edge case inputs → Validation robustness | NOT concurrency (budget_concurrency.rs), NOT database state (budget_database_state.rs), NOT security (budget_security.rs), NOT types (budget_routes.rs) |
 | `budget_security.rs` | Test Protocol 005 security-critical scenarios | Security attacks → Attack prevention | NOT concurrency (budget_concurrency.rs), NOT database state (budget_database_state.rs), NOT input validation (budget_corner_cases.rs), NOT types (budget_routes.rs) |
+| `budget_security_ic_token.rs` | Test IC Token authentication enforcement on budget endpoints (H-2) | IC Token states → 400/401/403 validation | NOT budget accounting (budget_security.rs), NOT concurrency (budget_concurrency.rs), NOT invariants (budget_invariants.rs) |
+| `budget_invariants.rs` | Test Protocol 005 budget accounting invariant: `total_allocated = total_spent + budget_remaining` | Budget operations → Invariant validation | NOT security attacks (budget_security.rs), NOT concurrency (budget_concurrency.rs), NOT input validation (budget_corner_cases.rs) |
+| `ic_token_unit_tests.rs` | Unit tests for ic_token module: `sha256_hash`, `validate_ic_token_runtime` error branches, `IcTokenRateLimiter`, Debug redaction (M2, M6, GAP-1, C-1) | ic_token function inputs → Return value validation | NOT endpoint integration (budget_security_ic_token.rs), NOT concurrency (ic_token_concurrent_test.rs), NOT endpoint orchestrator (ic_token_endpoint_validation_test.rs) |
+| `ic_token_endpoint_validation_test.rs` | Direct tests for `validate_ic_token_for_endpoint` orchestrator: rate limit, JWT validation, hash-check, timing padding (GAP-2) | Token states → StatusCode or Ok(agent_id) | NOT unit-level (ic_token_unit_tests.rs), NOT budget endpoint integration (budget_security_ic_token.rs), NOT concurrency (ic_token_concurrent_test.rs) |
+| `ic_token_concurrent_test.rs` | Concurrent IC Token validation and regeneration tests: no deadlock, no data corruption under parallel operations (H5) | Concurrent token operations → Consistency validation | NOT unit-level (ic_token_unit_tests.rs), NOT endpoint integration (budget_security_ic_token.rs), NOT budget concurrency (budget_concurrency.rs) |
+| `analytics_ic_token_test.rs` | Test analytics endpoint IC Token rotation: rotated token rejected, new token accepted after regeneration (M5) | Token lifecycle → Analytics endpoint response | NOT budget endpoints (budget_security_ic_token.rs), NOT analytics business logic (analytics/), NOT unit-level (ic_token_unit_tests.rs) |
 | `auth_endpoints.rs` | Test authentication endpoint JWT token lifecycle | JWT scenarios → Token validation | NOT auth flows (auth/), NOT user management (users.rs), NOT RBAC (rbac.rs), NOT integration (integration_tests.rs) |
 | `users.rs` | Test user management CRUD endpoints | User management scenarios → CRUD validation | NOT auth (auth/, auth_endpoints.rs), NOT tokens (tokens/), NOT RBAC middleware (rbac.rs), NOT integration (integration_tests.rs) |
 | `auth_rate_limiting.rs` | Test Protocol 007 login rate limiting for brute force prevention | Login rate limit scenarios → Attack prevention validation | NOT token rate limiting (tokens/rate_limiting.rs), NOT auth flows (auth/), NOT JWT lifecycle (auth_endpoints.rs), NOT user management (users.rs) |
 | `agent_provider_key_tests.rs` | Test provider API key retrieval endpoint | Key fetch scenarios → Retrieval validation | Feature 014 provider key tests | NOT budget (budget_*), NOT auth (auth/), NOT tokens (tokens/) |
+| `ip_token_e2e_test.rs` | Test end-to-end IP Token encryption flow across server/client boundary | Server response → Client plaintext key | NOT HTTP integration (integration_tests.rs), NOT budget flow (budget_*), NOT auth (auth/) |
 | `test_no_url_redirect.rs` | Validate url_redirect middleware deletion | Source code → NEGATIVE ACCEPTANCE validation | NOT endpoint tests (tokens/, auth/), NOT integration (integration_tests.rs), NOT manual (manual/) |
 | `test_cors_configuration.rs` | Validate CORS configuration via environment variable | Source code → Environment variable enforcement | NOT endpoint tests (tokens/, auth/), NOT integration (integration_tests.rs), NOT manual (manual/) |
 | `test_server_port_configuration.rs` | Validate server port via environment variable | Source code → Environment variable enforcement | NOT endpoint tests (tokens/, auth/), NOT integration (integration_tests.rs), NOT manual (manual/) |
@@ -165,6 +172,27 @@ tests/
   - Port parsing validation (u16 range 1-65535)
 - **Phase 5 Complete:** 379 tests → **Migration Complete:** 499 tests (+120 tests, +32%)
 - **Status:** All migration tests passing, zero legacy code, zero hardcoded config, production-ready
+
+**IC Token Runtime Validation (PR #44)** (2026-02-18):
+- **ic_token_unit_tests.rs:** 18 unit tests for ic_token module internals (M2, M6, GAP-1, C-1)
+  - `sha256_hash`: deterministic output, 64-char hex format
+  - `validate_ic_token_runtime`: all error branches (InvalidToken, InvalidAgentId, TokenInactive, DatabaseError) + success path
+  - `IcTokenRateLimiter`: below threshold, at threshold, retry_after, monotonic increment, window expiry, token isolation, concurrent safety
+  - `IcTokenManager` Debug redaction: HMAC secret must not appear in `{:?}` output (C-1 fix)
+- **ic_token_endpoint_validation_test.rs:** 5 tests for `validate_ic_token_for_endpoint` orchestrator (GAP-2)
+  - Rate limit exceeded → 429, invalid JWT → 401 (failure recorded), revoked token → 401 (failure recorded), database error → 500, valid token → Ok(agent_id)
+- **ic_token_concurrent_test.rs:** 2 concurrent tests (H5)
+  - Concurrent validation during regenerate: no deadlock, old token rejected after regenerate
+  - Concurrent double regenerate: no deadlock, exactly one token wins
+- **analytics_ic_token_test.rs:** 1 test for analytics IC Token rotation (M5)
+  - POST /api/v1/analytics/events: rotated token rejected (401), new token accepted (202)
+- **budget_security_ic_token.rs:** 10 IC Token security tests for budget endpoints (H-2)
+  - Expired token on handshake/refresh (E2, E2b), missing/invalid/revoked/cross-tenant on report (R-1..R-4), same on return (RT-1..RT-4)
+  - JTI bug reproducers (issue-budget-009): unique hashes, regenerate invalidation, revoke+reissue stays dead
+- **budget_invariants.rs:** 3 budget accounting invariant tests
+  - `total_allocated = total_spent + budget_remaining` verified after handshake, report, and refresh
+- **Migration Complete:** 499 tests → **IC Token Runtime Validation Complete:** 538 tests (+39 tests, +8%)
+- **Status:** All IC Token runtime validation tests passing, HMAC secret redacted, rate limiting enforced
 
 ### By Protocol and Functional Requirement
 
@@ -340,8 +368,8 @@ Follow bug-fixing workflow (code_design.rulebook.md):
 
 ## Verification
 
-Last verified: 2025-12-07 (Phases 1-5 Complete)
-- ✅ 353/353 tests passing (all 8 implementation bugs fixed)
+Last verified: 2026-02-18 (IC Token Runtime Validation Complete — PR #44)
+- ✅ 538 tests passing (all 8 implementation bugs fixed + 39 new IC Token tests)
 - ✅ 0 clippy warnings
 - ✅ All Phase 1-5 tests passing (Security, Corner Cases, API Contract, Edge Cases, Additional Coverage)
 - ✅ All doc tests passing
@@ -368,3 +396,11 @@ Last verified: 2025-12-07 (Phases 1-5 Complete)
 - ✅ All bug reproducer tests have 5-section documentation
 - ✅ All infrastructure tests have 5-section documentation
 - ✅ Loud failure pattern consistently applied
+- ✅ IC Token runtime validation complete (PR #44):
+  - ✅ HMAC secret redacted in IcTokenManager Debug output (C-1, issue-security-redaction)
+  - ✅ IC Token authentication enforced on /report and /return endpoints (H-2)
+  - ✅ JTI uniqueness guarantees token invalidation on regenerate/revoke (issue-budget-009)
+  - ✅ Rate limiter per-token-hash with sliding window and LRU eviction (GAP-1)
+  - ✅ validate_ic_token_for_endpoint all code paths covered (GAP-2)
+  - ✅ Concurrent validation + regeneration: no deadlock (H5)
+  - ✅ Analytics endpoint IC Token rotation tested (M5)

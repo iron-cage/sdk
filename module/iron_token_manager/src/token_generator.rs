@@ -117,36 +117,32 @@
 //! - Implementation: `encode_base62()` function (uses modulo arithmetic)
 //! - Mathematical analysis: test doc comments explain why strict chi-squared fails
 
-use rand::{ Rng, thread_rng };
-use sha2::{ Sha256, Digest };
+use rand::{rng, RngExt};
+use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 
 /// Base62 alphabet (0-9, A-Z, a-z)
-const BASE62_ALPHABET: &[ u8 ] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+const BASE62_ALPHABET: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
 /// Encode bytes as Base62
 ///
 /// Converts random bytes to Base62 string using custom encoding.
 /// This produces URL-safe tokens without special characters.
-fn encode_base62( bytes: &[ u8 ] ) -> String
-{
+fn encode_base62(bytes: &[u8]) -> String {
   let mut result = String::new();
 
   // Simple byte-to-character mapping for deterministic output
-  for chunk in bytes.chunks( 3 )
-  {
+  for chunk in bytes.chunks(3) {
     // Convert up to 3 bytes to a 24-bit number
     let mut num: u32 = 0;
-    for (i, &byte) in chunk.iter().enumerate()
-    {
-      num |= u32::from( byte ) << ( 8 * ( 2 - i ) );
+    for (i, &byte) in chunk.iter().enumerate() {
+      num |= u32::from(byte) << (8 * (2 - i));
     }
 
     // Extract 4 Base62 characters from 24 bits
-    for _ in 0..4
-    {
-      let idx = ( num % 62 ) as usize;
-      result.push( BASE62_ALPHABET[ idx ] as char );
+    for _ in 0..4 {
+      let idx = (num % 62) as usize;
+      result.push(BASE62_ALPHABET[idx] as char);
       num /= 62;
     }
   }
@@ -177,15 +173,13 @@ fn encode_base62( bytes: &[ u8 ] ) -> String
 ///
 /// assert!( generator.verify_token( &token, &hash ) );
 /// ```
-#[ derive( Debug, Clone ) ]
+#[derive(Debug, Clone)]
 pub struct TokenGenerator;
 
-impl TokenGenerator
-{
+impl TokenGenerator {
   /// Create new token generator
-  #[ must_use ]
-  pub fn new() -> Self
-  {
+  #[must_use]
+  pub fn new() -> Self {
     Self
   }
 
@@ -203,29 +197,25 @@ impl TokenGenerator
   /// - Body: 64 Base62 characters ([0-9A-Za-z])
   /// - Total length: 71 characters
   /// - Entropy: 256+ bits (48 random bytes)
-  #[ must_use ]
-  pub fn generate( &self ) -> String
-  {
-    let mut rng = thread_rng();
+  #[must_use]
+  pub fn generate(&self) -> String {
+    let mut rng = rng();
 
     // Generate 48 random bytes (384 bits entropy)
-    let mut random_bytes = vec![ 0u8; 48 ];
-    rng.fill( &mut random_bytes[ .. ] );
+    let mut random_bytes = vec![0u8; 48];
+    rng.fill(&mut random_bytes[..]);
 
-    let encoded = encode_base62( &random_bytes );
+    let encoded = encode_base62(&random_bytes);
 
     // Ensure exactly 64 characters by padding or truncating
-    let body = if encoded.len() >= 64
-    {
-      encoded[ ..64 ].to_string()
-    }
-    else
-    {
+    let body = if encoded.len() >= 64 {
+      encoded[..64].to_string()
+    } else {
       // Pad with zeros if needed (should not happen with 48 bytes)
-      format!( "{encoded:0<64}" )
+      format!("{encoded:0<64}")
     };
 
-    format!( "apitok_{body}" )
+    format!("apitok_{body}")
   }
 
   /// Generate token with custom prefix
@@ -237,10 +227,9 @@ impl TokenGenerator
   /// # Returns
   ///
   /// Token string starting with prefix, followed by underscore and random data
-  #[ must_use ]
-  pub fn generate_with_prefix( &self, prefix: &str ) -> String
-  {
-    format!( "{}_{}", prefix, self.generate() )
+  #[must_use]
+  pub fn generate_with_prefix(&self, prefix: &str) -> String {
+    format!("{}_{}", prefix, self.generate())
   }
 
   // Fix(issue-bcrypt-revert): Revert from BCrypt to SHA-256 for API token hashing
@@ -276,15 +265,14 @@ impl TokenGenerator
   /// - New tokens (format `apitok_{64 chars}`): Strips `apitok_` prefix before hashing
   /// - Old tokens (no prefix): Hashes entire token as-is
   /// - This ensures old tokens continue to authenticate during migration period
-  #[ must_use ]
-  pub fn hash_token( &self, token: &str ) -> String
-  {
+  #[must_use]
+  pub fn hash_token(&self, token: &str) -> String {
     // Strip apitok_ prefix if present (Protocol 014 new format)
-    let token_body = token.strip_prefix( "apitok_" ).unwrap_or( token );
+    let token_body = token.strip_prefix("apitok_").unwrap_or(token);
 
     let mut hasher = Sha256::new();
-    hasher.update( token_body.as_bytes() );
-    format!( "{:x}", hasher.finalize() )
+    hasher.update(token_body.as_bytes());
+    format!("{:x}", hasher.finalize())
   }
 
   /// Verify token against stored SHA-256 hash using constant-time comparison
@@ -306,18 +294,18 @@ impl TokenGenerator
   /// This function uses constant-time comparison via the `subtle` crate
   /// to prevent timing attacks. The comparison time is independent of
   /// where the mismatch occurs in the hash strings.
-  #[ must_use ]
-  pub fn verify_token( &self, token: &str, stored_hash: &str ) -> bool
-  {
-    let computed_hash = self.hash_token( token );
-    computed_hash.as_bytes().ct_eq( stored_hash.as_bytes() ).into()
+  #[must_use]
+  pub fn verify_token(&self, token: &str, stored_hash: &str) -> bool {
+    let computed_hash = self.hash_token(token);
+    computed_hash
+      .as_bytes()
+      .ct_eq(stored_hash.as_bytes())
+      .into()
   }
 }
 
-impl Default for TokenGenerator
-{
-  fn default() -> Self
-  {
+impl Default for TokenGenerator {
+  fn default() -> Self {
     Self::new()
   }
 }

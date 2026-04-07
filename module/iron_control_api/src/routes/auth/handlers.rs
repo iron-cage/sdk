@@ -8,11 +8,11 @@ use axum::{
   http::StatusCode,
   response::{IntoResponse, Json},
 };
-use std::net::SocketAddr;
 use axum_extra::{
-    headers::{authorization::Bearer, Authorization},
-    TypedHeader
+  headers::{authorization::Bearer, Authorization},
+  TypedHeader,
 };
+use core::net::SocketAddr;
 
 // ============================================================================
 // Login Endpoint - POST /api/v1/auth/login
@@ -70,10 +70,8 @@ pub async fn login(
   // Extract real client IP from TCP connection (secure, cannot be spoofed)
   let client_ip = addr.ip();
 
-  if state.rate_limiting_enabled
-  {
-    if let Err( retry_after_secs ) = state.rate_limiter.check_and_record( client_ip )
-    {
+  if state.rate_limiting_enabled {
+    if let Err(retry_after_secs) = state.rate_limiter.check_and_record(client_ip) {
       tracing::warn!(
         email = %request.email,
         client_ip = %client_ip,
@@ -82,11 +80,13 @@ pub async fn login(
       );
       return (
         StatusCode::TOO_MANY_REQUESTS,
-        Json( ErrorResponse {
+        Json(ErrorResponse {
           error: ErrorDetail {
             code: "RATE_LIMIT_EXCEEDED".to_string(),
-            message: format!( "Too many login attempts. Please try again in {} seconds.", retry_after_secs ),
-            details: Some( serde_json::json!({
+            message: format!(
+              "Too many login attempts. Please try again in {retry_after_secs} seconds."
+            ),
+            details: Some(serde_json::json!({
               "retry_after": retry_after_secs
             })),
           },
@@ -98,20 +98,17 @@ pub async fn login(
 
   // Check account lockout before attempting authentication
   // Protocol 007: "Account lockout after 10 failed attempts"
-  let lockout_check: Option<( i64, Option< i64 > )> = sqlx::query_as(
-    "SELECT failed_login_count, locked_until FROM users WHERE email = ?"
-  )
-    .bind( &request.email )
-    .fetch_optional( &state.db_pool )
-    .await
-    .unwrap_or( None );
+  let lockout_check: Option<(i64, Option<i64>)> =
+    sqlx::query_as("SELECT failed_login_count, locked_until FROM users WHERE email = ?")
+      .bind(&request.email)
+      .fetch_optional(&state.db_pool)
+      .await
+      .unwrap_or(None);
 
-  if let Some(( failed_count, Some( locked_until_ts ) )) = lockout_check
-  {
+  if let Some((failed_count, Some(locked_until_ts))) = lockout_check {
     let now = chrono::Utc::now().timestamp_millis();
-    if locked_until_ts > now
-    {
-      let retry_after_secs = ( locked_until_ts - now ) / 1000;
+    if locked_until_ts > now {
+      let retry_after_secs = (locked_until_ts - now) / 1000;
       tracing::warn!(
         email = %request.email,
         failed_login_count = failed_count,
@@ -123,7 +120,7 @@ pub async fn login(
         Json( ErrorResponse {
           error: ErrorDetail {
             code: "AUTH_ACCOUNT_LOCKED".to_string(),
-            message: format!( "Account locked due to too many failed login attempts. Try again in {} seconds.", retry_after_secs ),
+            message: format!( "Account locked due to too many failed login attempts. Try again in {retry_after_secs} seconds." ),
             details: Some( serde_json::json!({
               "retry_after": retry_after_secs,
               "locked_until": locked_until_ts
@@ -137,87 +134,82 @@ pub async fn login(
 
   // Authenticate user against database
   // Note: Using username field for email (database schema uses username)
-  let user = match user_auth::authenticate_user(&state.db_pool, &request.email, &request.password)
-    .await
-  {
-    Ok(Some(user)) => user,
-    Ok(None) => {
-      // Invalid credentials - increment failed login counter
-      // Protocol 007: Account lockout after 10 failed attempts (15-30 min duration)
-      let now = chrono::Utc::now().timestamp_millis();
+  let user =
+    match user_auth::authenticate_user(&state.db_pool, &request.email, &request.password).await {
+      Ok(Some(user)) => user,
+      Ok(None) => {
+        // Invalid credentials - increment failed login counter
+        // Protocol 007: Account lockout after 10 failed attempts (15-30 min duration)
+        let now = chrono::Utc::now().timestamp_millis();
 
-      let failed_count: Option<i64> = sqlx::query_scalar(
-        "UPDATE users SET
+        let failed_count: Option<i64> = sqlx::query_scalar(
+          "UPDATE users SET
          failed_login_count = failed_login_count + 1,
          last_failed_login = ?
          WHERE email = ?
-         RETURNING failed_login_count"
-      )
-        .bind( now )
-        .bind( &request.email )
-        .fetch_optional( &state.db_pool )
+         RETURNING failed_login_count",
+        )
+        .bind(now)
+        .bind(&request.email)
+        .fetch_optional(&state.db_pool)
         .await
-        .unwrap_or( None );
+        .unwrap_or(None);
 
-      // Lock account if threshold reached (10 failed attempts)
-      if let Some( count ) = failed_count
-      {
-        if count >= 10
-        {
-          // Lock for 30 minutes (1800000 milliseconds)
-          let locked_until = now + 1800000;
-          sqlx::query(
-            "UPDATE users SET locked_until = ? WHERE email = ?"
-          )
-            .bind( locked_until )
-            .bind( &request.email )
-            .execute( &state.db_pool )
-            .await
-            .ok();
+        // Lock account if threshold reached (10 failed attempts)
+        if let Some(count) = failed_count {
+          if count >= 10 {
+            // Lock for 30 minutes (1800000 milliseconds)
+            let locked_until = now + 1_800_000;
+            sqlx::query("UPDATE users SET locked_until = ? WHERE email = ?")
+              .bind(locked_until)
+              .bind(&request.email)
+              .execute(&state.db_pool)
+              .await
+              .ok();
 
-          tracing::warn!(
-            email = %request.email,
-            failed_login_count = count,
-            locked_until = locked_until,
-            "Account locked after 10 failed login attempts"
-          );
+            tracing::warn!(
+              email = %request.email,
+              failed_login_count = count,
+              locked_until = locked_until,
+              "Account locked after 10 failed login attempts"
+            );
+          }
         }
-      }
 
-      // GAP-004: Log failed login attempt for security monitoring
-      tracing::warn!(
-        email = %request.email,
-        failure_reason = "invalid_credentials",
-        "Failed login attempt - invalid credentials"
-      );
-      return (
-        StatusCode::UNAUTHORIZED,
-        Json(ErrorResponse {
-          error: ErrorDetail {
-            code: "AUTH_INVALID_CREDENTIALS".to_string(),
-            message: "Invalid email or password".to_string(),
-            details: None,
-          },
-        }),
-      )
-        .into_response();
-    }
-    Err(err) => {
-      // Database error - return 500
-      tracing::error!("Database error during authentication: {}", err);
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(ErrorResponse {
-          error: ErrorDetail {
-            code: "INTERNAL_ERROR".to_string(),
-            message: "Authentication service unavailable".to_string(),
-            details: None,
-          },
-        }),
-      )
-        .into_response();
-    }
-  };
+        // GAP-004: Log failed login attempt for security monitoring
+        tracing::warn!(
+          email = %request.email,
+          failure_reason = "invalid_credentials",
+          "Failed login attempt - invalid credentials"
+        );
+        return (
+          StatusCode::UNAUTHORIZED,
+          Json(ErrorResponse {
+            error: ErrorDetail {
+              code: "AUTH_INVALID_CREDENTIALS".to_string(),
+              message: "Invalid email or password".to_string(),
+              details: None,
+            },
+          }),
+        )
+          .into_response();
+      }
+      Err(err) => {
+        // Database error - return 500
+        tracing::error!("Database error during authentication: {}", err);
+        return (
+          StatusCode::INTERNAL_SERVER_ERROR,
+          Json(ErrorResponse {
+            error: ErrorDetail {
+              code: "INTERNAL_ERROR".to_string(),
+              message: "Authentication service unavailable".to_string(),
+              details: None,
+            },
+          }),
+        )
+          .into_response();
+      }
+    };
 
   // Check if account is active
   if !user.is_active {
@@ -252,41 +244,47 @@ pub async fn login(
      failed_login_count = 0,
      last_failed_login = NULL,
      locked_until = NULL
-     WHERE id = ?"
+     WHERE id = ?",
   )
-    .bind( user_id )
-    .execute( &state.db_pool )
-    .await
-    .ok();
+  .bind(user_id)
+  .execute(&state.db_pool)
+  .await
+  .ok();
 
   // Generate User Token (30 days expiration)
   // Generate unique token ID for blacklist tracking (UUID for session fixation prevention)
-  let access_token_id = format!("access_{}_{}", user_id, uuid::Uuid::new_v4());
-  let user_token = match state.jwt_secret.generate_access_token(user_id, &user.email, user_role, &access_token_id) {
-    Ok(token) => token,
-    Err(err) => {
-      tracing::error!("Failed to generate user token: {}", err);
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(ErrorResponse {
-          error: ErrorDetail {
-            code: "TOKEN_GENERATION_ERROR".to_string(),
-            message: "Failed to generate access token".to_string(),
-            details: None,
-          },
-        }),
-      )
-        .into_response();
-    }
-  };
+  let access_token_id = format!("access_{user_id}_{}", uuid::Uuid::new_v4());
+  let user_token =
+    match state
+      .jwt_secret
+      .generate_access_token(user_id, &user.email, user_role, &access_token_id)
+    {
+      Ok(token) => token,
+      Err(err) => {
+        tracing::error!("Failed to generate user token: {}", err);
+        return (
+          StatusCode::INTERNAL_SERVER_ERROR,
+          Json(ErrorResponse {
+            error: ErrorDetail {
+              code: "TOKEN_GENERATION_ERROR".to_string(),
+              message: "Failed to generate access token".to_string(),
+              details: None,
+            },
+          }),
+        )
+          .into_response();
+      }
+    };
 
   // Generate refresh token (optional, future feature)
   // Per Protocol 007: refresh_token is optional
-  let refresh_token_id = format!("refresh_{}_{}", user_id, chrono::Utc::now().timestamp());
-  let refresh_token = match state
-    .jwt_secret
-    .generate_refresh_token(user_id, &user.email, user_role, &refresh_token_id)
-  {
+  let refresh_token_id = format!("refresh_{user_id}_{}", chrono::Utc::now().timestamp());
+  let refresh_token = match state.jwt_secret.generate_refresh_token(
+    user_id,
+    &user.email,
+    user_role,
+    &refresh_token_id,
+  ) {
     Ok(token) => Some(token),
     Err(err) => {
       tracing::warn!("Failed to generate refresh token: {}", err);
@@ -295,8 +293,9 @@ pub async fn login(
   };
 
   // Calculate expiration (30 days from now)
-  let expires_in = 2592000u64; // 30 days in seconds
-  let expires_at = chrono::Utc::now() + chrono::Duration::seconds(expires_in as i64);
+  let expires_in = 2_592_000_u64; // 30 days in seconds
+  let expires_at =
+    chrono::Utc::now() + chrono::Duration::seconds(i64::try_from(expires_in).unwrap_or(i64::MAX));
 
   (
     StatusCode::OK,
@@ -353,7 +352,7 @@ pub async fn login(
 /// - Other User Tokens for same user remain valid (if user has multiple sessions)
 pub async fn logout(
   State(state): State<AuthState>,
-  AuthenticatedUser( claims ): AuthenticatedUser
+  AuthenticatedUser(claims): AuthenticatedUser,
 ) -> impl IntoResponse {
   let jti = claims.jti;
   let user_id = claims.sub;
@@ -362,21 +361,22 @@ pub async fn logout(
   // - jti: Token ID from JWT claims
   // - blacklisted_at: Current timestamp
   // - expires_at: Original token expiration (for cleanup)
-  let expires_at = match chrono::DateTime::from_timestamp( claims.exp, 0 ) {
-    Some( dt ) => dt,
-    None => {
-      tracing::error!( "Invalid expiration timestamp in JWT claims: {}", claims.exp );
-      return ( StatusCode::BAD_REQUEST, Json( ErrorResponse {
+  let Some(expires_at) = chrono::DateTime::from_timestamp(claims.exp, 0) else {
+    tracing::error!("Invalid expiration timestamp in JWT claims: {}", claims.exp);
+    return (
+      StatusCode::BAD_REQUEST,
+      Json(ErrorResponse {
         error: ErrorDetail {
           code: "INVALID_TOKEN".to_string(),
           message: "Token contains invalid expiration timestamp".to_string(),
           details: None,
         },
-      } ) ).into_response();
-    }
+      }),
+    )
+      .into_response();
   };
   match user_auth::add_token_to_blacklist(&state.db_pool, &jti, &user_id, expires_at).await {
-    Ok(()) => {},
+    Ok(()) => {}
     Err(err) => {
       tracing::error!("Failed to add token to blacklist: {}", err);
       return (
@@ -437,23 +437,19 @@ pub async fn refresh(
   State(state): State<AuthState>,
   TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>,
   // AuthenticatedUser( claims ): AuthenticatedUser
-
 ) -> impl IntoResponse {
-  let claims = match state.jwt_secret.verify_refresh_token(bearer.token()) {
-    Ok(claims) => claims,
-    Err(_) => {
-      return (
-        StatusCode::UNAUTHORIZED,
-        Json(ErrorResponse {
-          error: ErrorDetail {
-            code: "AUTH_INVALID_TOKEN".to_string(),
-            message: "Invalid or expired authentication token".to_string(),
-            details: None,
-          },
-        }),
-      )
-        .into_response();
-    }
+  let Ok(claims) = state.jwt_secret.verify_refresh_token(bearer.token()) else {
+    return (
+      StatusCode::UNAUTHORIZED,
+      Json(ErrorResponse {
+        error: ErrorDetail {
+          code: "AUTH_INVALID_TOKEN".to_string(),
+          message: "Invalid or expired authentication token".to_string(),
+          details: None,
+        },
+      }),
+    )
+      .into_response();
   };
 
   let blacklisted = match user_auth::get_blacklisted_token(&state.db_pool, &claims.jti).await {
@@ -475,16 +471,16 @@ pub async fn refresh(
   };
   if blacklisted.is_some() {
     return (
-        StatusCode::UNAUTHORIZED,
-        Json(ErrorResponse {
-          error: ErrorDetail {
-            code: "AUTH_INVALID_TOKEN".to_string(),
-            message: "Invalid or expired authentication token".to_string(),
-            details: None,
-          },
-        }),
-      )
-        .into_response();
+      StatusCode::UNAUTHORIZED,
+      Json(ErrorResponse {
+        error: ErrorDetail {
+          code: "AUTH_INVALID_TOKEN".to_string(),
+          message: "Invalid or expired authentication token".to_string(),
+          details: None,
+        },
+      }),
+    )
+      .into_response();
   }
 
   // Fetch user to get current role
@@ -506,13 +502,11 @@ pub async fn refresh(
     }
   };
 
-  let user = match user {
-    Some(user) => user,
-    None => {
-      return (
-        StatusCode::UNAUTHORIZED,
-        Json(ErrorResponse {
-          error: ErrorDetail {
+  let Some(user) = user else {
+    return (
+      StatusCode::UNAUTHORIZED,
+      Json(ErrorResponse {
+        error: ErrorDetail {
           code: "USER_NOT_FOUND".to_string(),
           message: "User not found".to_string(),
           details: None,
@@ -520,44 +514,61 @@ pub async fn refresh(
       }),
     )
       .into_response();
-    }
   };
 
   // Generate new User Token (30 days) with unique JTI (session fixation prevention)
   let new_token_id = format!("refresh_{}_{}", user.id, uuid::Uuid::new_v4());
-  let new_user_token = match state.jwt_secret.generate_access_token(&user.id, &user.email, &user.role, &new_token_id) {
-    Ok( token ) => token,
-    Err( e ) => {
-      tracing::error!( "Failed to generate new access token during refresh: {}", e );
-      return ( StatusCode::INTERNAL_SERVER_ERROR, Json( ErrorResponse {
-        error: ErrorDetail {
-          code: "TOKEN_GENERATION_FAILED".to_string(),
-          message: "Failed to generate new access token".to_string(),
-          details: None,
-        },
-      } ) ).into_response();
-    }
-  };
+  let new_user_token =
+    match state
+      .jwt_secret
+      .generate_access_token(&user.id, &user.email, &user.role, &new_token_id)
+    {
+      Ok(token) => token,
+      Err(e) => {
+        tracing::error!("Failed to generate new access token during refresh: {}", e);
+        return (
+          StatusCode::INTERNAL_SERVER_ERROR,
+          Json(ErrorResponse {
+            error: ErrorDetail {
+              code: "TOKEN_GENERATION_FAILED".to_string(),
+              message: "Failed to generate new access token".to_string(),
+              details: None,
+            },
+          }),
+        )
+          .into_response();
+      }
+    };
 
   // Generate new refresh token (token rotation security feature)
   // Per Protocol 007 enhancement: rotate refresh tokens to limit exposure window
   // Use nanosecond timestamp to ensure uniqueness even within same second
-  let new_refresh_token_id = format!("refresh_{}_{}", user.id, chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0));
-  let new_refresh_token = match state
-    .jwt_secret
-    .generate_refresh_token(&user.id, &user.email, &user.role, &new_refresh_token_id)
-  {
+  let new_refresh_token_id = format!(
+    "refresh_{}_{}",
+    user.id,
+    chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
+  );
+  let new_refresh_token = match state.jwt_secret.generate_refresh_token(
+    &user.id,
+    &user.email,
+    &user.role,
+    &new_refresh_token_id,
+  ) {
     Ok(token) => Some(token),
     Err(err) => {
-      tracing::warn!("Failed to generate new refresh token during rotation: {}", err);
+      tracing::warn!(
+        "Failed to generate new refresh token during rotation: {}",
+        err
+      );
       None
     }
   };
 
   // Blacklist old User Token (atomic operation)
-  let expires_at = chrono::Utc::now() + chrono::Duration::seconds(claims.exp as i64);
+  let expires_at =
+    chrono::Utc::now() + chrono::Duration::seconds(i64::try_from(claims.exp).unwrap_or(i64::MAX));
   match user_auth::add_token_to_blacklist(&state.db_pool, &claims.jti, &user.id, expires_at).await {
-    Ok(()) => {},
+    Ok(()) => {}
     Err(err) => {
       tracing::error!("Failed to add token to blacklist: {}", err);
       return (
@@ -575,8 +586,9 @@ pub async fn refresh(
   }
 
   // Calculate expiration (30 days from now)
-  let expires_in = 2592000u64; // 30 days in seconds
-  let expires_at = chrono::Utc::now() + chrono::Duration::seconds(expires_in as i64);
+  let expires_in = 2_592_000_u64; // 30 days in seconds
+  let expires_at =
+    chrono::Utc::now() + chrono::Duration::seconds(i64::try_from(expires_in).unwrap_or(i64::MAX));
 
   // Return response with new tokens (both access and refresh)
   (
@@ -628,12 +640,16 @@ pub async fn validate(
     Ok(claims) => claims,
     Err(_err) => {
       // Token expired or invalid
-      return (StatusCode::OK, Json(ValidateResponse::Invalid {
-        valid: false,
-        reason: "TOKEN_EXPIRED".to_string(),
-        expired_at: Some(chrono::Utc::now().to_rfc3339()),
-        revoked_at: None,
-      })).into_response();
+      return (
+        StatusCode::OK,
+        Json(ValidateResponse::Invalid {
+          valid: false,
+          reason: "TOKEN_EXPIRED".to_string(),
+          expired_at: Some(chrono::Utc::now().to_rfc3339()),
+          revoked_at: None,
+        }),
+      )
+        .into_response();
     }
   };
 
@@ -644,13 +660,17 @@ pub async fn validate(
     Ok(blacklisted) => blacklisted,
     Err(err) => {
       tracing::error!("Failed to check if token is blacklisted: {}", err);
-      return (StatusCode::INTERNAL_SERVER_ERROR, Json(ErrorResponse {
-        error: ErrorDetail {
-          code: "TOKEN_BLACKLIST_ERROR".to_string(),
-          message: "Failed to check if token is blacklisted".to_string(),
-          details: None,
-        },
-      })).into_response();
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(ErrorResponse {
+          error: ErrorDetail {
+            code: "TOKEN_BLACKLIST_ERROR".to_string(),
+            message: "Failed to check if token is blacklisted".to_string(),
+            details: None,
+          },
+        }),
+      )
+        .into_response();
     }
   };
 
@@ -659,22 +679,30 @@ pub async fn validate(
 
     match blacklisted_at {
       Some(timestamp) => {
-        return (StatusCode::OK, Json(ValidateResponse::Invalid {
-          valid: false,
-          reason: "TOKEN_REVOKED".to_string(),
-          expired_at: None,
-          revoked_at: Some(timestamp.to_rfc3339()),
-        })).into_response();
-      },
+        return (
+          StatusCode::OK,
+          Json(ValidateResponse::Invalid {
+            valid: false,
+            reason: "TOKEN_REVOKED".to_string(),
+            expired_at: None,
+            revoked_at: Some(timestamp.to_rfc3339()),
+          }),
+        )
+          .into_response();
+      }
       None => {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(ErrorResponse {
-          error: ErrorDetail {
-            code: "TOKEN_BLACKLIST_ERROR".to_string(),
-            message: "Failed to check if token is blacklisted".to_string(),
-            details: None,
-          },
-        })).into_response();
-      },
+        return (
+          StatusCode::INTERNAL_SERVER_ERROR,
+          Json(ErrorResponse {
+            error: ErrorDetail {
+              code: "TOKEN_BLACKLIST_ERROR".to_string(),
+              message: "Failed to check if token is blacklisted".to_string(),
+              details: None,
+            },
+          }),
+        )
+          .into_response();
+      }
     }
   }
 
@@ -685,43 +713,49 @@ pub async fn validate(
     Ok(user) => user,
     Err(err) => {
       tracing::error!("Failed to fetch user: {}", err);
-      return (StatusCode::INTERNAL_SERVER_ERROR, Json(ErrorResponse {
-        error: ErrorDetail {
-          code: "USER_FETCH_ERROR".to_string(),
-          message: "Failed to fetch user".to_string(),
-          details: None,
-        },
-      })).into_response();
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(ErrorResponse {
+          error: ErrorDetail {
+            code: "USER_FETCH_ERROR".to_string(),
+            message: "Failed to fetch user".to_string(),
+            details: None,
+          },
+        }),
+      )
+        .into_response();
     }
   };
 
-  let user = match user_option {
-    Some(user) => user,
-    None => {
-      return (StatusCode::NOT_FOUND, Json(ErrorResponse {
+  let Some(user) = user_option else {
+    return (
+      StatusCode::NOT_FOUND,
+      Json(ErrorResponse {
         error: ErrorDetail {
           code: "USER_NOT_FOUND".to_string(),
           message: "User not found".to_string(),
           details: None,
         },
-      })).into_response();
-    }
+      }),
+    )
+      .into_response();
   };
 
-  let expires_at = match chrono::DateTime::from_timestamp(claims.exp, 0) {
-    Some( dt ) => dt,
-    None => {
-      tracing::error!( "Invalid expiration timestamp in JWT claims: {}", claims.exp );
-      return ( StatusCode::BAD_REQUEST, Json( ErrorResponse {
+  let Some(expires_at) = chrono::DateTime::from_timestamp(claims.exp, 0) else {
+    tracing::error!("Invalid expiration timestamp in JWT claims: {}", claims.exp);
+    return (
+      StatusCode::BAD_REQUEST,
+      Json(ErrorResponse {
         error: ErrorDetail {
           code: "INVALID_TOKEN".to_string(),
           message: "Token contains invalid expiration timestamp".to_string(),
           details: None,
         },
-      } ) ).into_response();
-    }
+      }),
+    )
+      .into_response();
   };
-  let expires_in = (expires_at - chrono::Utc::now()).num_seconds() as u64;
+  let expires_in = u64::try_from((expires_at - chrono::Utc::now()).num_seconds()).unwrap_or(0);
 
   // Placeholder response
   (

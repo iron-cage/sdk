@@ -3,9 +3,9 @@
 //! Pure functions for agent management operations.
 //! No I/O - all external operations handled by adapter layer.
 
-use std::collections::HashMap;
+use crate::handlers::validation::{validate_non_empty, validate_non_negative_integer};
 use crate::handlers::CliError;
-use crate::handlers::validation::{ validate_non_empty, validate_non_negative_integer };
+use std::collections::HashMap;
 
 /// Handle .agent.list command
 ///
@@ -18,27 +18,24 @@ use crate::handlers::validation::{ validate_non_empty, validate_non_negative_int
 /// - limit: String (positive integer)
 /// - v: String (verbosity level 0-5)
 /// - format: String (table|json|yaml, default: table)
-pub fn list_agents_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if pagination or verbosity parameters are invalid.
+pub fn list_agents_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate optional pagination
-  if let Some(page_str) = params.get("page")
-  {
+  if let Some(page_str) = params.get("page") {
     validate_non_negative_integer(page_str, "page")?;
   }
 
-  if let Some(limit_str) = params.get("limit")
-  {
+  if let Some(limit_str) = params.get("limit") {
     validate_non_negative_integer(limit_str, "limit")?;
   }
 
   // Validate verbosity
-  if let Some(v_str) = params.get("v")
-  {
+  if let Some(v_str) = params.get("v") {
     let v = validate_non_negative_integer(v_str, "v")?;
-    if v > 5
-    {
+    if v > 5 {
       return Err(CliError::InvalidParameter {
         param: "v",
         reason: "verbosity must be 0-5",
@@ -46,12 +43,9 @@ pub fn list_agents_handler(
     }
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
-  Ok(format!(
-    "Agent list parameters valid\nFormat: {}",
-    format
-  ))
+  Ok(format!("Agent list parameters valid\nFormat: {format}"))
 }
 
 /// Handle .agent.create command
@@ -63,16 +57,17 @@ pub fn list_agents_handler(
 /// Required:
 /// - name: String (non-empty, max 100 chars, pattern: ^[a-zA-Z0-9_-]+$)
 /// - providers: String (comma-separated list, e.g., "openai" or "openai,anthropic")
-/// - provider_key_id: String (positive integer)
+/// - `provider_key_id`: String (positive integer)
 /// - budget: String (positive integer, in microdollars)
 ///
 /// Optional:
 /// - dry: String (0 or 1, default: 0)
 /// - format: String (table|json|yaml, default: table)
-pub fn create_agent_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn create_agent_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
   let name = params
     .get("name")
@@ -93,8 +88,7 @@ pub fn create_agent_handler(
   // Validate name
   validate_non_empty(name, "name")?;
 
-  if name.len() > 100
-  {
+  if name.len() > 100 {
     return Err(CliError::InvalidParameter {
       param: "name",
       reason: "cannot exceed 100 characters",
@@ -105,8 +99,7 @@ pub fn create_agent_handler(
   let name_pattern = regex::Regex::new(r"^[a-zA-Z0-9_-]+$")
     .map_err(|_| CliError::ValidationError("regex compilation failed".into()))?;
 
-  if !name_pattern.is_match(name)
-  {
+  if !name_pattern.is_match(name) {
     return Err(CliError::InvalidParameter {
       param: "name",
       reason: "must match pattern ^[a-zA-Z0-9_-]+$",
@@ -118,8 +111,7 @@ pub fn create_agent_handler(
 
   // Validate provider_key_id
   let provider_key_id = validate_non_negative_integer(provider_key_id_str, "provider_key_id")?;
-  if provider_key_id == 0
-  {
+  if provider_key_id == 0 {
     return Err(CliError::InvalidParameter {
       param: "provider_key_id",
       reason: "must be a positive integer",
@@ -128,8 +120,7 @@ pub fn create_agent_handler(
 
   // Validate budget (must be positive for initial budget)
   let budget = validate_non_negative_integer(budget_str, "budget")?;
-  if budget == 0
-  {
+  if budget == 0 {
     return Err(CliError::InvalidParameter {
       param: "budget",
       reason: "must be a positive integer (in microdollars)",
@@ -137,11 +128,9 @@ pub fn create_agent_handler(
   }
 
   // Validate optional dry run
-  if let Some(dry_str) = params.get("dry")
-  {
+  if let Some(dry_str) = params.get("dry") {
     let dry = validate_non_negative_integer(dry_str, "dry")?;
-    if dry > 1
-    {
+    if dry > 1 {
       return Err(CliError::InvalidParameter {
         param: "dry",
         reason: "must be 0 or 1",
@@ -149,11 +138,10 @@ pub fn create_agent_handler(
     }
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Agent creation parameters valid\nName: {}\nProviders: {}\nProvider Key ID: {}\nBudget: {}\nFormat: {}",
-    name, providers, provider_key_id_str, budget_str, format
+    "Agent creation parameters valid\nName: {name}\nProviders: {providers}\nProvider Key ID: {provider_key_id_str}\nBudget: {budget_str}\nFormat: {format}"
   ))
 }
 
@@ -168,22 +156,20 @@ pub fn create_agent_handler(
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn get_agent_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn get_agent_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameter
-  let id = params
-    .get("id")
-    .ok_or(CliError::MissingParameter("id"))?;
+  let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
   validate_non_empty(id, "id")?;
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Agent get parameters valid\nID: {}\nFormat: {}",
-    id, format
+    "Agent get parameters valid\nID: {id}\nFormat: {format}"
   ))
 }
 
@@ -201,24 +187,21 @@ pub fn get_agent_handler(
 /// - budget: String (non-negative integer)
 /// - dry: String (0 or 1, default: 0)
 /// - format: String (table|json|yaml, default: table)
-pub fn update_agent_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn update_agent_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameter
-  let id = params
-    .get("id")
-    .ok_or(CliError::MissingParameter("id"))?;
+  let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
   validate_non_empty(id, "id")?;
 
   // Validate optional name
-  if let Some(name) = params.get("name")
-  {
+  if let Some(name) = params.get("name") {
     validate_non_empty(name, "name")?;
 
-    if name.len() > 100
-    {
+    if name.len() > 100 {
       return Err(CliError::InvalidParameter {
         param: "name",
         reason: "cannot exceed 100 characters",
@@ -228,8 +211,7 @@ pub fn update_agent_handler(
     let name_pattern = regex::Regex::new(r"^[a-zA-Z0-9_-]+$")
       .map_err(|_| CliError::ValidationError("regex compilation failed".into()))?;
 
-    if !name_pattern.is_match(name)
-    {
+    if !name_pattern.is_match(name) {
       return Err(CliError::InvalidParameter {
         param: "name",
         reason: "must match pattern ^[a-zA-Z0-9_-]+$",
@@ -238,17 +220,14 @@ pub fn update_agent_handler(
   }
 
   // Validate optional budget
-  if let Some(budget_str) = params.get("budget")
-  {
+  if let Some(budget_str) = params.get("budget") {
     validate_non_negative_integer(budget_str, "budget")?;
   }
 
   // Validate optional dry run
-  if let Some(dry_str) = params.get("dry")
-  {
+  if let Some(dry_str) = params.get("dry") {
     let dry = validate_non_negative_integer(dry_str, "dry")?;
-    if dry > 1
-    {
+    if dry > 1 {
       return Err(CliError::InvalidParameter {
         param: "dry",
         reason: "must be 0 or 1",
@@ -256,11 +235,10 @@ pub fn update_agent_handler(
     }
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Agent update parameters valid\nID: {}\nFormat: {}",
-    id, format
+    "Agent update parameters valid\nID: {id}\nFormat: {format}"
   ))
 }
 
@@ -276,23 +254,20 @@ pub fn update_agent_handler(
 /// Optional:
 /// - dry: String (0 or 1, default: 0)
 /// - format: String (table|json|yaml, default: table)
-pub fn delete_agent_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn delete_agent_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameter
-  let id = params
-    .get("id")
-    .ok_or(CliError::MissingParameter("id"))?;
+  let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
   validate_non_empty(id, "id")?;
 
   // Validate optional dry run
-  if let Some(dry_str) = params.get("dry")
-  {
+  if let Some(dry_str) = params.get("dry") {
     let dry = validate_non_negative_integer(dry_str, "dry")?;
-    if dry > 1
-    {
+    if dry > 1 {
       return Err(CliError::InvalidParameter {
         param: "dry",
         reason: "must be 0 or 1",
@@ -300,15 +275,14 @@ pub fn delete_agent_handler(
     }
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Agent delete parameters valid\nID: {}\nFormat: {}",
-    id, format
+    "Agent delete parameters valid\nID: {id}\nFormat: {format}"
   ))
 }
 
-/// Handle .agent.assign_providers command
+/// Handle `.agent.assign_providers` command
 ///
 /// Assigns providers to agent.
 ///
@@ -316,19 +290,18 @@ pub fn delete_agent_handler(
 ///
 /// Required:
 /// - id: String (non-empty agent ID)
-/// - provider_ids: String (comma-separated list of provider IDs)
+/// - `provider_ids`: String (comma-separated list of provider IDs)
 ///
 /// Optional:
 /// - dry: String (0 or 1, default: 0)
 /// - format: String (table|json|yaml, default: table)
-pub fn assign_providers_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn assign_providers_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
-  let id = params
-    .get("id")
-    .ok_or(CliError::MissingParameter("id"))?;
+  let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
   let provider_ids = params
     .get("provider_ids")
@@ -338,8 +311,7 @@ pub fn assign_providers_handler(
   validate_non_empty(provider_ids, "provider_ids")?;
 
   // Validate provider_ids format (should be comma-separated)
-  if provider_ids.split(',').any(|id| id.trim().is_empty())
-  {
+  if provider_ids.split(',').any(|id| id.trim().is_empty()) {
     return Err(CliError::InvalidParameter {
       param: "provider_ids",
       reason: "cannot contain empty provider IDs",
@@ -347,11 +319,9 @@ pub fn assign_providers_handler(
   }
 
   // Validate optional dry run
-  if let Some(dry_str) = params.get("dry")
-  {
+  if let Some(dry_str) = params.get("dry") {
     let dry = validate_non_negative_integer(dry_str, "dry")?;
-    if dry > 1
-    {
+    if dry > 1 {
       return Err(CliError::InvalidParameter {
         param: "dry",
         reason: "must be 0 or 1",
@@ -359,15 +329,14 @@ pub fn assign_providers_handler(
     }
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Assign providers parameters valid\nAgent ID: {}\nProvider IDs: {}\nFormat: {}",
-    id, provider_ids, format
+    "Assign providers parameters valid\nAgent ID: {id}\nProvider IDs: {provider_ids}\nFormat: {format}"
   ))
 }
 
-/// Handle .agent.list_providers command
+/// Handle `.agent.list_providers` command
 ///
 /// Lists providers assigned to agent.
 ///
@@ -378,26 +347,24 @@ pub fn assign_providers_handler(
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn list_agent_providers_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn list_agent_providers_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameter
-  let id = params
-    .get("id")
-    .ok_or(CliError::MissingParameter("id"))?;
+  let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
   validate_non_empty(id, "id")?;
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "List agent providers parameters valid\nAgent ID: {}\nFormat: {}",
-    id, format
+    "List agent providers parameters valid\nAgent ID: {id}\nFormat: {format}"
   ))
 }
 
-/// Handle .agent.remove_provider command
+/// Handle `.agent.remove_provider` command
 ///
 /// Removes provider from agent.
 ///
@@ -405,19 +372,18 @@ pub fn list_agent_providers_handler(
 ///
 /// Required:
 /// - id: String (non-empty agent ID)
-/// - provider_id: String (non-empty provider ID)
+/// - `provider_id`: String (non-empty provider ID)
 ///
 /// Optional:
 /// - dry: String (0 or 1, default: 0)
 /// - format: String (table|json|yaml, default: table)
-pub fn remove_provider_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn remove_provider_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameters
-  let id = params
-    .get("id")
-    .ok_or(CliError::MissingParameter("id"))?;
+  let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
   let provider_id = params
     .get("provider_id")
@@ -427,11 +393,9 @@ pub fn remove_provider_handler(
   validate_non_empty(provider_id, "provider_id")?;
 
   // Validate optional dry run
-  if let Some(dry_str) = params.get("dry")
-  {
+  if let Some(dry_str) = params.get("dry") {
     let dry = validate_non_negative_integer(dry_str, "dry")?;
-    if dry > 1
-    {
+    if dry > 1 {
       return Err(CliError::InvalidParameter {
         param: "dry",
         reason: "must be 0 or 1",
@@ -439,15 +403,14 @@ pub fn remove_provider_handler(
     }
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Remove provider parameters valid\nAgent ID: {}\nProvider ID: {}\nFormat: {}",
-    id, provider_id, format
+    "Remove provider parameters valid\nAgent ID: {id}\nProvider ID: {provider_id}\nFormat: {format}"
   ))
 }
 
-/// Handle .agent.ic_token.generate command
+/// Handle `.agent.ic_token.generate` command
 ///
 /// Generates IC token for agent.
 ///
@@ -458,26 +421,24 @@ pub fn remove_provider_handler(
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn generate_ic_token_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn generate_ic_token_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameter
-  let id = params
-    .get("id")
-    .ok_or(CliError::MissingParameter("id"))?;
+  let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
   validate_non_empty(id, "id")?;
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Generate IC token parameters valid\nAgent ID: {}\nFormat: {}",
-    id, format
+    "Generate IC token parameters valid\nAgent ID: {id}\nFormat: {format}"
   ))
 }
 
-/// Handle .agent.ic_token.status command
+/// Handle `.agent.ic_token.status` command
 ///
 /// Gets IC token status for agent.
 ///
@@ -488,26 +449,24 @@ pub fn generate_ic_token_handler(
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn get_ic_token_status_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn get_ic_token_status_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameter
-  let id = params
-    .get("id")
-    .ok_or(CliError::MissingParameter("id"))?;
+  let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
   validate_non_empty(id, "id")?;
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Get IC token status parameters valid\nAgent ID: {}\nFormat: {}",
-    id, format
+    "Get IC token status parameters valid\nAgent ID: {id}\nFormat: {format}"
   ))
 }
 
-/// Handle .agent.ic_token.regenerate command
+/// Handle `.agent.ic_token.regenerate` command
 ///
 /// Regenerates IC token for agent.
 ///
@@ -518,26 +477,24 @@ pub fn get_ic_token_status_handler(
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn regenerate_ic_token_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn regenerate_ic_token_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameter
-  let id = params
-    .get("id")
-    .ok_or(CliError::MissingParameter("id"))?;
+  let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
   validate_non_empty(id, "id")?;
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Regenerate IC token parameters valid\nAgent ID: {}\nFormat: {}",
-    id, format
+    "Regenerate IC token parameters valid\nAgent ID: {id}\nFormat: {format}"
   ))
 }
 
-/// Handle .agent.ic_token.revoke command
+/// Handle `.agent.ic_token.revoke` command
 ///
 /// Revokes IC token for agent.
 ///
@@ -548,21 +505,19 @@ pub fn regenerate_ic_token_handler(
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn revoke_ic_token_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn revoke_ic_token_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameter
-  let id = params
-    .get("id")
-    .ok_or(CliError::MissingParameter("id"))?;
+  let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
   validate_non_empty(id, "id")?;
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Revoke IC token parameters valid\nAgent ID: {}\nFormat: {}",
-    id, format
+    "Revoke IC token parameters valid\nAgent ID: {id}\nFormat: {format}"
   ))
 }

@@ -3,11 +3,11 @@
 //! Pure functions for API token management operations.
 //! No I/O - all external operations handled by adapter layer.
 
-use std::collections::HashMap;
+use crate::handlers::validation::{validate_non_empty, validate_non_negative_integer};
 use crate::handlers::CliError;
-use crate::handlers::validation::{ validate_non_empty, validate_non_negative_integer };
+use std::collections::HashMap;
 
-/// Handle .api_token.list command
+/// Handle `.api_token.list` command
 ///
 /// Lists all API tokens.
 ///
@@ -15,19 +15,17 @@ use crate::handlers::validation::{ validate_non_empty, validate_non_negative_int
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn list_api_tokens_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if validation fails.
+pub fn list_api_tokens_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
+  let format = params.get("format").map_or("table", String::as_str);
 
-  Ok(format!(
-    "API token list parameters valid\nFormat: {}",
-    format
-  ))
+  Ok(format!("API token list parameters valid\nFormat: {format}"))
 }
 
-/// Handle .api_token.create command
+/// Handle `.api_token.create` command
 ///
 /// Creates new API token.
 ///
@@ -39,10 +37,11 @@ pub fn list_api_tokens_handler(
 /// Optional:
 /// - dry: String (0 or 1, default: 0)
 /// - format: String (table|json|yaml, default: table)
-pub fn create_api_token_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn create_api_token_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameter
   let name = params
     .get("name")
@@ -50,8 +49,7 @@ pub fn create_api_token_handler(
 
   validate_non_empty(name, "name")?;
 
-  if name.len() > 100
-  {
+  if name.len() > 100 {
     return Err(CliError::InvalidParameter {
       param: "name",
       reason: "cannot exceed 100 characters",
@@ -59,11 +57,9 @@ pub fn create_api_token_handler(
   }
 
   // Validate optional dry run
-  if let Some(dry_str) = params.get("dry")
-  {
+  if let Some(dry_str) = params.get("dry") {
     let dry = validate_non_negative_integer(dry_str, "dry")?;
-    if dry > 1
-    {
+    if dry > 1 {
       return Err(CliError::InvalidParameter {
         param: "dry",
         reason: "must be 0 or 1",
@@ -71,15 +67,14 @@ pub fn create_api_token_handler(
     }
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "API token creation parameters valid\nName: {}\nFormat: {}",
-    name, format
+    "API token creation parameters valid\nName: {name}\nFormat: {format}"
   ))
 }
 
-/// Handle .api_token.get command
+/// Handle `.api_token.get` command
 ///
 /// Gets API token details by ID.
 ///
@@ -90,26 +85,24 @@ pub fn create_api_token_handler(
 ///
 /// Optional:
 /// - format: String (table|json|yaml, default: table)
-pub fn get_api_token_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn get_api_token_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameter
-  let id = params
-    .get("id")
-    .ok_or(CliError::MissingParameter("id"))?;
+  let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
   validate_non_empty(id, "id")?;
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Get API token parameters valid\nID: {}\nFormat: {}",
-    id, format
+    "Get API token parameters valid\nID: {id}\nFormat: {format}"
   ))
 }
 
-/// Handle .api_token.revoke command
+/// Handle `.api_token.revoke` command
 ///
 /// Revokes API token by ID.
 ///
@@ -121,23 +114,20 @@ pub fn get_api_token_handler(
 /// Optional:
 /// - dry: String (0 or 1, default: 0)
 /// - format: String (table|json|yaml, default: table)
-pub fn revoke_api_token_handler(
-  params: &HashMap<String, String>,
-) -> Result<String, CliError>
-{
+///
+/// # Errors
+///
+/// Returns `Err(CliError)` if required parameters are missing or validation fails.
+pub fn revoke_api_token_handler(params: &HashMap<String, String>) -> Result<String, CliError> {
   // Validate required parameter
-  let id = params
-    .get("id")
-    .ok_or(CliError::MissingParameter("id"))?;
+  let id = params.get("id").ok_or(CliError::MissingParameter("id"))?;
 
   validate_non_empty(id, "id")?;
 
   // Validate optional dry run
-  if let Some(dry_str) = params.get("dry")
-  {
+  if let Some(dry_str) = params.get("dry") {
     let dry = validate_non_negative_integer(dry_str, "dry")?;
-    if dry > 1
-    {
+    if dry > 1 {
       return Err(CliError::InvalidParameter {
         param: "dry",
         reason: "must be 0 or 1",
@@ -145,10 +135,9 @@ pub fn revoke_api_token_handler(
     }
   }
 
-  let format = params.get("format").map(|s| s.as_str()).unwrap_or("table");
+  let format = params.get("format").map_or("table", String::as_str);
 
   Ok(format!(
-    "Revoke API token parameters valid\nID: {}\nFormat: {}",
-    id, format
+    "Revoke API token parameters valid\nID: {id}\nFormat: {format}"
   ))
 }

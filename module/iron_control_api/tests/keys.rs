@@ -3,14 +3,14 @@
 //! This module contains tests for the /api/keys endpoint.
 //! Tests verify secure key retrieval with API token authentication.
 
-#[ path = "common/mod.rs" ]
+#[path = "common/mod.rs"]
 mod common;
 
-#[ path = "keys/endpoints.rs" ]
+#[path = "keys/endpoints.rs"]
 mod endpoints;
 
-#[ path = "keys/security.rs" ]
+#[path = "keys/security.rs"]
 mod security;
 
-#[ path = "keys/full_flow.rs" ]
+#[path = "keys/full_flow.rs"]
 mod full_flow;

@@ -3,51 +3,48 @@
 //!
 //! `SQLite`/`PostgreSQL` persistence for tokens, usage, limits, traces, audit logs.
 
-use sqlx::{ SqlitePool, sqlite::SqlitePoolOptions, Row };
-use crate::token_generator::TokenGenerator;
 use crate::error::Result;
+use crate::token_generator::TokenGenerator;
+use sqlx::{sqlite::SqlitePoolOptions, Row, SqlitePool};
 
 /// Token metadata returned from storage
-#[ derive( Debug, Clone ) ]
-pub struct TokenMetadata
-{
+#[derive(Debug, Clone)]
+pub struct TokenMetadata {
   /// Database ID
   pub id: i64,
   /// User ID who owns this token
   pub user_id: String,
   /// Optional project ID
-  pub project_id: Option< String >,
+  pub project_id: Option<String>,
   /// Optional human-friendly name
-  pub name: Option< String >,
+  pub name: Option<String>,
   /// Optional agent ID
-  pub agent_id: Option< i64 >,
+  pub agent_id: Option<i64>,
   /// Optional provider
-  pub provider: Option< String >,
+  pub provider: Option<String>,
   /// Whether token is active
   pub is_active: bool,
   /// Creation timestamp (milliseconds since epoch)
   pub created_at: i64,
   /// Last used timestamp (milliseconds since epoch)
-  pub last_used_at: Option< i64 >,
+  pub last_used_at: Option<i64>,
   /// Expiration timestamp (milliseconds since epoch)
-  pub expires_at: Option< i64 >,
+  pub expires_at: Option<i64>,
   /// Revocation timestamp (milliseconds since epoch, NULL if rotated/deactivated)
-  pub revoked_at: Option< i64 >,
+  pub revoked_at: Option<i64>,
 }
 
 /// Token storage layer
 ///
 /// Manages token persistence in `SQLite` database.
 /// Stores SHA-256 hashes, never plaintext tokens.
-#[ derive( Debug, Clone ) ]
-pub struct TokenStorage
-{
+#[derive(Debug, Clone)]
+pub struct TokenStorage {
   pool: SqlitePool,
   generator: TokenGenerator,
 }
 
-impl TokenStorage
-{
+impl TokenStorage {
   /// Create new token storage from existing pool
   ///
   /// Preferred constructor for test environments using `iron_test_db`.
@@ -70,9 +67,8 @@ impl TokenStorage
   /// let db = TestDatabaseBuilder::new().in_memory().build().await?;
   /// let storage = TokenStorage::from_pool( db.pool().clone() );
   /// ```
-  #[ must_use ]
-  pub fn from_pool( pool: SqlitePool ) -> Self
-  {
+  #[must_use]
+  pub fn from_pool(pool: SqlitePool) -> Self {
     Self {
       pool,
       generator: TokenGenerator::new(),
@@ -92,20 +88,19 @@ impl TokenStorage
   /// # Errors
   ///
   /// Returns error if database connection fails or migration fails
-  pub async fn new( database_url: &str ) -> Result< Self >
-  {
+  pub async fn new(database_url: &str) -> Result<Self> {
     let pool = SqlitePoolOptions::new()
-      .max_connections( 5 )
-      .connect( database_url )
+      .max_connections(5)
+      .connect(database_url)
       .await
-      .map_err( crate::error::TokenError::Database )?;
+      .map_err(crate::error::TokenError::Database)?;
 
     // Apply all migrations using unified helper
-    crate::migrations::apply_all_migrations( &pool ).await?;
-    Ok( Self {
+    crate::migrations::apply_all_migrations(&pool).await?;
+    Ok(Self {
       pool,
       generator: TokenGenerator::new(),
-    } )
+    })
   }
 
   /// Create new token storage from configuration file
@@ -133,10 +128,9 @@ impl TokenStorage
   /// std::env::set_var("IRON_ENV", "production");
   /// let storage = TokenStorage::from_config().await?;
   /// ```
-  pub async fn from_config() -> Result< Self >
-  {
+  pub async fn from_config() -> Result<Self> {
     let config = crate::config::Config::load()?;
-    Self::from_config_object( &config ).await
+    Self::from_config_object(&config).await
   }
 
   /// Create new token storage from configuration object
@@ -152,37 +146,35 @@ impl TokenStorage
   /// # Errors
   ///
   /// Returns error if database connection fails or migration fails
-  pub async fn from_config_object( config: &crate::config::Config ) -> Result< Self >
-  {
+  pub async fn from_config_object(config: &crate::config::Config) -> Result<Self> {
     let pool = SqlitePoolOptions::new()
-      .max_connections( config.database.max_connections )
-      .connect( &config.database.url )
+      .max_connections(config.database.max_connections)
+      .connect(&config.database.url)
       .await
-      .map_err( crate::error::TokenError::Database )?;
+      .map_err(crate::error::TokenError::Database)?;
 
     // Apply migrations if configured
-    if config.database.auto_migrate
-    {
-      crate::migrations::apply_all_migrations( &pool ).await?;
+    if config.database.auto_migrate {
+      crate::migrations::apply_all_migrations(&pool).await?;
     }
 
     // Wipe and seed if configured (development/test only)
-    let should_wipe_and_seed = config.development
+    let should_wipe_and_seed = config
+      .development
       .as_ref()
-      .map( |d| d.wipe_and_seed )
-      .or_else( || config.test.as_ref().map( |t| t.wipe_and_seed ) )
-      .unwrap_or( false );
+      .map(|d| d.wipe_and_seed)
+      .or_else(|| config.test.as_ref().map(|t| t.wipe_and_seed))
+      .unwrap_or(false);
 
-    if should_wipe_and_seed
-    {
-      crate::seed::wipe_database( &pool ).await?;
-      crate::seed::seed_all( &pool ).await?;
+    if should_wipe_and_seed {
+      crate::seed::wipe_database(&pool).await?;
+      crate::seed::seed_all(&pool).await?;
     }
 
-    Ok( Self {
+    Ok(Self {
       pool,
       generator: TokenGenerator::new(),
-    } )
+    })
   }
 
   /// Create new token in database
@@ -205,14 +197,13 @@ impl TokenStorage
     &self,
     plaintext_token: &str,
     user_id: &str,
-    project_id: Option< &str >,
-    name: Option< &str >,
-    agent_id: Option< i64 >,
-    provider: Option< &str >,
-  ) -> Result< i64 >
-  {
+    project_id: Option<&str>,
+    name: Option<&str>,
+    agent_id: Option<i64>,
+    provider: Option<&str>,
+  ) -> Result<i64> {
     let now_ms = current_time_ms();
-    let token_hash = self.generator.hash_token( plaintext_token );
+    let token_hash = self.generator.hash_token(plaintext_token);
 
     let result = sqlx::query(
       "INSERT INTO api_tokens (token_hash, user_id, project_id, name, agent_id, provider, created_at) \
@@ -229,7 +220,7 @@ impl TokenStorage
     .await
     .map_err( crate::error::TokenError::Database )?;
 
-    Ok( result.last_insert_rowid() )
+    Ok(result.last_insert_rowid())
   }
 
   /// Create token with custom expiration
@@ -253,29 +244,28 @@ impl TokenStorage
     &self,
     plaintext_token: &str,
     user_id: &str,
-    project_id: Option< &str >,
-    name: Option< &str >,
-    expires_at: Option< i64 >,
-  ) -> Result< i64 >
-  {
+    project_id: Option<&str>,
+    name: Option<&str>,
+    expires_at: Option<i64>,
+  ) -> Result<i64> {
     let now_ms = current_time_ms();
-    let token_hash = self.generator.hash_token( plaintext_token );
+    let token_hash = self.generator.hash_token(plaintext_token);
 
     let result = sqlx::query(
       "INSERT INTO api_tokens (token_hash, user_id, project_id, name, created_at, expires_at) \
-       VALUES ($1, $2, $3, $4, $5, $6)"
+       VALUES ($1, $2, $3, $4, $5, $6)",
     )
-    .bind( &token_hash )
-    .bind( user_id )
-    .bind( project_id )
-    .bind( name )
-    .bind( now_ms )
-    .bind( expires_at )
-    .execute( &self.pool )
+    .bind(&token_hash)
+    .bind(user_id)
+    .bind(project_id)
+    .bind(name)
+    .bind(now_ms)
+    .bind(expires_at)
+    .execute(&self.pool)
     .await
-    .map_err( crate::error::TokenError::Database )?;
+    .map_err(crate::error::TokenError::Database)?;
 
-    Ok( result.last_insert_rowid() )
+    Ok(result.last_insert_rowid())
   }
 
   /// Verify token and return its database ID
@@ -291,26 +281,25 @@ impl TokenStorage
   /// # Errors
   ///
   /// Returns error if token is invalid, inactive, or expired
-  pub async fn verify_token( &self, plaintext_token: &str ) -> Result< i64 >
-  {
-    let token_hash = self.generator.hash_token( plaintext_token );
+  pub async fn verify_token(&self, plaintext_token: &str) -> Result<i64> {
+    let token_hash = self.generator.hash_token(plaintext_token);
     let now_ms = current_time_ms();
 
     let row = sqlx::query(
       "SELECT id FROM api_tokens \
        WHERE token_hash = $1 \
        AND is_active = 1 \
-       AND (expires_at IS NULL OR expires_at > $2)"
+       AND (expires_at IS NULL OR expires_at > $2)",
     )
-    .bind( &token_hash )
-    .bind( now_ms )
-    .fetch_optional( &self.pool )
+    .bind(&token_hash)
+    .bind(now_ms)
+    .fetch_optional(&self.pool)
     .await
-    .map_err( crate::error::TokenError::Database )?;
+    .map_err(crate::error::TokenError::Database)?;
 
     row
-      .map( |r| r.get::< i64, _ >( "id" ) )
-      .ok_or( crate::error::TokenError::Generic )
+      .map(|r| r.get::<i64, _>("id"))
+      .ok_or(crate::error::TokenError::Generic)
   }
 
   /// Get token hash by ID
@@ -326,15 +315,14 @@ impl TokenStorage
   /// # Errors
   ///
   /// Returns error if token ID not found
-  pub async fn get_token_hash( &self, token_id: i64 ) -> Result< String >
-  {
-    let row = sqlx::query( "SELECT token_hash FROM api_tokens WHERE id = $1" )
-      .bind( token_id )
-      .fetch_one( &self.pool )
+  pub async fn get_token_hash(&self, token_id: i64) -> Result<String> {
+    let row = sqlx::query("SELECT token_hash FROM api_tokens WHERE id = $1")
+      .bind(token_id)
+      .fetch_one(&self.pool)
       .await
-      .map_err( crate::error::TokenError::Database )?;
+      .map_err(crate::error::TokenError::Database)?;
 
-    Ok( row.get::< String, _ >( "token_hash" ) )
+    Ok(row.get::<String, _>("token_hash"))
   }
 
   /// Get token metadata by ID
@@ -350,8 +338,7 @@ impl TokenStorage
   /// # Errors
   ///
   /// Returns error if token ID not found
-  pub async fn get_token_metadata( &self, token_id: i64 ) -> Result< TokenMetadata >
-  {
+  pub async fn get_token_metadata(&self, token_id: i64) -> Result<TokenMetadata> {
     let row = sqlx::query(
       "SELECT id, user_id, project_id, name, agent_id, provider, is_active, created_at, last_used_at, expires_at, revoked_at \
        FROM api_tokens WHERE id = $1"
@@ -361,19 +348,19 @@ impl TokenStorage
     .await
     .map_err( crate::error::TokenError::Database )?;
 
-    Ok( TokenMetadata {
-      id: row.get( "id" ),
-      user_id: row.get( "user_id" ),
-      project_id: row.get( "project_id" ),
-      name: row.get( "name" ),
-      agent_id: row.get( "agent_id" ),
-      provider: row.get( "provider" ),
-      is_active: row.get::< bool, _ >( "is_active" ),
-      created_at: row.get( "created_at" ),
-      last_used_at: row.get( "last_used_at" ),
-      expires_at: row.get( "expires_at" ),
-      revoked_at: row.get( "revoked_at" ),
-    } )
+    Ok(TokenMetadata {
+      id: row.get("id"),
+      user_id: row.get("user_id"),
+      project_id: row.get("project_id"),
+      name: row.get("name"),
+      agent_id: row.get("agent_id"),
+      provider: row.get("provider"),
+      is_active: row.get::<bool, _>("is_active"),
+      created_at: row.get("created_at"),
+      last_used_at: row.get("last_used_at"),
+      expires_at: row.get("expires_at"),
+      revoked_at: row.get("revoked_at"),
+    })
   }
 
   /// Deactivate token
@@ -385,20 +372,18 @@ impl TokenStorage
   /// # Errors
   ///
   /// Returns error if database update fails or token not found (0 rows affected)
-  pub async fn deactivate_token( &self, token_id: i64 ) -> Result< () >
-  {
-    let result = sqlx::query( "UPDATE api_tokens SET is_active = 0 WHERE id = $1 AND is_active = 1" )
-      .bind( token_id )
-      .execute( &self.pool )
+  pub async fn deactivate_token(&self, token_id: i64) -> Result<()> {
+    let result = sqlx::query("UPDATE api_tokens SET is_active = 0 WHERE id = $1 AND is_active = 1")
+      .bind(token_id)
+      .execute(&self.pool)
       .await
-      .map_err( crate::error::TokenError::Database )?;
+      .map_err(crate::error::TokenError::Database)?;
 
-    if result.rows_affected() == 0
-    {
-      return Err( crate::error::TokenError::Generic );
+    if result.rows_affected() == 0 {
+      return Err(crate::error::TokenError::Generic);
     }
 
-    Ok( () )
+    Ok(())
   }
 
   /// Revoke token (deactivate and mark as explicitly revoked)
@@ -413,25 +398,23 @@ impl TokenStorage
   /// # Errors
   ///
   /// Returns error if database update fails or token not found (0 rows affected)
-  pub async fn revoke_token( &self, token_id: i64 ) -> Result< () >
-  {
+  pub async fn revoke_token(&self, token_id: i64) -> Result<()> {
     let now_ms = current_time_ms();
 
     let result = sqlx::query(
-      "UPDATE api_tokens SET is_active = 0, revoked_at = $1 WHERE id = $2 AND is_active = 1"
+      "UPDATE api_tokens SET is_active = 0, revoked_at = $1 WHERE id = $2 AND is_active = 1",
     )
-    .bind( now_ms )
-    .bind( token_id )
-    .execute( &self.pool )
+    .bind(now_ms)
+    .bind(token_id)
+    .execute(&self.pool)
     .await
-    .map_err( crate::error::TokenError::Database )?;
+    .map_err(crate::error::TokenError::Database)?;
 
-    if result.rows_affected() == 0
-    {
-      return Err( crate::error::TokenError::Generic );
+    if result.rows_affected() == 0 {
+      return Err(crate::error::TokenError::Generic);
     }
 
-    Ok( () )
+    Ok(())
   }
 
   /// Update last used timestamp
@@ -443,18 +426,17 @@ impl TokenStorage
   /// # Errors
   ///
   /// Returns error if database update fails
-  pub async fn update_last_used( &self, token_id: i64 ) -> Result< () >
-  {
+  pub async fn update_last_used(&self, token_id: i64) -> Result<()> {
     let now_ms = current_time_ms();
 
-    sqlx::query( "UPDATE api_tokens SET last_used_at = $1 WHERE id = $2" )
-      .bind( now_ms )
-      .bind( token_id )
-      .execute( &self.pool )
+    sqlx::query("UPDATE api_tokens SET last_used_at = $1 WHERE id = $2")
+      .bind(now_ms)
+      .bind(token_id)
+      .execute(&self.pool)
       .await
-      .map_err( crate::error::TokenError::Database )?;
+      .map_err(crate::error::TokenError::Database)?;
 
-    Ok( () )
+    Ok(())
   }
 
   /// List all tokens for a user
@@ -470,8 +452,7 @@ impl TokenStorage
   /// # Errors
   ///
   /// Returns error if database query fails
-  pub async fn list_user_tokens( &self, user_id: &str ) -> Result< Vec< TokenMetadata > >
-  {
+  pub async fn list_user_tokens(&self, user_id: &str) -> Result<Vec<TokenMetadata>> {
     let rows = sqlx::query(
       "SELECT id, user_id, project_id, name, agent_id, provider, is_active, created_at, last_used_at, expires_at, revoked_at \
        FROM api_tokens WHERE user_id = $1 ORDER BY created_at DESC"
@@ -482,19 +463,22 @@ impl TokenStorage
     .map_err( crate::error::TokenError::Database )?;
 
     Ok(
-      rows.iter().map( |row| TokenMetadata {
-        id: row.get( "id" ),
-        user_id: row.get( "user_id" ),
-        project_id: row.get( "project_id" ),
-        name: row.get( "name" ),
-        agent_id: row.get( "agent_id" ),
-        provider: row.get( "provider" ),
-        is_active: row.get::< bool, _ >( "is_active" ),
-        created_at: row.get( "created_at" ),
-        last_used_at: row.get( "last_used_at" ),
-        expires_at: row.get( "expires_at" ),
-        revoked_at: row.get( "revoked_at" ),
-      } ).collect()
+      rows
+        .iter()
+        .map(|row| TokenMetadata {
+          id: row.get("id"),
+          user_id: row.get("user_id"),
+          project_id: row.get("project_id"),
+          name: row.get("name"),
+          agent_id: row.get("agent_id"),
+          provider: row.get("provider"),
+          is_active: row.get::<bool, _>("is_active"),
+          created_at: row.get("created_at"),
+          last_used_at: row.get("last_used_at"),
+          expires_at: row.get("expires_at"),
+          revoked_at: row.get("revoked_at"),
+        })
+        .collect(),
     )
   }
 
@@ -507,20 +491,18 @@ impl TokenStorage
   /// # Errors
   ///
   /// Returns error if database delete fails or token not found (0 rows affected)
-  pub async fn delete_token( &self, token_id: i64 ) -> Result< () >
-  {
-    let result = sqlx::query( "DELETE FROM api_tokens WHERE id = $1" )
-      .bind( token_id )
-      .execute( &self.pool )
+  pub async fn delete_token(&self, token_id: i64) -> Result<()> {
+    let result = sqlx::query("DELETE FROM api_tokens WHERE id = $1")
+      .bind(token_id)
+      .execute(&self.pool)
       .await
-      .map_err( crate::error::TokenError::Database )?;
+      .map_err(crate::error::TokenError::Database)?;
 
-    if result.rows_affected() == 0
-    {
-      return Err( crate::error::TokenError::Generic );
+    if result.rows_affected() == 0 {
+      return Err(crate::error::TokenError::Generic);
     }
 
-    Ok( () )
+    Ok(())
   }
 
   /// Update token provider
@@ -533,21 +515,19 @@ impl TokenStorage
   /// # Errors
   ///
   /// Returns error if database update fails or token not found (0 rows affected)
-  pub async fn update_token_provider( &self, token_id: i64, provider: &str ) -> Result< () >
-  {
-    let result = sqlx::query( "UPDATE api_tokens SET provider = $2 WHERE id = $1" )
-      .bind( token_id )
-      .bind( provider )
-      .execute( &self.pool )
+  pub async fn update_token_provider(&self, token_id: i64, provider: &str) -> Result<()> {
+    let result = sqlx::query("UPDATE api_tokens SET provider = $2 WHERE id = $1")
+      .bind(token_id)
+      .bind(provider)
+      .execute(&self.pool)
       .await
-      .map_err( crate::error::TokenError::Database )?;
+      .map_err(crate::error::TokenError::Database)?;
 
-    if result.rows_affected() == 0
-    {
-      return Err( crate::error::TokenError::Generic );
+    if result.rows_affected() == 0 {
+      return Err(crate::error::TokenError::Generic);
     }
 
-    Ok( () )
+    Ok(())
   }
 
   // Fix(issue-003): Database pool accessor for test verification
@@ -579,9 +559,8 @@ impl TokenStorage
   ///   .unwrap();
   /// assert_ne!(row.0, plaintext_token, "Plaintext must not be stored");
   /// ```
-  #[ must_use ]
-  pub fn pool( &self ) -> &SqlitePool
-  {
+  #[must_use]
+  pub fn pool(&self) -> &SqlitePool {
     &self.pool
   }
 
@@ -613,26 +592,25 @@ impl TokenStorage
     entity_id: i64,
     action: &str,
     actor_user_id: &str,
-    changes: Option< &str >,
-  ) -> Result< () >
-  {
+    changes: Option<&str>,
+  ) -> Result<()> {
     let logged_at = current_time_ms();
 
     sqlx::query(
       "INSERT INTO audit_log (entity_type, entity_id, action, actor_user_id, changes, logged_at)
-       VALUES (?, ?, ?, ?, ?, ?)"
+       VALUES (?, ?, ?, ?, ?, ?)",
     )
-    .bind( entity_type )
-    .bind( entity_id )
-    .bind( action )
-    .bind( actor_user_id )
-    .bind( changes )
-    .bind( logged_at )
-    .execute( &self.pool )
+    .bind(entity_type)
+    .bind(entity_id)
+    .bind(action)
+    .bind(actor_user_id)
+    .bind(changes)
+    .bind(logged_at)
+    .execute(&self.pool)
     .await
-    .map_err( crate::error::TokenError::Database )?;
+    .map_err(crate::error::TokenError::Database)?;
 
-    Ok( () )
+    Ok(())
   }
 
   /// Count active tokens for a user
@@ -650,17 +628,15 @@ impl TokenStorage
   /// # Errors
   ///
   /// Returns `TokenError` if database query fails
-  pub async fn count_active_tokens_for_user( &self, user_id: &str ) -> Result< i64 >
-  {
-    let count: i64 = sqlx::query_scalar(
-      "SELECT COUNT(*) FROM api_tokens WHERE user_id = ? AND is_active = 1"
-    )
-    .bind( user_id )
-    .fetch_one( &self.pool )
-    .await
-    .map_err( crate::error::TokenError::Database )?;
+  pub async fn count_active_tokens_for_user(&self, user_id: &str) -> Result<i64> {
+    let count: i64 =
+      sqlx::query_scalar("SELECT COUNT(*) FROM api_tokens WHERE user_id = ? AND is_active = 1")
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(crate::error::TokenError::Database)?;
 
-    Ok( count )
+    Ok(count)
   }
 
   /// Count token creations in the last minute for a user
@@ -678,29 +654,26 @@ impl TokenStorage
   /// # Errors
   ///
   /// Returns `TokenError` if database query fails
-  pub async fn count_recent_token_creations( &self, user_id: &str ) -> Result< i64 >
-  {
-    let one_minute_ago = current_time_ms() - 60_000;  // 60 seconds in milliseconds
+  pub async fn count_recent_token_creations(&self, user_id: &str) -> Result<i64> {
+    let one_minute_ago = current_time_ms() - 60_000; // 60 seconds in milliseconds
 
-    let count: i64 = sqlx::query_scalar(
-      "SELECT COUNT(*) FROM api_tokens WHERE user_id = ? AND created_at > ?"
-    )
-    .bind( user_id )
-    .bind( one_minute_ago )
-    .fetch_one( &self.pool )
-    .await
-    .map_err( crate::error::TokenError::Database )?;
+    let count: i64 =
+      sqlx::query_scalar("SELECT COUNT(*) FROM api_tokens WHERE user_id = ? AND created_at > ?")
+        .bind(user_id)
+        .bind(one_minute_ago)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(crate::error::TokenError::Database)?;
 
-    Ok( count )
+    Ok(count)
   }
 }
 
 /// Get current time in milliseconds since UNIX epoch
-#[ allow( clippy::cast_possible_truncation ) ]
-pub( crate ) fn current_time_ms() -> i64
-{
+#[allow(clippy::cast_possible_truncation)]
+pub(crate) fn current_time_ms() -> i64 {
   std::time::SystemTime::now()
-    .duration_since( std::time::UNIX_EPOCH )
-    .expect( "LOUD FAILURE: Time went backwards" )
+    .duration_since(std::time::UNIX_EPOCH)
+    .expect("LOUD FAILURE: Time went backwards")
     .as_millis() as i64
 }

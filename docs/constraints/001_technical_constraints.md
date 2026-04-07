@@ -17,7 +17,7 @@ Understand what technical constraints limit design options and why.
 | Constraint | Minimum Version | Rationale |
 |------------|----------------|-----------|
 | **Python** | 3.8+ | Typing support, async/await maturity |
-| **Rust** | 1.70+ | MSRV for error_tools, mod_interface |
+| **Rust** | 1.85+ | MSRV for bcrypt 0.18, mod_interface |
 | **PyO3** | 0.22 | Latest stable for Python 3.12 support |
 | **Linux Kernel** | 5.15+ | Landlock LSM support for sandboxing |
 

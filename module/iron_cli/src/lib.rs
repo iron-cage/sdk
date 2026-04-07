@@ -30,7 +30,7 @@
 //!
 //! Located in `src/adapters/`:
 //! - Bridge pure handlers to async HTTP client
-//! - Call iron_token_manager API endpoints
+//! - Call `iron_token_manager` API endpoints
 //! - Handle network errors and retries
 //! - Serialize/deserialize JSON
 //!
@@ -50,7 +50,7 @@
 //! **Handler Categories:**
 //! - Authentication (login, logout, whoami)
 //! - Token management (create, list, revoke, show, rotate)
-//! - Usage tracking (show, by_project, by_provider, export)
+//! - Usage tracking (show, `by_project`, `by_provider`, export)
 //! - Limits configuration (list, show, create, update, delete)
 //! - Trace inspection (list, show, export)
 //! - Health monitoring (health, status)
@@ -144,7 +144,7 @@
 //!
 //! All tests use real implementations:
 //! - **Real HTTP server**: Axum server on random port
-//! - **Real database**: PostgreSQL with fixtures
+//! - **Real database**: `PostgreSQL` with fixtures
 //! - **Real CLI binary**: Process spawn with actual binary
 //!
 //! ## Test Coverage
@@ -210,7 +210,7 @@
 //! - Response time: <200ms for typical operations
 //! - Memory usage: <10MB resident set size
 
-pub mod handlers;
-pub mod formatting;
 pub mod adapters;
 pub mod config;
+pub mod formatting;
+pub mod handlers;

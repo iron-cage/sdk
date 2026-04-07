@@ -3,20 +3,28 @@
 //! Provides admin-only operations for user lifecycle management: create, suspend,
 //! activate, delete, role changes, and password resets. All operations are audited.
 
-use sqlx::{ SqlitePool, Row };
-use crate::error::Result;
+use core::str::FromStr;
+
+use sqlx::{Row, SqlitePool};
 use tracing::error;
+use uuid::Uuid;
+
+use crate::error::{Result, TokenError};
+use iron_types::Role;
+
+/// `BCrypt` cost factor for password hashing.
+/// Must be 12 (not `DEFAULT_COST=10`) per Fix(issue-001) security requirements.
+const BCRYPT_COST: u32 = 12;
 
 /// User data returned from database
-#[ derive( Debug, Clone ) ]
-pub struct User
-{
+#[derive(Debug, Clone)]
+pub struct User {
   /// Database ID
   pub id: String,
   /// Username (unique)
   pub username: String,
   /// Email address (unique, optional)
-  pub email: Option< String >,
+  pub email: Option<String>,
   /// `BCrypt` password hash
   pub password_hash: String,
   /// User role (user, `super_user`, admin)
@@ -26,23 +34,22 @@ pub struct User
   /// Creation timestamp (milliseconds since epoch)
   pub created_at: i64,
   /// Last login timestamp (milliseconds since epoch)
-  pub last_login: Option< i64 >,
+  pub last_login: Option<i64>,
   /// Suspension timestamp (milliseconds since epoch)
-  pub suspended_at: Option< i64 >,
+  pub suspended_at: Option<i64>,
   /// Admin who suspended this user
-  pub suspended_by: Option< String >,
+  pub suspended_by: Option<String>,
   /// Deletion timestamp (milliseconds since epoch, soft delete)
-  pub deleted_at: Option< i64 >,
+  pub deleted_at: Option<i64>,
   /// Admin who deleted this user
-  pub deleted_by: Option< String >,
+  pub deleted_by: Option<String>,
   /// Force password change on next login
   pub force_password_change: bool,
 }
 
 /// User creation parameters
-#[ derive( Debug, Clone ) ]
-pub struct CreateUserParams
-{
+#[derive(Debug, Clone)]
+pub struct CreateUserParams {
   /// Username (3-50 chars, alphanumeric + underscore)
   pub username: String,
   /// Password (will be hashed with `BCrypt`)
@@ -54,25 +61,23 @@ pub struct CreateUserParams
 }
 
 /// User listing filters
-#[ derive( Debug, Clone, Default ) ]
-pub struct ListUsersFilters
-{
+#[derive(Debug, Clone, Default)]
+pub struct ListUsersFilters {
   /// Filter by role
-  pub role: Option< String >,
+  pub role: Option<String>,
   /// Filter by active status
-  pub is_active: Option< bool >,
+  pub is_active: Option<bool>,
   /// Search by username or email (partial match)
-  pub search: Option< String >,
+  pub search: Option<String>,
   /// Results limit (default 50, max 100)
-  pub limit: Option< i64 >,
+  pub limit: Option<i64>,
   /// Pagination offset (default 0)
-  pub offset: Option< i64 >,
+  pub offset: Option<i64>,
 }
 
 /// User statistics (agents, tokens, spending)
-#[ derive( Debug, Clone ) ]
-pub struct UserStatistics
-{
+#[derive(Debug, Clone)]
+pub struct UserStatistics {
   /// Number of active agents
   pub active_agents: i64,
   /// Total API tokens
@@ -82,9 +87,8 @@ pub struct UserStatistics
 }
 
 /// Audit log entry for user management operations
-#[ derive( Debug, Clone ) ]
-pub struct UserAuditLog
-{
+#[derive(Debug, Clone)]
+pub struct UserAuditLog {
   /// Audit log ID
   pub id: i64,
   /// Operation type
@@ -96,32 +100,29 @@ pub struct UserAuditLog
   /// Operation timestamp (milliseconds since epoch)
   pub timestamp: i64,
   /// Previous state (JSON)
-  pub previous_state: Option< String >,
+  pub previous_state: Option<String>,
   /// New state (JSON)
-  pub new_state: Option< String >,
+  pub new_state: Option<String>,
   /// Optional reason
-  pub reason: Option< String >,
+  pub reason: Option<String>,
 }
 
 /// User management service
 ///
 /// Handles all admin-only user lifecycle operations with automatic audit logging.
-#[ derive( Debug, Clone ) ]
-pub struct UserService
-{
+#[derive(Debug, Clone)]
+pub struct UserService {
   pool: SqlitePool,
 }
 
-impl UserService
-{
+impl UserService {
   /// Create new user service
   ///
   /// # Arguments
   ///
   /// * `pool` - Database connection pool
-  #[ must_use ]
-  pub fn new( pool: SqlitePool ) -> Self
-  {
+  #[must_use]
+  pub fn new(pool: SqlitePool) -> Self {
     Self { pool }
   }
 
@@ -143,96 +144,94 @@ impl UserService
   /// - Email already exists (unique constraint violation)
   /// - Password hashing fails
   /// - Database insert fails
-  pub async fn create_user( &self, params: CreateUserParams, admin_id: &str ) -> Result< User >
-  {
+  pub async fn create_user(&self, params: CreateUserParams, admin_id: &str) -> Result<User> {
     // Validate inputs
-    if params.username.trim().is_empty()
-    {
-      return Err( crate::error::TokenError::Validation {
+    if params.username.trim().is_empty() {
+      return Err(TokenError::Validation {
         field: "username".to_string(),
         reason: "username is required and cannot be empty".to_string(),
-      } );
+      });
     }
 
-    if params.password.trim().is_empty()
-    {
-      return Err( crate::error::TokenError::Validation {
+    if params.password.trim().is_empty() {
+      return Err(TokenError::Validation {
         field: "password".to_string(),
         reason: "password is required and cannot be empty".to_string(),
-      } );
+      });
     }
 
-    if params.email.trim().is_empty()
-    {
-      return Err( crate::error::TokenError::Validation {
+    if params.email.trim().is_empty() {
+      return Err(TokenError::Validation {
         field: "email".to_string(),
         reason: "email is required and cannot be empty".to_string(),
-      } );
+      });
     }
 
-    // Validate role (only admin, user, viewer allowed)
-    let valid_roles = [ "admin", "user", "viewer" ];
-    if !valid_roles.contains( &params.role.as_str() )
-    {
-      return Err( crate::error::TokenError::Validation {
+    // Validate role via iron_types::Role (single source of truth)
+    if Role::from_str(&params.role).is_err() {
+      return Err(TokenError::Validation {
         field: "role".to_string(),
-        reason: format!( "invalid role '{}'. Must be admin, user, or viewer", params.role ),
-      } );
+        reason: format!(
+          "invalid role '{}'. Must be admin, manager, or developer",
+          params.role
+        ),
+      });
     }
 
-    // Fix(issue-001): BCrypt cost must be explicitly 12 (not DEFAULT_COST=10)
-    //
-    // Root cause: Used bcrypt::DEFAULT_COST which is 10 for backward compatibility,
-    // but our security requirements mandate cost=12 for adequate protection against
-    // brute-force attacks. DEFAULT_COST=10 is 4x weaker than cost=12.
-    //
-    // Pitfall: Library defaults prioritize backward compatibility over security.
-    // When implementing security-critical features (password hashing, encryption,
-    // key derivation), ALWAYS specify security parameters explicitly. Never rely
-    // on library defaults - they may be weak for current security standards.
-    const BCRYPT_COST: u32 = 12;
-    let password_hash = bcrypt::hash( &params.password, BCRYPT_COST )
-      .map_err( |e| { error!( "Error hashing password: {}", e ); crate::error::TokenError::Generic } )?;
+    // Fix(issue-001): BCrypt cost must be explicitly 12 (not DEFAULT_COST=10).
+    // See module-level BCRYPT_COST constant for details.
+    let password_hash = bcrypt::hash(&params.password, BCRYPT_COST).map_err(|e| {
+      error!("Error hashing password: {}", e);
+      TokenError::Generic
+    })?;
 
     let now_ms = current_time_ms();
 
     let mut user_prefix = "user_".to_string();
-    let user_id = uuid::Uuid::new_v4().to_string();
-    user_prefix.push_str( &user_id );
+    let user_id = Uuid::new_v4().to_string();
+    user_prefix.push_str(&user_id);
 
     // Insert user
     let _result = sqlx::query(
       "INSERT INTO users (id, username, password_hash, email, role, is_active, created_at) \
-       VALUES ($1, $2, $3, $4, $5, 1, $6)"
+       VALUES ($1, $2, $3, $4, $5, 1, $6)",
     )
-    .bind( &user_prefix )
-    .bind( &params.username )
-    .bind( &password_hash )
-    .bind( &params.email )
-    .bind( &params.role )
-    .bind( now_ms )
-    .execute( &self.pool )
+    .bind(&user_prefix)
+    .bind(&params.username)
+    .bind(&password_hash)
+    .bind(&params.email)
+    .bind(&params.role)
+    .bind(now_ms)
+    .execute(&self.pool)
     .await
-    .map_err( |e| { error!( "Error creating user: {}", e ); crate::error::TokenError::Generic } )?;
+    .map_err(|e| {
+      error!("Error creating user: {}", e);
+      TokenError::Generic
+    })?;
 
     let user_id = user_prefix;
 
     // Audit log
-    self.log_audit(
-      "create",
-      &user_id,
-      admin_id,
-      None,
-      Some( serde_json::json!( {
-        "username": params.username,
-        "email": params.email,
-        "role": params.role,
-      } ).to_string() ),
-      None,
-    ).await?;
+    self
+      .log_audit(
+        "create",
+        &user_id,
+        admin_id,
+        None,
+        Some(
+          serde_json::json!({
+            "username": params.username,
+            "email": params.email,
+            "role": params.role,
+          })
+          .to_string(),
+        ),
+        None,
+      )
+      .await?;
 
     // Return created user
-    self.get_user_by_id( &user_id ).await
+    self.get_user_by_id(&user_id).await
   }
 
   /// List users with optional filters
@@ -248,10 +247,9 @@ impl UserService
   /// # Errors
   ///
   /// Returns error if database query fails
-  pub async fn list_users( &self, filters: ListUsersFilters ) -> Result< ( Vec< User >, i64 ) >
-  {
-    let limit = filters.limit.unwrap_or( 50 ).min( 100 );
-    let offset = filters.offset.unwrap_or( 0 );
+  pub async fn list_users(&self, filters: ListUsersFilters) -> Result<(Vec<User>, i64)> {
+    let limit = filters.limit.unwrap_or(50).min(100);
+    let offset = filters.offset.unwrap_or(0);
 
     // Fix(issue-002): Use parameterized queries to prevent SQL injection
     //
@@ -267,32 +265,35 @@ impl UserService
     let mut count_conditions = Vec::new();
 
     // Base condition - exclude deleted users
-    query_conditions.push( "deleted_at IS NULL".to_string() );
-    count_conditions.push( "deleted_at IS NULL".to_string() );
+    query_conditions.push("deleted_at IS NULL".to_string());
+    count_conditions.push("deleted_at IS NULL".to_string());
 
     let mut param_index = 1;
 
     // Role filter (if provided)
-    if filters.role.is_some()
-    {
-      query_conditions.push( format!( "role = ${param_index}" ) );
-      count_conditions.push( format!( "role = ${param_index}" ) );
+    if filters.role.is_some() {
+      query_conditions.push(format!("role = ${param_index}"));
+      count_conditions.push(format!("role = ${param_index}"));
       param_index += 1;
     }
 
     // Active status filter (if provided)
-    if filters.is_active.is_some()
-    {
-      query_conditions.push( format!( "is_active = ${param_index}" ) );
-      count_conditions.push( format!( "is_active = ${param_index}" ) );
+    if filters.is_active.is_some() {
+      query_conditions.push(format!("is_active = ${param_index}"));
+      count_conditions.push(format!("is_active = ${param_index}"));
       param_index += 1;
     }
 
     // Search filter (if provided)
-    if filters.search.is_some()
-    {
-      query_conditions.push( format!( "(username LIKE ${param_index} OR email LIKE ${})", param_index + 1 ) );
-      count_conditions.push( format!( "(username LIKE ${param_index} OR email LIKE ${})", param_index + 1 ) );
+    if filters.search.is_some() {
+      query_conditions.push(format!(
+        "(username LIKE ${param_index} OR email LIKE ${})",
+        param_index + 1
+      ));
+      count_conditions.push(format!(
+        "(username LIKE ${param_index} OR email LIKE ${})",
+        param_index + 1
+      ));
       param_index += 2;
     }
 
@@ -300,85 +301,82 @@ impl UserService
       "SELECT id, username, email, password_hash, role, is_active, created_at, \
        last_login, suspended_at, suspended_by, deleted_at, deleted_by, force_password_change \
        FROM users WHERE {} ORDER BY created_at DESC LIMIT ${param_index} OFFSET ${}",
-      query_conditions.join( " AND " ),
+      query_conditions.join(" AND "),
       param_index + 1
     );
 
     let count_query = format!(
       "SELECT COUNT(*) FROM users WHERE {}",
-      count_conditions.join( " AND " )
+      count_conditions.join(" AND ")
     );
 
     // Prepare search pattern outside if block to extend its lifetime
-    let search_pattern = filters.search.as_ref().map( | s | format!( "%{s}%" ) );
+    let search_pattern = filters.search.as_ref().map(|s| format!("%{s}%"));
 
     // Build count query with parameters
-    let mut count_q = sqlx::query_scalar::< _, i64 >( &count_query );
+    let mut count_q = sqlx::query_scalar::<_, i64>(&count_query);
 
-    if let Some( ref role ) = filters.role
-    {
-      count_q = count_q.bind( role );
+    if let Some(ref role) = filters.role {
+      count_q = count_q.bind(role);
     }
 
-    if let Some( is_active ) = filters.is_active
-    {
-      count_q = count_q.bind( i32::from( is_active ) );
+    if let Some(is_active) = filters.is_active {
+      count_q = count_q.bind(i32::from(is_active));
     }
 
-    if let Some( ref pattern ) = search_pattern
-    {
-      count_q = count_q.bind( pattern ).bind( pattern );
+    if let Some(ref pattern) = search_pattern {
+      count_q = count_q.bind(pattern).bind(pattern);
     }
 
     // Get total count
     let total = count_q
-      .fetch_one( &self.pool )
+      .fetch_one(&self.pool)
       .await
-      .map_err( |_| crate::error::TokenError::Generic )?;
+      .map_err(|_| TokenError::Generic)?;
 
     // Build data query with parameters
-    let mut data_q = sqlx::query( &query );
+    let mut data_q = sqlx::query(&query);
 
-    if let Some( ref role ) = filters.role
-    {
-      data_q = data_q.bind( role );
+    if let Some(ref role) = filters.role {
+      data_q = data_q.bind(role);
     }
 
-    if let Some( is_active ) = filters.is_active
-    {
-      data_q = data_q.bind( i32::from( is_active ) );
+    if let Some(is_active) = filters.is_active {
+      data_q = data_q.bind(i32::from(is_active));
     }
 
-    if let Some( ref pattern ) = search_pattern
-    {
-      data_q = data_q.bind( pattern ).bind( pattern );
+    if let Some(ref pattern) = search_pattern {
+      data_q = data_q.bind(pattern).bind(pattern);
     }
 
-    data_q = data_q.bind( limit ).bind( offset );
+    data_q = data_q.bind(limit).bind(offset);
 
     // Get users
     let rows = data_q
-      .fetch_all( &self.pool )
+      .fetch_all(&self.pool)
       .await
-      .map_err( |_| crate::error::TokenError::Generic )?;
+      .map_err(|_| TokenError::Generic)?;
 
-    let users = rows.iter().map( |row| User {
-      id: row.get( "id" ),
-      username: row.get( "username" ),
-      email: row.get( "email" ),
-      password_hash: row.get( "password_hash" ),
-      role: row.get( "role" ),
-      is_active: row.get::< i64, _ >( "is_active" ) != 0,
-      created_at: row.get( "created_at" ),
-      last_login: row.get( "last_login" ),
-      suspended_at: row.get( "suspended_at" ),
-      suspended_by: row.get( "suspended_by" ),
-      deleted_at: row.get( "deleted_at" ),
-      deleted_by: row.get( "deleted_by" ),
-      force_password_change: row.get::< i64, _ >( "force_password_change" ) != 0,
-    } ).collect();
+    let users = rows
+      .iter()
+      .map(|row| User {
+        id: row.get("id"),
+        username: row.get("username"),
+        email: row.get("email"),
+        password_hash: row.get("password_hash"),
+        role: row.get("role"),
+        is_active: row.get::<i64, _>("is_active") != 0,
+        created_at: row.get("created_at"),
+        last_login: row.get("last_login"),
+        suspended_at: row.get("suspended_at"),
+        suspended_by: row.get("suspended_by"),
+        deleted_at: row.get("deleted_at"),
+        deleted_by: row.get("deleted_by"),
+        force_password_change: row.get::<i64, _>("force_password_change") != 0,
+      })
+      .collect();
 
-    Ok( ( users, total ) )
+    Ok((users, total))
   }
 
   /// Get user by ID
@@ -394,33 +392,32 @@ impl UserService
   /// # Errors
   ///
   /// Returns error if user not found or database query fails
-  pub async fn get_user_by_id( &self, user_id: &str ) -> Result< User >
-  {
+  pub async fn get_user_by_id(&self, user_id: &str) -> Result<User> {
     let row = sqlx::query(
       "SELECT id, username, email, password_hash, role, is_active, created_at, \
        last_login, suspended_at, suspended_by, deleted_at, deleted_by, force_password_change \
-       FROM users WHERE id = $1"
+       FROM users WHERE id = $1",
     )
-    .bind( user_id )
-    .fetch_one( &self.pool )
+    .bind(user_id)
+    .fetch_one(&self.pool)
     .await
-    .map_err( |_| crate::error::TokenError::Generic )?;
+    .map_err(|_| TokenError::Generic)?;
 
-    Ok( User {
-      id: row.get( "id" ),
-      username: row.get( "username" ),
-      email: row.get( "email" ),
-      password_hash: row.get( "password_hash" ),
-      role: row.get( "role" ),
-      is_active: row.get::< i64, _ >( "is_active" ) != 0,
-      created_at: row.get( "created_at" ),
-      last_login: row.get( "last_login" ),
-      suspended_at: row.get( "suspended_at" ),
-      suspended_by: row.get( "suspended_by" ),
-      deleted_at: row.get( "deleted_at" ),
-      deleted_by: row.get( "deleted_by" ),
-      force_password_change: row.get::< i64, _ >( "force_password_change" ) != 0,
-    } )
+    Ok(User {
+      id: row.get("id"),
+      username: row.get("username"),
+      email: row.get("email"),
+      password_hash: row.get("password_hash"),
+      role: row.get("role"),
+      is_active: row.get::<i64, _>("is_active") != 0,
+      created_at: row.get("created_at"),
+      last_login: row.get("last_login"),
+      suspended_at: row.get("suspended_at"),
+      suspended_by: row.get("suspended_by"),
+      deleted_at: row.get("deleted_at"),
+      deleted_by: row.get("deleted_by"),
+      force_password_change: row.get::<i64, _>("force_password_change") != 0,
+    })
   }
 
   /// Suspend user account
@@ -441,41 +438,46 @@ impl UserService
   /// - User not found
   /// - User already suspended
   /// - Database update fails
-  pub async fn suspend_user( &self, user_id: &str, admin_id: &str, reason: Option< String > ) -> Result< User >
-  {
+  pub async fn suspend_user(
+    &self,
+    user_id: &str,
+    admin_id: &str,
+    reason: Option<String>,
+  ) -> Result<User> {
     let now_ms = current_time_ms();
 
     // Get current user state
-    let user = self.get_user_by_id( user_id ).await?;
+    let user = self.get_user_by_id(user_id).await?;
 
     // Check if already suspended
-    if !user.is_active
-    {
-      return Err( crate::error::TokenError::Generic );
+    if !user.is_active {
+      return Err(TokenError::Generic);
     }
 
     // Suspend user
     sqlx::query(
-      "UPDATE users SET is_active = 0, suspended_at = $1, suspended_by = $2 WHERE id = $3"
+      "UPDATE users SET is_active = 0, suspended_at = $1, suspended_by = $2 WHERE id = $3",
     )
-    .bind( now_ms )
-    .bind( admin_id )
-    .bind( user_id )
-    .execute( &self.pool )
+    .bind(now_ms)
+    .bind(admin_id)
+    .bind(user_id)
+    .execute(&self.pool)
     .await
-    .map_err( |_| crate::error::TokenError::Generic )?;
+    .map_err(|_| TokenError::Generic)?;
 
     // Audit log
-    self.log_audit(
-      "suspend",
-      user_id,
-      admin_id,
-      Some( serde_json::json!( { "is_active": true } ).to_string() ),
-      Some( serde_json::json!( { "is_active": false } ).to_string() ),
-      reason,
-    ).await?;
+    self
+      .log_audit(
+        "suspend",
+        user_id,
+        admin_id,
+        Some(serde_json::json!({"is_active": true}).to_string()),
+        Some(serde_json::json!({"is_active": false}).to_string()),
+        reason,
+      )
+      .await?;
 
-    self.get_user_by_id( user_id ).await
+    self.get_user_by_id(user_id).await
   }
 
   /// Activate user account
@@ -495,37 +497,37 @@ impl UserService
   /// - User not found
   /// - User already active
   /// - Database update fails
-  pub async fn activate_user( &self, user_id: &str, admin_id: &str ) -> Result< User >
-  {
+  pub async fn activate_user(&self, user_id: &str, admin_id: &str) -> Result<User> {
     // Get current user state
-    let user = self.get_user_by_id( user_id ).await?;
+    let user = self.get_user_by_id(user_id).await?;
 
     // Check if already active
-    if user.is_active
-    {
-      return Err( crate::error::TokenError::Generic );
+    if user.is_active {
+      return Err(TokenError::Generic);
     }
 
     // Activate user
     sqlx::query(
-      "UPDATE users SET is_active = 1, suspended_at = NULL, suspended_by = NULL WHERE id = $1"
+      "UPDATE users SET is_active = 1, suspended_at = NULL, suspended_by = NULL WHERE id = $1",
     )
-    .bind( user_id )
-    .execute( &self.pool )
+    .bind(user_id)
+    .execute(&self.pool)
     .await
-    .map_err( |_| crate::error::TokenError::Generic )?;
+    .map_err(|_| TokenError::Generic)?;
 
     // Audit log
-    self.log_audit(
-      "activate",
-      user_id,
-      admin_id,
-      Some( serde_json::json!( { "is_active": false } ).to_string() ),
-      Some( serde_json::json!( { "is_active": true } ).to_string() ),
-      None,
-    ).await?;
+    self
+      .log_audit(
+        "activate",
+        user_id,
+        admin_id,
+        Some(serde_json::json!({"is_active": false}).to_string()),
+        Some(serde_json::json!({"is_active": true}).to_string()),
+        None,
+      )
+      .await?;
 
-    self.get_user_by_id( user_id ).await
+    self.get_user_by_id(user_id).await
   }
 
   /// Delete user (soft delete)
@@ -545,38 +547,36 @@ impl UserService
   /// - User not found
   /// - Trying to delete self
   /// - Database update fails
-  pub async fn delete_user( &self, user_id: &str, admin_id: &str ) -> Result< User >
-  {
+  pub async fn delete_user(&self, user_id: &str, admin_id: &str) -> Result<User> {
     // Prevent deleting self
-    if user_id == admin_id
-    {
-      return Err( crate::error::TokenError::Generic );
+    if user_id == admin_id {
+      return Err(TokenError::Generic);
     }
 
     let now_ms = current_time_ms();
 
     // Soft delete user
-    sqlx::query(
-      "UPDATE users SET is_active = 0, deleted_at = $1, deleted_by = $2 WHERE id = $3"
-    )
-    .bind( now_ms )
-    .bind( admin_id )
-    .bind( user_id )
-    .execute( &self.pool )
-    .await
-    .map_err( |_| crate::error::TokenError::Generic )?;
+    sqlx::query("UPDATE users SET is_active = 0, deleted_at = $1, deleted_by = $2 WHERE id = $3")
+      .bind(now_ms)
+      .bind(admin_id)
+      .bind(user_id)
+      .execute(&self.pool)
+      .await
+      .map_err(|_| TokenError::Generic)?;
 
     // Audit log
-    self.log_audit(
-      "delete",
-      user_id,
-      admin_id,
-      None,
-      Some( serde_json::json!( { "deleted": true } ).to_string() ),
-      None,
-    ).await?;
+    self
+      .log_audit(
+        "delete",
+        user_id,
+        admin_id,
+        None,
+        Some(serde_json::json!({"deleted": true}).to_string()),
+        None,
+      )
+      .await?;
 
-    self.get_user_by_id( user_id ).await
+    self.get_user_by_id(user_id).await
   }
 
   /// Change user role
@@ -597,37 +597,50 @@ impl UserService
   /// - User not found
   /// - Trying to change own role
   /// - Database update fails
-  pub async fn change_user_role( &self, user_id: &str, admin_id: &str, new_role: String ) -> Result< User >
-  {
+  pub async fn change_user_role(
+    &self,
+    user_id: &str,
+    admin_id: &str,
+    new_role: String,
+  ) -> Result<User> {
+    // Validate role string via iron_types::Role (single source of truth)
+    if Role::from_str(&new_role).is_err() {
+      return Err(TokenError::Validation {
+        field: "role".to_string(),
+        reason: format!("invalid role '{new_role}'. Must be admin, manager, or developer"),
+      });
+    }
+
     // Prevent changing own role
-    if user_id == admin_id
-    {
-      return Err( crate::error::TokenError::Generic );
+    if user_id == admin_id {
+      return Err(TokenError::Generic);
     }
 
     // Get current user state
-    let user = self.get_user_by_id( user_id ).await?;
+    let user = self.get_user_by_id(user_id).await?;
     let old_role = user.role.clone();
 
     // Update role
-    sqlx::query( "UPDATE users SET role = $1 WHERE id = $2" )
-      .bind( &new_role )
-      .bind( user_id )
-      .execute( &self.pool )
+    sqlx::query("UPDATE users SET role = $1 WHERE id = $2")
+      .bind(&new_role)
+      .bind(user_id)
+      .execute(&self.pool)
       .await
-      .map_err( |_| crate::error::TokenError::Generic )?;
+      .map_err(|_| TokenError::Generic)?;
 
     // Audit log
-    self.log_audit(
-      "role_change",
-      user_id,
-      admin_id,
-      Some( serde_json::json!( { "role": old_role } ).to_string() ),
-      Some( serde_json::json!( { "role": &new_role } ).to_string() ),
-      None,
-    ).await?;
+    self
+      .log_audit(
+        "role_change",
+        user_id,
+        admin_id,
+        Some(serde_json::json!({"role": old_role}).to_string()),
+        Some(serde_json::json!({"role": &new_role}).to_string()),
+        None,
+      )
+      .await?;
 
-    self.get_user_by_id( user_id ).await
+    self.get_user_by_id(user_id).await
   }
 
   /// Reset user password
@@ -655,36 +668,35 @@ impl UserService
     admin_id: &str,
     new_password: String,
     force_change: bool,
-  ) -> Result< User >
-  {
+  ) -> Result<User> {
     // Hash new password
-    let password_hash = bcrypt::hash( &new_password, bcrypt::DEFAULT_COST )
-      .map_err( |_| crate::error::TokenError::Generic )?;
+    let password_hash =
+      bcrypt::hash(&new_password, BCRYPT_COST).map_err(|_| TokenError::Generic)?;
 
-    let force_change_val = i32::from( force_change );
+    let force_change_val = i32::from(force_change);
 
     // Update password
-    sqlx::query(
-      "UPDATE users SET password_hash = $1, force_password_change = $2 WHERE id = $3"
-    )
-    .bind( &password_hash )
-    .bind( force_change_val )
-    .bind( user_id )
-    .execute( &self.pool )
-    .await
-    .map_err( |_| crate::error::TokenError::Generic )?;
+    sqlx::query("UPDATE users SET password_hash = $1, force_password_change = $2 WHERE id = $3")
+      .bind(&password_hash)
+      .bind(force_change_val)
+      .bind(user_id)
+      .execute(&self.pool)
+      .await
+      .map_err(|_| TokenError::Generic)?;
 
     // Audit log
-    self.log_audit(
-      "password_reset",
-      user_id,
-      admin_id,
-      None,
-      Some( serde_json::json!( { "force_change": force_change } ).to_string() ),
-      None,
-    ).await?;
+    self
+      .log_audit(
+        "password_reset",
+        user_id,
+        admin_id,
+        None,
+        Some(serde_json::json!({"force_change": force_change}).to_string()),
+        None,
+      )
+      .await?;
 
-    self.get_user_by_id( user_id ).await
+    self.get_user_by_id(user_id).await
   }
 
   /// Log audit entry for user management operation
@@ -706,50 +718,50 @@ impl UserService
     operation: &str,
     target_user_id: &str,
     performed_by: &str,
-    previous_state: Option< String >,
-    new_state: Option< String >,
-    reason: Option< String >,
-  ) -> Result< () >
-  {
+    previous_state: Option<String>,
+    new_state: Option<String>,
+    reason: Option<String>,
+  ) -> Result<()> {
     let now_ms = current_time_ms();
-    let audit_id = format!( "audit_{}", uuid::Uuid::new_v4() );
+    let audit_id = format!("audit_{}", Uuid::new_v4());
 
     sqlx::query(
       "INSERT INTO user_audit_log \
        (id, operation, target_user_id, performed_by, timestamp, previous_state, new_state, reason) \
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
     )
-    .bind( &audit_id )
-    .bind( operation )
-    .bind( target_user_id )
-    .bind( performed_by )
-    .bind( now_ms )
-    .bind( previous_state )
-    .bind( new_state )
-    .bind( reason )
-    .execute( &self.pool )
+    .bind(&audit_id)
+    .bind(operation)
+    .bind(target_user_id)
+    .bind(performed_by)
+    .bind(now_ms)
+    .bind(previous_state)
+    .bind(new_state)
+    .bind(reason)
+    .execute(&self.pool)
     .await
-    .map_err( |e| { error!( "Error logging audit: {}", e ); crate::error::TokenError::Generic } )?;
+    .map_err(|e| {
+      error!("Error logging audit: {}", e);
+      TokenError::Generic
+    })?;
 
-    Ok( () )
+    Ok(())
   }
 
   /// Get database pool for test verification
   ///
   /// **Warning:** Test-only method for accessing internal state
-  #[ must_use ]
-  pub fn pool( &self ) -> &SqlitePool
-  {
+  #[must_use]
+  pub fn pool(&self) -> &SqlitePool {
     &self.pool
   }
 }
 
 /// Get current time in milliseconds since UNIX epoch
-#[ allow( clippy::cast_possible_truncation ) ]
-fn current_time_ms() -> i64
-{
+#[allow(clippy::cast_possible_truncation)]
+fn current_time_ms() -> i64 {
   std::time::SystemTime::now()
-    .duration_since( std::time::UNIX_EPOCH )
-    .expect( "LOUD FAILURE: Time went backwards" )
+    .duration_since(std::time::UNIX_EPOCH)
+    .expect("LOUD FAILURE: Time went backwards")
     .as_millis() as i64
 }

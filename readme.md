@@ -73,7 +73,7 @@ This diagram shows Iron Cage's three-boundary architecture at the highest level,
 ## Workspace Organization
 
 <details>
-<summary>Module Responsibilities & Boundaries (click to expand - 19 modules across 7 layers)</summary>
+<summary>Module Responsibilities & Boundaries (click to expand - 23 modules across 7 layers)</summary>
 
 | Entity | Responsibility | Input→Output | Scope | Out of Scope |
 |--------|----------------|--------------|-------|--------------|
@@ -88,8 +88,10 @@ This diagram shows Iron Cage's three-boundary architecture at the highest level,
 | iron_secrets | Secrets management | Plaintext secrets → Encrypted storage | Encryption, key management, access control | Secret generation, rotation policies |
 | iron_token_manager | API token management | Provider keys → Managed tokens | Token lifecycle, usage tracking, limits | Token generation, provider integration |
 | iron_control_api | HTTP API for control plane | HTTP requests → JSON responses | REST endpoints, auth, validation | CLI implementations, SDK |
+| iron_llm_core | Shared LLM routing library | Provider requests → Translated API calls | Provider detection, format translation, request forwarding, cost extraction | Agent orchestration, token management |
 | iron_runtime | Agent runtime and LLM routing | Agent requests → Provider API calls | Request translation, response parsing | Actual LLM provider SDKs |
 | iron_cli | Command-line interface | User commands → API operations | CLI parsing, formatting, output | API implementation, business logic |
+| iron_server_proxy | Centralized LLM proxy service | IC Token-authenticated requests → Provider API calls | Remote agent auth, key resolution, decryption, request forwarding | Agent orchestration, provider key management |
 | iron_control_schema | Database schema definitions | Schema changes → SQL migrations | Table definitions, migrations, indexes | Query logic, application code |
 
 ### Layer Organization
@@ -99,8 +101,8 @@ Foundation:     iron_types, iron_cost, iron_telemetry, iron_runtime_analytics
 Infrastructure: iron_runtime_state
 Feature:        iron_safety, iron_reliability, iron_secrets, iron_token_manager
 Specialized:    iron_control_schema
-Integration:    iron_control_api, iron_runtime
-Application:    iron_cli, iron_cli_py, iron_sdk, iron_testing
+Integration:    iron_control_api, iron_runtime, iron_llm_core
+Application:    iron_cli, iron_cli_py, iron_sdk, iron_testing, iron_server_proxy
 Frontend:       iron_dashboard
 ```
 

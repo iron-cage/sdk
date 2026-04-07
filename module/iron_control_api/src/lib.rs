@@ -20,7 +20,7 @@
 //! 1. **Transport Layer**: Axum web framework with HTTP/1.1, HTTP/2, and WebSocket support
 //! 2. **Authentication Layer**: JWT validation, token auth, and user sessions
 //! 3. **Authorization Layer**: Role-based access control (RBAC)
-//! 4. **Route Layer**: RESTful endpoints organized by resource domain
+//! 4. **Route Layer**: `RESTful` endpoints organized by resource domain
 //! 5. **State Layer**: Shared access to runtime state via `StateManager`
 //!
 //! All layers use async/await with Tokio runtime for concurrent request handling.
@@ -61,9 +61,9 @@
 //! ### Agent Management
 //!
 //! ```text
-//! GET  /api/agents/:id/status   - Get agent status
-//! POST /api/agents/:id/stop     - Stop agent
-//! GET  /api/agents/:id/metrics  - Get agent metrics
+//! GET  /api/agents/{id}/status   - Get agent status
+//! POST /api/agents/{id}/stop     - Stop agent
+//! GET  /api/agents/{id}/metrics  - Get agent metrics
 //! ```
 //!
 //! ### Analytics & Usage
@@ -205,14 +205,13 @@ pub mod token_auth;
 pub mod ic_token;
 
 #[cfg(feature = "enabled")]
-pub mod ip_token;
-
-#[cfg(feature = "enabled")]
 pub mod rate_limiter;
 
 #[cfg(feature = "enabled")]
-mod implementation
-{
+pub use iron_secrets::ip_token;
+
+#[cfg(feature = "enabled")]
+mod implementation {
   use axum::{
     extract::{Path, State, WebSocketUpgrade},
     http::StatusCode,
@@ -220,29 +219,45 @@ mod implementation
     routing::{get, post},
     Router,
   };
+  use core::net::SocketAddr;
   use serde::{Deserialize, Serialize};
-  use std::{net::SocketAddr, sync::Arc};
+  use std::sync::Arc;
   use tower_http::cors::CorsLayer;
 
   /// API server state
   #[derive(Clone)]
-  pub struct ApiState
-  {
+  pub struct ApiState {
+    /// Shared runtime state manager
     pub state_manager: Arc<iron_runtime_state::StateManager>,
   }
 
+  impl core::fmt::Debug for ApiState {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+      f.debug_struct("ApiState")
+        .field("state_manager", &"<StateManager>")
+        .finish()
+    }
+  }
+
   /// API server
-  pub struct ApiServer
-  {
+  pub struct ApiServer {
     state: ApiState,
     addr: SocketAddr,
   }
 
-  impl ApiServer
-  {
+  impl core::fmt::Debug for ApiServer {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+      f.debug_struct("ApiServer")
+        .field("state", &self.state)
+        .field("addr", &self.addr)
+        .finish()
+    }
+  }
+
+  impl ApiServer {
     /// Create new API server
-    pub fn new(state_manager: Arc<iron_runtime_state::StateManager>, port: u16) -> Self
-    {
+    #[must_use]
+    pub fn new(state_manager: Arc<iron_runtime_state::StateManager>, port: u16) -> Self {
       let addr = SocketAddr::from(([127, 0, 0, 1], port));
 
       Self {
@@ -252,12 +267,16 @@ mod implementation
     }
 
     /// Start API server
-    pub async fn start(self) -> Result<(), anyhow::Error>
-    {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the TCP listener fails to bind or the server
+    /// encounters a fatal runtime error.
+    pub async fn start(self) -> Result<(), anyhow::Error> {
       let app = Router::new()
-        .route("/api/agents/:id/status", get(get_agent_status))
-        .route("/api/agents/:id/stop", post(stop_agent))
-        .route("/api/agents/:id/metrics", get(get_agent_metrics))
+        .route("/api/agents/{id}/status", get(get_agent_status))
+        .route("/api/agents/{id}/stop", post(stop_agent))
+        .route("/api/agents/{id}/metrics", get(get_agent_metrics))
         .route("/ws", get(websocket_handler))
         .layer(CorsLayer::permissive())
         .with_state(self.state);
@@ -273,8 +292,7 @@ mod implementation
 
   /// Agent status response
   #[derive(Debug, Serialize, Deserialize)]
-  struct AgentStatusResponse
-  {
+  struct AgentStatusResponse {
     agent_id: String,
     status: String,
   }
@@ -283,10 +301,8 @@ mod implementation
   async fn get_agent_status(
     State(state): State<ApiState>,
     Path(agent_id): Path<String>,
-  ) -> impl IntoResponse
-  {
-    match state.state_manager.get_agent_state(&agent_id)
-    {
+  ) -> impl IntoResponse {
+    match state.state_manager.get_agent_state(&agent_id) {
       Some(agent_state) => {
         let response = AgentStatusResponse {
           agent_id: agent_state.agent_id.to_string(),
@@ -308,17 +324,13 @@ mod implementation
   async fn stop_agent(
     State(state): State<ApiState>,
     Path(agent_id): Path<String>,
-  ) -> impl IntoResponse
-  {
-    if let Some(mut agent_state) = state.state_manager.get_agent_state(&agent_id)
-    {
+  ) -> impl IntoResponse {
+    if let Some(mut agent_state) = state.state_manager.get_agent_state(&agent_id) {
       agent_state.status = iron_runtime_state::AgentStatus::Stopped;
       state.state_manager.save_agent_state(agent_state);
 
       (StatusCode::OK, Json(serde_json::json!({ "success": true })))
-    }
-    else
-    {
+    } else {
       (
         StatusCode::NOT_FOUND,
         Json(serde_json::json!({ "error": "Agent not found" })),
@@ -330,10 +342,8 @@ mod implementation
   async fn get_agent_metrics(
     State(state): State<ApiState>,
     Path(agent_id): Path<String>,
-  ) -> impl IntoResponse
-  {
-    match state.state_manager.get_agent_state(&agent_id)
-    {
+  ) -> impl IntoResponse {
+    match state.state_manager.get_agent_state(&agent_id) {
       Some(agent_state) => {
         let metrics = serde_json::json!({
           "agent_id": agent_state.agent_id.to_string(),
@@ -352,8 +362,10 @@ mod implementation
   }
 
   /// WebSocket handler
-  async fn websocket_handler(ws: WebSocketUpgrade, State(_state): State<ApiState>) -> impl IntoResponse
-  {
+  async fn websocket_handler(
+    ws: WebSocketUpgrade,
+    State(_state): State<ApiState>,
+  ) -> impl IntoResponse {
     ws.on_upgrade(|_socket| async {
       tracing::info!("WebSocket connection established");
     })
@@ -364,26 +376,22 @@ mod implementation
 pub use implementation::*;
 
 #[cfg(not(feature = "enabled"))]
-mod stub
-{
-  use std::{net::SocketAddr, sync::Arc};
+mod stub {
+  use core::net::SocketAddr;
+  use std::sync::Arc;
 
   #[derive(Clone)]
-  pub struct ApiState
-  {
+  pub struct ApiState {
     pub state_manager: Arc<iron_runtime_state::StateManager>,
   }
 
-  pub struct ApiServer
-  {
+  pub struct ApiServer {
     state: ApiState,
     addr: SocketAddr,
   }
 
-  impl ApiServer
-  {
-    pub fn new(state_manager: Arc<iron_runtime_state::StateManager>, port: u16) -> Self
-    {
+  impl ApiServer {
+    pub fn new(state_manager: Arc<iron_runtime_state::StateManager>, port: u16) -> Self {
       let addr = SocketAddr::from(([127, 0, 0, 1], port));
       Self {
         state: ApiState { state_manager },
@@ -391,8 +399,7 @@ mod stub
       }
     }
 
-    pub async fn start(self) -> Result<(), anyhow::Error>
-    {
+    pub async fn start(self) -> Result<(), anyhow::Error> {
       tracing::info!("Stub API server would listen on {}", self.addr);
       Ok(())
     }

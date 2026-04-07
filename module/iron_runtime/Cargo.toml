@@ -1,14 +1,17 @@
 [package]
 name = "iron_runtime"
-version= "0.4.0"
-edition.workspace = true
-rust-version.workspace = true
-license.workspace = true
+version = "0.4.0"
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
 description = "Agent runtime with LLM request routing and translation"
 repository = "https://github.com/.../iron_runtime"
 readme = "readme.md"
 keywords = ["runtime", "llm", "routing", "agent-runtime"]
 categories = ["asynchronous"]
+
+[lints]
+workspace = true
 
 [features]
 default = ["full"]
@@ -19,6 +22,11 @@ enabled = [
   "dep:iron_safety",
   "dep:iron_cost",
   "dep:iron_reliability",
+  "dep:iron_secrets",
+  "dep:iron_llm_core",
+  "dep:zeroize",
+  "dep:secrecy",
+  "dep:hex",
   "dep:tokio",
   "dep:serde",
   "dep:serde_json",
@@ -34,21 +42,23 @@ full = ["enabled", "analytics"]
 
 [dependencies]
 # Iron Cage crates
-iron_types = { workspace = true, features = ["full"], optional = true }
-iron_runtime_state = { workspace = true, features = ["enabled", "sqlite"], optional = true }
-iron_telemetry = { workspace = true, features = ["full"], optional = true }
-iron_safety = { workspace = true, features = ["full"], optional = true }
-iron_cost = { workspace = true, features = ["full"], optional = true }
-iron_reliability = { workspace = true, features = ["full"], optional = true }
-iron_runtime_analytics = { workspace = true, features = ["full"], optional = true }
+iron_types = { workspace = true, optional = true, features = ["full"] }
+iron_runtime_state = { workspace = true, optional = true, features = ["enabled", "sqlite"] }
+iron_telemetry = { workspace = true, optional = true, features = ["full"] }
+iron_safety = { workspace = true, optional = true, features = ["full"] }
+iron_cost = { workspace = true, optional = true, features = ["full"] }
+iron_reliability = { workspace = true, optional = true, features = ["full"] }
+iron_secrets = { workspace = true, optional = true }
+iron_runtime_analytics = { workspace = true, optional = true, features = ["full"] }
+iron_llm_core = { workspace = true, optional = true }
 
 # Note: PyO3 moved to iron_sdk (ADR-010)
 
 # Async runtime
-tokio = { workspace = true, features = ["full"], optional = true }
+tokio = { workspace = true, optional = true, features = ["full"] }
 
 # Serialization
-serde = { workspace = true, features = ["derive"], optional = true }
+serde = { workspace = true, optional = true, features = ["derive"] }
 serde_json = { workspace = true, optional = true }
 
 # Error handling
@@ -56,21 +66,31 @@ anyhow = { workspace = true, optional = true }
 
 
 # Utilities
-uuid = { workspace = true, features = ["v4"], optional = true }
+uuid = { workspace = true, optional = true, features = ["v4"] }
 
 # HTTP server (LlmRouter)
 axum = { workspace = true, optional = true }
 
 # HTTP client (LlmRouter)
-reqwest = { workspace = true, features = ["json", "blocking"], optional = true }
+reqwest = { workspace = true, optional = true, features = ["json", "blocking"] }
+
+# Hex decoding (IP_TOKEN_KEY env var)
+hex = { workspace = true, optional = true }
+
+# Memory-safe secret zeroing (IP Token decryption)
+zeroize = { workspace = true, optional = true }
+secrecy = { workspace = true, optional = true }
 
 # Logging
 tracing = { workspace = true, optional = true }
+futures-util = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }
 # Enable test utilities for ID types in tests
 iron_types = { workspace = true, features = ["test-helpers"] }
+# KeyFetcher integration tests — encrypt tokens for mock server responses
+iron_secrets = { workspace = true }
 
 [lib]
 name = "iron_runtime"

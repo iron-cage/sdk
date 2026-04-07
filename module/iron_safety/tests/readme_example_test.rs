@@ -3,8 +3,7 @@
 use iron_safety::PiiDetector;
 
 #[test]
-fn readme_example_compiles()
-{
+fn readme_example_compiles() {
   // Example from readme.md - verify it compiles and works
   let detector = PiiDetector::new().unwrap();
 
@@ -16,8 +15,7 @@ fn readme_example_compiles()
 }
 
 #[test]
-fn pii_detection_phone_numbers()
-{
+fn pii_detection_phone_numbers() {
   let detector = PiiDetector::new().unwrap();
 
   let text = "Call 555-123-4567";
@@ -28,8 +26,7 @@ fn pii_detection_phone_numbers()
 }
 
 #[test]
-fn no_false_positives()
-{
+fn no_false_positives() {
   let detector = PiiDetector::new().unwrap();
 
   let text = "No PII here";

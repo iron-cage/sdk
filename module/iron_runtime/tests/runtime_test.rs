@@ -1,9 +1,10 @@
+//! Tests for `AgentRuntime` lifecycle management
+
 use iron_runtime::*;
 use std::path::Path;
 
 #[tokio::test]
-async fn test_runtime_creation()
-{
+async fn test_runtime_creation() {
   let config = RuntimeConfig {
     budget: 50.0,
     verbose: false,
@@ -14,8 +15,7 @@ async fn test_runtime_creation()
 }
 
 #[tokio::test]
-async fn test_start_agent()
-{
+async fn test_start_agent() {
   let config = RuntimeConfig {
     budget: 100.0,
     verbose: true,
@@ -33,8 +33,7 @@ async fn test_start_agent()
 }
 
 #[tokio::test]
-async fn test_get_metrics()
-{
+async fn test_get_metrics() {
   let config = RuntimeConfig {
     budget: 50.0,
     verbose: false,
@@ -51,14 +50,22 @@ async fn test_get_metrics()
   assert!(metrics.is_some());
 
   let metrics = metrics.unwrap();
-  assert_eq!(metrics.agent_id, handle.agent_id, "Metrics should have correct agent ID");
-  assert_eq!(metrics.budget_spent, 0.0, "Newly started agent should have no budget spent");
-  assert_eq!(metrics.pii_detections, 0, "Newly started agent should have no PII detections");
+  assert_eq!(
+    metrics.agent_id, handle.agent_id,
+    "Metrics should have correct agent ID"
+  );
+  assert!(
+    metrics.budget_spent.abs() < f64::EPSILON,
+    "Newly started agent should have no budget spent"
+  );
+  assert_eq!(
+    metrics.pii_detections, 0,
+    "Newly started agent should have no PII detections"
+  );
 }
 
 #[tokio::test]
-async fn test_stop_agent()
-{
+async fn test_stop_agent() {
   let config = RuntimeConfig {
     budget: 50.0,
     verbose: false,
@@ -80,5 +87,8 @@ async fn test_stop_agent()
 
   // Check status is Stopped
   let metrics = metrics.unwrap();
-  assert!(matches!(metrics.status, iron_runtime_state::AgentStatus::Stopped), "Stopped agent should have Stopped status");
+  assert!(
+    matches!(metrics.status, iron_runtime_state::AgentStatus::Stopped),
+    "Stopped agent should have Stopped status"
+  );
 }

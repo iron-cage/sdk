@@ -1,8 +1,8 @@
 //! Usage data persistence tests for FR-8.
 //!
 //! ## Purpose
-//! Verify that usage data persists across UsageTracker restarts when using
-//! file-based SQLite databases (not in-memory).
+//! Verify that usage data persists across `UsageTracker` restarts when using
+//! file-based `SQLite` databases (not in-memory).
 //!
 //! ## Why This Test Exists
 //! During manual testing (2025-12-07), usage aggregation returned zeros after
@@ -94,7 +94,7 @@
 //!    check for existence before dropping
 //! 5. **Document CASCADE constraints:** Explicitly note which deletes trigger cascades
 //! 6. **Migration framework consideration:** For production, use proper migration
-//!    tracking (like SQLx migrations or Diesel) instead of raw SQL
+//!    tracking (like `SQLx` migrations or Diesel) instead of raw SQL
 //!
 //! ## Pitfall
 //!
@@ -105,14 +105,14 @@
 //! migration runs twice?" If the answer is data loss, add a guard table.
 //!
 //! ## Test Strategy
-//! 1. Create UsageTracker with file-based database
+//! 1. Create `UsageTracker` with file-based database
 //! 2. Record usage via proper API (`UsageTracker.record_usage_with_cost()`)
 //! 3. Drop tracker (simulates server stop)
 //! 4. Create new tracker with same database (simulates server restart)
 //! 5. Verify all usage data persisted
 //!
 //! ## Coverage
-//! - File-based SQLite persistence (production scenario)
+//! - File-based `SQLite` persistence (production scenario)
 //! - Cross-token aggregation persistence
 //! - Cross-provider breakdown persistence
 //! - Cost tracking persistence
@@ -123,23 +123,22 @@
 //! - Manual sqlite3 inserts may not commit properly (test artifact, not production issue)
 //! - Production code uses `UsageTracker.record_usage()` which commits automatically
 
-use iron_control_api::routes::usage::UsageState;
 use iron_control_api::routes::tokens::TokenState;
+use iron_control_api::routes::usage::UsageState;
 use iron_token_manager::token_generator::TokenGenerator;
 
-/// Test usage data persists across UsageState restart (simulates server restart).
+/// Test usage data persists across `UsageState` restart (simulates server restart).
 ///
 /// WHY: Critical for production - usage data must persist for billing/analytics.
 /// If this fails: CRITICAL BUG - usage data loss on server restart.
-#[ tokio::test ]
-async fn test_usage_persists_across_restart()
-{
+#[tokio::test]
+async fn test_usage_persists_across_restart() {
   // Create temporary file database
-  let temp_db = format!( "/tmp/iron_test_usage_persistence_{}.db", std::process::id() );
-  let db_url = format!( "sqlite://{}?mode=rwc", temp_db );
+  let temp_db = format!("/tmp/iron_test_usage_persistence_{}.db", std::process::id());
+  let db_url = format!("sqlite://{temp_db}?mode=rwc");
 
   // Clean up any existing test database
-  let _ = std::fs::remove_file( &temp_db );
+  let _ = std::fs::remove_file(&temp_db);
 
   let expected_tokens: i64;
   let expected_requests: i64;
@@ -147,20 +146,23 @@ async fn test_usage_persists_across_restart()
 
   // Phase 1: Create usage data (simulates normal server operation)
   {
-    let usage_state = UsageState::new( &db_url )
+    let usage_state = UsageState::new(&db_url)
       .await
-      .expect( "LOUD FAILURE: Failed to create usage state" );
+      .expect("LOUD FAILURE: Failed to create usage state");
 
-    let token_state = TokenState::new( &db_url )
+    let token_state = TokenState::new(&db_url)
       .await
-      .expect( "LOUD FAILURE: Failed to create token state" );
+      .expect("LOUD FAILURE: Failed to create token state");
 
     // Create test user (required by FK constraint from migration 013)
     let pool = token_state.storage.pool();
-    let now_ms = std::time::SystemTime::now()
-      .duration_since( std::time::UNIX_EPOCH )
-      .unwrap()
-      .as_millis() as i64;
+    let now_ms = i64::try_from(
+      std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis(),
+    )
+    .unwrap();
 
     sqlx::query(
       "INSERT INTO users (id, username, email, password_hash, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
@@ -180,47 +182,52 @@ async fn test_usage_persists_across_restart()
     let generator = TokenGenerator::new();
     let token = generator.generate();
 
-    let token_id = token_state.storage.create_token(
-      &token,
-      "persistence-test-user",
-      Some( "persistence-proj" ),
-      Some( "Persistence test token" ),
-      None,
-      None
-    )
-    .await
-    .expect( "LOUD FAILURE: Failed to create token" );
+    let token_id = token_state
+      .storage
+      .create_token(
+        &token,
+        "persistence-test-user",
+        Some("persistence-proj"),
+        Some("Persistence test token"),
+        None,
+        None,
+      )
+      .await
+      .expect("LOUD FAILURE: Failed to create token");
 
     // Record usage 1: OpenAI
-    usage_state.tracker.record_usage_with_cost(
-      token_id,
-      "openai",
-      "gpt-4",
-      500,   // input_tokens
-      300,   // output_tokens
-      800,   // total_tokens
-      120,   // cost_cents
-    )
-    .await
-    .expect( "LOUD FAILURE: Failed to record usage 1" );
+    usage_state
+      .tracker
+      .record_usage_with_cost(
+        token_id, "openai", "gpt-4", 500, // input_tokens
+        300, // output_tokens
+        800, // total_tokens
+        120, // cost_cents
+      )
+      .await
+      .expect("LOUD FAILURE: Failed to record usage 1");
 
     // Record usage 2: Anthropic (different provider)
-    usage_state.tracker.record_usage_with_cost(
-      token_id,
-      "anthropic",
-      "claude-sonnet-4-5",
-      1000,  // input_tokens
-      500,   // output_tokens
-      1500,  // total_tokens
-      200,   // cost_cents
-    )
-    .await
-    .expect( "LOUD FAILURE: Failed to record usage 2" );
+    usage_state
+      .tracker
+      .record_usage_with_cost(
+        token_id,
+        "anthropic",
+        "claude-sonnet-4-5",
+        1000, // input_tokens
+        500,  // output_tokens
+        1500, // total_tokens
+        200,  // cost_cents
+      )
+      .await
+      .expect("LOUD FAILURE: Failed to record usage 2");
 
     // Verify data recorded before restart
-    let aggregate = usage_state.tracker.get_all_aggregate_usage()
+    let aggregate = usage_state
+      .tracker
+      .get_all_aggregate_usage()
       .await
-      .expect( "LOUD FAILURE: Failed to get aggregate usage before restart" );
+      .expect("LOUD FAILURE: Failed to get aggregate usage before restart");
 
     assert_eq!(
       aggregate.total_tokens, 2300,
@@ -243,14 +250,16 @@ async fn test_usage_persists_across_restart()
 
   // Phase 2: Restart (create new UsageState, simulates server restart)
   {
-    let usage_state = UsageState::new( &db_url )
+    let usage_state = UsageState::new(&db_url)
       .await
-      .expect( "LOUD FAILURE: Failed to create usage state after restart" );
+      .expect("LOUD FAILURE: Failed to create usage state after restart");
 
     // Verify all usage data persisted
-    let aggregate = usage_state.tracker.get_all_aggregate_usage()
+    let aggregate = usage_state
+      .tracker
+      .get_all_aggregate_usage()
       .await
-      .expect( "LOUD FAILURE: Failed to get aggregate usage after restart" );
+      .expect("LOUD FAILURE: Failed to get aggregate usage after restart");
 
     assert_eq!(
       aggregate.total_tokens, expected_tokens,
@@ -266,28 +275,33 @@ async fn test_usage_persists_across_restart()
     );
 
     // Verify provider breakdown persisted
-    let provider_breakdown = usage_state.tracker.get_usage_by_provider_all()
+    let provider_breakdown = usage_state
+      .tracker
+      .get_usage_by_provider_all()
       .await
-      .expect( "LOUD FAILURE: Failed to get provider breakdown after restart" );
+      .expect("LOUD FAILURE: Failed to get provider breakdown after restart");
 
     assert_eq!(
-      provider_breakdown.len(), 2,
+      provider_breakdown.len(),
+      2,
       "LOUD FAILURE: Should have 2 providers (openai, anthropic) after restart"
     );
 
     // Find OpenAI provider
-    let openai = provider_breakdown.iter()
-      .find( |( provider, _ )| provider == "openai" )
-      .expect( "LOUD FAILURE: OpenAI provider should exist after restart" );
+    let openai = provider_breakdown
+      .iter()
+      .find(|(provider, _)| provider == "openai")
+      .expect("LOUD FAILURE: OpenAI provider should exist after restart");
     assert_eq!(
       openai.1.total_tokens, 800,
       "LOUD FAILURE: OpenAI tokens should persist"
     );
 
     // Find Anthropic provider
-    let anthropic = provider_breakdown.iter()
-      .find( |( provider, _ )| provider == "anthropic" )
-      .expect( "LOUD FAILURE: Anthropic provider should exist after restart" );
+    let anthropic = provider_breakdown
+      .iter()
+      .find(|(provider, _)| provider == "anthropic")
+      .expect("LOUD FAILURE: Anthropic provider should exist after restart");
     assert_eq!(
       anthropic.1.total_tokens, 1500,
       "LOUD FAILURE: Anthropic tokens should persist"
@@ -295,31 +309,37 @@ async fn test_usage_persists_across_restart()
   }
 
   // Clean up test database
-  let _ = std::fs::remove_file( &temp_db );
+  let _ = std::fs::remove_file(&temp_db);
 }
 
 /// Test multiple restart cycles preserve data integrity.
 ///
 /// WHY: Verify data persists across multiple server restarts, not just one.
-#[ tokio::test ]
-async fn test_usage_persists_across_multiple_restarts()
-{
-  let temp_db = format!( "/tmp/iron_test_multi_restart_{}.db", std::process::id() );
-  let db_url = format!( "sqlite://{}?mode=rwc", temp_db );
+#[tokio::test]
+async fn test_usage_persists_across_multiple_restarts() {
+  let temp_db = format!("/tmp/iron_test_multi_restart_{}.db", std::process::id());
+  let db_url = format!("sqlite://{temp_db}?mode=rwc");
 
-  let _ = std::fs::remove_file( &temp_db );
+  let _ = std::fs::remove_file(&temp_db);
 
   // Restart cycle 1: Create initial data
   {
-    let usage_state = UsageState::new( &db_url ).await.expect("LOUD FAILURE: Failed cycle 1 create");
-    let token_state = TokenState::new( &db_url ).await.expect("LOUD FAILURE: Failed token create");
+    let usage_state = UsageState::new(&db_url)
+      .await
+      .expect("LOUD FAILURE: Failed cycle 1 create");
+    let token_state = TokenState::new(&db_url)
+      .await
+      .expect("LOUD FAILURE: Failed token create");
 
     // Create test user (required by FK constraint from migration 013)
     let pool = token_state.storage.pool();
-    let now_ms = std::time::SystemTime::now()
-      .duration_since( std::time::UNIX_EPOCH )
-      .unwrap()
-      .as_millis() as i64;
+    let now_ms = i64::try_from(
+      std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis(),
+    )
+    .unwrap();
 
     sqlx::query(
       "INSERT INTO users (id, username, email, password_hash, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
@@ -337,38 +357,37 @@ async fn test_usage_persists_across_multiple_restarts()
 
     let generator = TokenGenerator::new();
     let token = generator.generate();
-    let token_id = token_state.storage.create_token(
-      &token,
-      "multi-restart-user",
-      None,
-      None,
-      None,
-      None
-    )
-    .await
-    .expect("LOUD FAILURE: Failed to create token");
+    let token_id = token_state
+      .storage
+      .create_token(&token, "multi-restart-user", None, None, None, None)
+      .await
+      .expect("LOUD FAILURE: Failed to create token");
 
-    usage_state.tracker.record_usage_with_cost(
-      token_id,
-      "openai",
-      "gpt-4",
-      100, 50, 150, 20
-    )
-    .await
-    .expect("LOUD FAILURE: Failed record 1");
+    usage_state
+      .tracker
+      .record_usage_with_cost(token_id, "openai", "gpt-4", 100, 50, 150, 20)
+      .await
+      .expect("LOUD FAILURE: Failed record 1");
   }
 
   // Restart cycle 2: Add more data
   {
-    let usage_state = UsageState::new( &db_url ).await.expect("LOUD FAILURE: Failed cycle 2 create");
-    let token_state = TokenState::new( &db_url ).await.expect("LOUD FAILURE: Failed token state 2");
+    let usage_state = UsageState::new(&db_url)
+      .await
+      .expect("LOUD FAILURE: Failed cycle 2 create");
+    let token_state = TokenState::new(&db_url)
+      .await
+      .expect("LOUD FAILURE: Failed token state 2");
 
     // Create second test user (required by FK constraint from migration 013)
     let pool = token_state.storage.pool();
-    let now_ms = std::time::SystemTime::now()
-      .duration_since( std::time::UNIX_EPOCH )
-      .unwrap()
-      .as_millis() as i64;
+    let now_ms = i64::try_from(
+      std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis(),
+    )
+    .unwrap();
 
     sqlx::query(
       "INSERT INTO users (id, username, email, password_hash, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
@@ -386,34 +405,31 @@ async fn test_usage_persists_across_multiple_restarts()
 
     let generator = TokenGenerator::new();
     let token = generator.generate();
-    let token_id = token_state.storage.create_token(
-      &token,
-      "multi-restart-user-2",
-      None,
-      None,
-      None,
-      None
-    )
-    .await
-    .expect("LOUD FAILURE: Failed to create token 2");
+    let token_id = token_state
+      .storage
+      .create_token(&token, "multi-restart-user-2", None, None, None, None)
+      .await
+      .expect("LOUD FAILURE: Failed to create token 2");
 
-    usage_state.tracker.record_usage_with_cost(
-      token_id,
-      "anthropic",
-      "claude",
-      200, 100, 300, 40
-    )
-    .await
-    .expect("LOUD FAILURE: Failed record 2");
+    usage_state
+      .tracker
+      .record_usage_with_cost(token_id, "anthropic", "claude", 200, 100, 300, 40)
+      .await
+      .expect("LOUD FAILURE: Failed record 2");
 
     // Verify cumulative data
     let aggregate = usage_state.tracker.get_all_aggregate_usage().await.unwrap();
-    assert_eq!( aggregate.total_tokens, 450, "Should have 150 + 300 after cycle 2" );
+    assert_eq!(
+      aggregate.total_tokens, 450,
+      "Should have 150 + 300 after cycle 2"
+    );
   }
 
   // Restart cycle 3: Verify all data still persists
   {
-    let usage_state = UsageState::new( &db_url ).await.expect("LOUD FAILURE: Failed cycle 3 create");
+    let usage_state = UsageState::new(&db_url)
+      .await
+      .expect("LOUD FAILURE: Failed cycle 3 create");
 
     let aggregate = usage_state.tracker.get_all_aggregate_usage().await.unwrap();
     assert_eq!(
@@ -430,5 +446,5 @@ async fn test_usage_persists_across_multiple_restarts()
     );
   }
 
-  let _ = std::fs::remove_file( &temp_db );
+  let _ = std::fs::remove_file(&temp_db);
 }

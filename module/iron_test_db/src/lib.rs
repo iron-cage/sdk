@@ -27,41 +27,43 @@ mod error;
 mod migrations;
 mod wipe;
 
-pub use builder::{ TestDatabaseBuilder, StorageMode };
-pub use error::{ TestDbError, Result };
-pub use migrations::{ MigrationRegistry, Migration, MigrationRecord };
-pub use wipe::{ discover_table_dependencies, wipe_all_tables, topological_sort_reverse };
+pub use builder::{StorageMode, TestDatabaseBuilder};
+pub use error::{Result, TestDbError};
+pub use migrations::{Migration, MigrationRecord, MigrationRegistry};
+pub use wipe::{discover_table_dependencies, topological_sort_reverse, wipe_all_tables};
 
 use sqlx::SqlitePool;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
 /// Test database handle with automatic cleanup
-pub struct TestDatabase
-{
+#[derive(Debug)]
+pub struct TestDatabase {
   pool: SqlitePool,
-  _temp: Option< TempDir >,
+  _temp: Option<TempDir>,
   storage_mode: StorageMode,
-  path: Option< PathBuf >,
+  path: Option<PathBuf>,
 }
 
-impl TestDatabase
-{
+impl TestDatabase {
   /// Get reference to database connection pool
-  pub fn pool( &self ) -> &SqlitePool
-  {
+  #[must_use]
+  pub fn pool(&self) -> &SqlitePool {
     &self.pool
   }
 
   /// Wipe all data from all tables (respects foreign keys)
-  pub async fn wipe( &self ) -> Result< () >
-  {
-    wipe_all_tables( &self.pool ).await
+  ///
+  /// # Errors
+  ///
+  /// Returns an error if dependency discovery or any `DELETE` query fails.
+  pub async fn wipe(&self) -> Result<()> {
+    wipe_all_tables(&self.pool).await
   }
 
   /// Get storage mode
-  pub fn storage_mode( &self ) -> &StorageMode
-  {
+  #[must_use]
+  pub fn storage_mode(&self) -> &StorageMode {
     &self.storage_mode
   }
 
@@ -69,19 +71,17 @@ impl TestDatabase
   ///
   /// For CI environments, this returns the workspace-relative path where
   /// the test database is stored for post-failure inspection.
-  /// For local environments with TempFile, returns the temporary path.
+  /// For local environments with `TempFile`, returns the temporary path.
   /// For InMemory/SharedInMemory, returns None.
-  pub fn path( &self ) -> Option< &PathBuf >
-  {
+  #[must_use]
+  pub fn path(&self) -> Option<&PathBuf> {
     self.path.as_ref()
   }
 }
 
 // Automatic cleanup via Drop (in-memory DBs auto-cleanup, file DBs via TempDir)
-impl Drop for TestDatabase
-{
-  fn drop( &mut self )
-  {
+impl Drop for TestDatabase {
+  fn drop(&mut self) {
     // TempDir cleanup happens automatically
     // In-memory databases are cleaned up when pool is closed
   }

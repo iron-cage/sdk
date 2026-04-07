@@ -6,7 +6,6 @@
 //! Verifies that the migration from orphaned adapters to correct adapters
 //! completed successfully with all metrics at target values.
 
-mod migration
-{
+mod migration {
   pub mod metrics;
 }

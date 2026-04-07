@@ -25,25 +25,36 @@
 //! REFACTOR: Pending
 
 #[cfg(test)]
-mod tests
-{
-  use crate::fixtures::{ IntegrationTestHarness, TestServer };
+mod tests {
+  use crate::fixtures::{IntegrationTestHarness, TestServer};
 
   /// Test valid password
   #[tokio::test]
-  async fn test_password_valid()
-  {
+  async fn test_password_valid() {
     let server = TestServer::start().await;
 
-    let harness = IntegrationTestHarness::new()
-      .server_url( server.url() );
+    let harness = IntegrationTestHarness::new().server_url(server.url());
 
-    let result = harness.run( "iron-token", &[ ".auth.login", "username::testuser", "password::SecurePass123!" ] ).await;
+    let result = harness
+      .run(
+        "iron-token",
+        &[
+          ".auth.login",
+          "username::testuser",
+          "password::SecurePass123!",
+        ],
+      )
+      .await;
 
     // Should succeed or fail with auth error, not password format validation
     if !result.success() {
-      assert!( !result.stderr.contains( "password" ) || !result.stderr.contains( "invalid" ) || !result.stderr.contains( "format" ),
-        "Should not fail with password format error. Stderr: {}", result.stderr );
+      assert!(
+        !result.stderr.contains("password")
+          || !result.stderr.contains("invalid")
+          || !result.stderr.contains("format"),
+        "Should not fail with password format error. Stderr: {}",
+        result.stderr
+      );
     }
 
     server.shutdown().await;
@@ -51,42 +62,51 @@ mod tests
 
   /// Test empty password (should fail)
   #[tokio::test]
-  async fn test_password_empty()
-  {
+  async fn test_password_empty() {
     let server = TestServer::start().await;
 
-    let harness = IntegrationTestHarness::new()
-      .server_url( server.url() );
+    let harness = IntegrationTestHarness::new().server_url(server.url());
 
-    let result = harness.run( "iron-token", &[ ".auth.login", "username::testuser", "password::" ] ).await;
+    let result = harness
+      .run(
+        "iron-token",
+        &[".auth.login", "username::testuser", "password::"],
+      )
+      .await;
 
-    assert!( !result.success(), "Empty password should fail" );
-    assert!( result.stderr.contains( "password" ) || result.stderr.contains( "empty" ) || result.stderr.contains( "required" ),
-      "Error should mention empty password. Stderr: {}", result.stderr );
+    assert!(!result.success(), "Empty password should fail");
+    assert!(
+      result.stderr.contains("password")
+        || result.stderr.contains("empty")
+        || result.stderr.contains("required"),
+      "Error should mention empty password. Stderr: {}",
+      result.stderr
+    );
 
     server.shutdown().await;
   }
 
   /// Test missing required password
   #[tokio::test]
-  async fn test_password_missing_required()
-  {
+  async fn test_password_missing_required() {
     let server = TestServer::start().await;
 
-    let harness = IntegrationTestHarness::new()
-      .server_url( server.url() );
+    let harness = IntegrationTestHarness::new().server_url(server.url());
 
-    let result = harness.run( "iron-token", &[ ".auth.login", "username::testuser" ] ).await;
+    let result = harness
+      .run("iron-token", &[".auth.login", "username::testuser"])
+      .await;
 
     // Command should fail (missing required parameter)
     // If command loading fails, that's a separate infrastructure issue
-    if result.success() {
-      panic!( "Command should fail when password is missing" );
-    }
+    assert!(
+      !result.success(),
+      "Command should fail when password is missing"
+    );
 
     // If it failed and error mentions password/required, test passes
     // If it failed for other reasons (command not found), skip validation
-    if result.stderr.contains( "password" ) || result.stderr.contains( "required" ) {
+    if result.stderr.contains("password") || result.stderr.contains("required") {
       // Test passes - correct error message
     }
 
@@ -95,18 +115,24 @@ mod tests
 
   /// Test very short password (security concern)
   #[tokio::test]
-  async fn test_password_too_short()
-  {
+  async fn test_password_too_short() {
     let server = TestServer::start().await;
 
-    let harness = IntegrationTestHarness::new()
-      .server_url( server.url() );
+    let harness = IntegrationTestHarness::new().server_url(server.url());
 
-    let result = harness.run( "iron-token", &[ ".auth.login", "username::testuser", "password::ab" ] ).await;
+    let result = harness
+      .run(
+        "iron-token",
+        &[".auth.login", "username::testuser", "password::ab"],
+      )
+      .await;
 
     // Very short password might be rejected for security
-    if !result.success() && result.stderr.contains( "password" ) {
-      println!( "Short password rejected (security policy): {}", result.stderr );
+    if !result.success() && result.stderr.contains("password") {
+      println!(
+        "Short password rejected (security policy): {}",
+        result.stderr
+      );
     }
 
     server.shutdown().await;
@@ -114,19 +140,29 @@ mod tests
 
   /// Test password with special characters
   #[tokio::test]
-  async fn test_password_special_characters()
-  {
+  async fn test_password_special_characters() {
     let server = TestServer::start().await;
 
-    let harness = IntegrationTestHarness::new()
-      .server_url( server.url() );
+    let harness = IntegrationTestHarness::new().server_url(server.url());
 
-    let result = harness.run( "iron-token", &[ ".auth.login", "username::testuser", "password::P@ssw0rd!#$%" ] ).await;
+    let result = harness
+      .run(
+        "iron-token",
+        &[
+          ".auth.login",
+          "username::testuser",
+          "password::P@ssw0rd!#$%",
+        ],
+      )
+      .await;
 
     // Special characters should be allowed in passwords
     if !result.success() {
-      assert!( !result.stderr.contains( "password" ) || !result.stderr.contains( "invalid" ),
-        "Should accept special characters in password. Stderr: {}", result.stderr );
+      assert!(
+        !result.stderr.contains("password") || !result.stderr.contains("invalid"),
+        "Should accept special characters in password. Stderr: {}",
+        result.stderr
+      );
     }
 
     server.shutdown().await;
@@ -134,19 +170,26 @@ mod tests
 
   /// Test very long password
   #[tokio::test]
-  async fn test_password_very_long()
-  {
+  async fn test_password_very_long() {
     let server = TestServer::start().await;
 
-    let harness = IntegrationTestHarness::new()
-      .server_url( server.url() );
+    let harness = IntegrationTestHarness::new().server_url(server.url());
 
-    let long_password = "a".repeat( 1000 );
-    let result = harness.run( "iron-token", &[ ".auth.login", "username::testuser", &format!( "password::{}", long_password ) ] ).await;
+    let long_password = "a".repeat(1000);
+    let result = harness
+      .run(
+        "iron-token",
+        &[
+          ".auth.login",
+          "username::testuser",
+          &format!("password::{long_password}"),
+        ],
+      )
+      .await;
 
     // Very long password may be accepted or have max length
-    if !result.success() && result.stderr.contains( "password" ) {
-      println!( "Very long password behavior: {}", result.stderr );
+    if !result.success() && result.stderr.contains("password") {
+      println!("Very long password behavior: {}", result.stderr);
     }
 
     server.shutdown().await;
@@ -154,19 +197,29 @@ mod tests
 
   /// Test password with unicode characters
   #[tokio::test]
-  async fn test_password_unicode()
-  {
+  async fn test_password_unicode() {
     let server = TestServer::start().await;
 
-    let harness = IntegrationTestHarness::new()
-      .server_url( server.url() );
+    let harness = IntegrationTestHarness::new().server_url(server.url());
 
-    let result = harness.run( "iron-token", &[ ".auth.login", "username::testuser", "password::パスワード123" ] ).await;
+    let result = harness
+      .run(
+        "iron-token",
+        &[
+          ".auth.login",
+          "username::testuser",
+          "password::パスワード123",
+        ],
+      )
+      .await;
 
     // Unicode should be allowed in passwords
     if !result.success() {
-      assert!( !result.stderr.contains( "password" ) || !result.stderr.contains( "invalid" ),
-        "Should accept unicode in password. Stderr: {}", result.stderr );
+      assert!(
+        !result.stderr.contains("password") || !result.stderr.contains("invalid"),
+        "Should accept unicode in password. Stderr: {}",
+        result.stderr
+      );
     }
 
     server.shutdown().await;

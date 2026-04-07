@@ -155,15 +155,15 @@ fi
 # Rule 4: Validate Rust code defaults
 # ============================================================================
 
-log_info "Rule 4: Validating Rust code defaults (Config::default_dev())..."
+log_info "Rule 4: Validating Rust code defaults (get_defaults_toml())..."
 
 CODE_VIOLATIONS=0
 
-# Check src/config.rs default_dev() function
-if grep -A 10 'pub fn default_dev()' src/config.rs 2>/dev/null | grep -q 'url: "sqlite:///./iron.db?mode=rwc"'; then
-  log_success "src/config.rs Config::default_dev() uses canonical path"
+# Check src/config.rs get_defaults_toml() function
+if grep -A 10 'fn get_defaults_toml()' src/config.rs 2>/dev/null | grep -q 'url = "sqlite:///./iron.db?mode=rwc"'; then
+  log_success "src/config.rs get_defaults_toml() uses canonical path"
 else
-  log_error "src/config.rs Config::default_dev() does not use canonical path"
+  log_error "src/config.rs get_defaults_toml() does not use canonical path"
   ((CODE_VIOLATIONS++))
 fi
 

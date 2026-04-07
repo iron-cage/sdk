@@ -4,8 +4,8 @@
 # Validates that the database schema matches expected structure.
 #
 # Rules:
-# 1. Database must have exactly 17 tables (11 application + 6 migration guards)
-# 2. Database must have exactly 32 indexes (idx_* pattern)
+# 1. Database must have exactly EXPECTED_TABLE_COUNT tables
+# 2. Database must have exactly EXPECTED_INDEX_COUNT indexes (idx_* pattern)
 # 3. All migration guard tables must exist
 # 4. Foreign keys must be enabled
 # 5. Core application tables must exist
@@ -50,6 +50,10 @@ log_warning() {
   echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
+# Expected counts (update when adding migrations)
+EXPECTED_TABLE_COUNT=45   # 18 application + 27 migration guards
+EXPECTED_INDEX_COUNT=53
+
 # Validation state
 VIOLATIONS=0
 
@@ -76,7 +80,7 @@ echo ""
 # Rule 1: Check table count
 # ============================================================================
 
-log_info "Rule 1: Checking table count (expect 17 total)..."
+log_info "Rule 1: Checking table count (expect $EXPECTED_TABLE_COUNT total)..."
 
 # Count application tables (excluding migration guards and sqlite_ tables)
 APP_TABLE_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_migration_%';")
@@ -86,10 +90,10 @@ GUARD_TABLE_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM sqlite_master WHERE
 
 TOTAL_TABLE_COUNT=$((APP_TABLE_COUNT + GUARD_TABLE_COUNT))
 
-if [ "$TOTAL_TABLE_COUNT" -eq 17 ]; then
+if [ "$TOTAL_TABLE_COUNT" -eq "$EXPECTED_TABLE_COUNT" ]; then
   log_success "Table count correct: $TOTAL_TABLE_COUNT (${APP_TABLE_COUNT} application + ${GUARD_TABLE_COUNT} guards)"
 else
-  log_error "Table count mismatch: expected 17, found $TOTAL_TABLE_COUNT (${APP_TABLE_COUNT} application + ${GUARD_TABLE_COUNT} guards)"
+  log_error "Table count mismatch: expected $EXPECTED_TABLE_COUNT, found $TOTAL_TABLE_COUNT (${APP_TABLE_COUNT} application + ${GUARD_TABLE_COUNT} guards)"
   ((VIOLATIONS++))
 fi
 
@@ -97,14 +101,14 @@ fi
 # Rule 2: Check index count
 # ============================================================================
 
-log_info "Rule 2: Checking index count (expect 32)..."
+log_info "Rule 2: Checking index count (expect $EXPECTED_INDEX_COUNT)..."
 
 INDEX_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%';")
 
-if [ "$INDEX_COUNT" -eq 32 ]; then
+if [ "$INDEX_COUNT" -eq "$EXPECTED_INDEX_COUNT" ]; then
   log_success "Index count correct: $INDEX_COUNT"
 else
-  log_error "Index count mismatch: expected 32, found $INDEX_COUNT"
+  log_error "Index count mismatch: expected $EXPECTED_INDEX_COUNT, found $INDEX_COUNT"
   ((VIOLATIONS++))
 fi
 
@@ -116,8 +120,8 @@ log_info "Rule 3: Checking migration guard tables..."
 
 GUARD_VIOLATIONS=0
 
-# Expected migration guards (migrations 002-006, 008 - 007 is reserved/skipped)
-EXPECTED_GUARDS=("_migration_002_completed" "_migration_003_completed" "_migration_004_completed" "_migration_005_completed" "_migration_006_completed" "_migration_008_completed")
+# Expected migration guards (migrations 001-025, all 25 guards)
+EXPECTED_GUARDS=("_migration_001_completed" "_migration_002_completed" "_migration_003_completed" "_migration_004_completed" "_migration_005_completed" "_migration_006_completed" "_migration_007_completed" "_migration_008_completed" "_migration_009_completed" "_migration_010_completed" "_migration_011_completed" "_migration_012_completed" "_migration_013_completed" "_migration_014_completed" "_migration_015_completed" "_migration_016_completed" "_migration_017_completed" "_migration_018_completed" "_migration_019_completed" "_migration_020_completed" "_migration_021_completed" "_migration_022_completed" "_migration_023_completed" "_migration_024_completed" "_migration_025_completed")
 
 for guard in "${EXPECTED_GUARDS[@]}"; do
   COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='$guard';")
@@ -155,7 +159,7 @@ fi
 
 log_info "Rule 5: Checking core application tables..."
 
-CORE_TABLES=("agents" "ai_provider_keys" "api_call_traces" "api_tokens" "audit_log" "project_provider_key_assignments" "token_blacklist" "token_usage" "usage_limits" "user_audit_log" "users")
+CORE_TABLES=("agent_budgets" "agents" "ai_provider_keys" "analytics_events" "api_call_traces" "api_tokens" "audit_log" "blacklist" "budget_change_requests" "budget_leases" "budget_modification_history" "project_provider_key_assignments" "system_config" "token_blacklist" "token_usage" "usage_limits" "user_audit_log" "users")
 
 TABLE_VIOLATIONS=0
 
