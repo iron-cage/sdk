@@ -1,16 +1,25 @@
 ---
 status: active
+lifecycle: active
 version: 1.0
 authority: iron_runtime
 applicability: all_documentation
 precedence: project_specific
+knowledge_units:
+  level: 3
+  total: 28
+  preamble: 4
+  collections: 1
+  rules: 23
+references:
+  - $PRO/genai/code/rules/organizational_principles.rulebook.md
 ---
 
 # documentation_management
 
 **Authority:** This rulebook is the authoritative standard for all documentation in iron_runtime project, covering Design Collections, module specifications, entity models, and reference documentation.
 
-**Alternative names:** docs_management, iron_runtime_documentation
+- **Alternative names:** docs_management, iron_runtime_documentation
 
 ### Vocabulary
 
@@ -56,8 +65,15 @@ Defines documentation standards for iron_runtime project including Design Collec
 - Test documentation (see test_organization.rulebook.md)
 - File system structure (see files_structure.rulebook.md)
 - Commit messages and git workflow (never use git per CLAUDE.md)
+- Project-specific implementations (see project rulebook.md)
 
-### Quick Reference Summary
+### Collections Index
+
+| Section | Responsibility |
+|---------|----------------|
+| Governing Principles | Core documentation philosophy for iron_runtime |
+
+### Rules Index
 
 | Group | Rule | Description |
 |-------|------|-------------|
@@ -126,7 +142,7 @@ Each Design Collection directory must have readme.md with:
 - Cross-references to related collections
 
 **5-Column Responsibility Table Format:**
-```markdown
+```
 | ID | Entity | Responsibility | Input → Output | Scope | Out of Scope |
 |----|--------|----------------|----------------|-------|--------------|
 | 001 | **001_file.md** | [Responsibility] | [Question] → [Answer] | [What's included] | NOT [excluded] (→ cross-refs) |
@@ -152,12 +168,12 @@ Concept files must be concise, targeting 30-50 lines, not exceeding 70 lines.
 All module spec.md files must include specification philosophy note after metadata, before first section.
 
 **Required text:**
-```markdown
+```
 > **Specification Philosophy:** This specification focuses on architectural-level design and well-established knowledge. It describes what the module does and why, not implementation details or algorithms. Implementation constraints are minimal to allow flexibility. For detailed requirements, see spec/-archived_detailed_spec.md.
 ```
 
 **Special case for spec-only modules:**
-```markdown
+```
 > **Specification Philosophy:** This specification focuses on architectural-level design and well-established knowledge. It describes what the module does and why, not implementation details or algorithms. This is a spec-only module - implementation planned for production phase. Schema definitions document intent, not enforce exact structure.
 ```
 
@@ -256,7 +272,7 @@ Always clarify "IP" means Inference Provider, NOT IP address, on first usage in 
 - "Inference Providers/IPs"
 
 **Add note at top of docs/architecture/007_entity_model.md:**
-```markdown
+```
 > **Note:** "IP" in this document means **Inference Provider** (e.g., OpenAI, Anthropic), NOT IP address.
 ```
 
@@ -389,7 +405,7 @@ All Design Collection readme.md files must have Responsibility Table with exactl
 6. **Out of Scope** - What's excluded (with ≥3 cross-references to other files)
 
 **Format:**
-```markdown
+```
 | ID | Entity | Responsibility | Input → Output | Scope | Out of Scope |
 |----|--------|----------------|----------------|-------|--------------|
 | 001 | **001_file.md** | [What it does] | [Question] → [Answer] | [Included] | NOT [excluded] (→ file1), NOT [excluded] (→ file2), NOT [excluded] (→ file3) |

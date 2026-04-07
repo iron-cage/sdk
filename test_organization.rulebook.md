@@ -1,17 +1,39 @@
-# Test Organization Rulebook
+# test_organization
 
 **Version:** 1.0
 **Status:** Active
 **Authority:** Project-Level Testing Standards
 **Scope:** All test code in iron_runtime workspace
 
+## Scope
+
+**Responsibilities:** Define testing standards for database cleanup and test organization.
+
+**In Scope:**
+- All test code in iron_runtime workspace.
+
+**Out of Scope:**
+- Project-specific implementations (see project rulebook.md)
+
+### Collections Index
+
+| Section | Responsibility |
+|---------|----------------|
+| Core Principles | Five foundational test isolation and cleanup principles |
+| Database Selection Matrix | When to use in-memory, tempfile, or config-based databases |
+| Database Cleanup Mechanisms | Three cleanup mechanism patterns |
+| Seed Data Standards | Standards for idempotent seed data operations |
+| Database Path Conventions | Naming conventions for test and production databases |
+| Manual Testing Procedures | Step-by-step procedures for manual testing workflows |
+| Test Organization Patterns | Patterns for organizing test files and infrastructure |
+| Bug Fix Testing Standards | Standards for documenting and reproducing bug fixes |
+| Known Pitfalls | Common mistakes and how to avoid them |
+
 ## Purpose
 
 This rulebook defines comprehensive testing standards for database cleanup, test data population, and test organization across all modules in the iron_runtime project. These standards ensure consistency, reliability, and maintainability of the test suite.
 
-## Core Principles
-
-### Principle 1: Automatic Database Cleanup
+### Principle 1 : Automatic Database Cleanup
 
 **Every test must automatically clean up its database state.** Manual cleanup is forbidden.
 
@@ -23,7 +45,7 @@ This rulebook defines comprehensive testing standards for database cleanup, test
 
 **Rationale:** Manual cleanup is error-prone and leaves test artifacts after failures.
 
-### Principle 2: Test Isolation
+### Principle 2 : Test Isolation
 
 **Every test gets an independent database instance.** Shared database state is forbidden.
 
@@ -35,7 +57,7 @@ This rulebook defines comprehensive testing standards for database cleanup, test
 
 **Rationale:** Shared state causes flaky tests and makes debugging difficult.
 
-### Principle 3: Real Implementations
+### Principle 3 : Real Implementations
 
 **All tests use real database implementations.** Mocking is forbidden.
 
@@ -47,7 +69,7 @@ This rulebook defines comprehensive testing standards for database cleanup, test
 
 **Rationale:** Mocks test mock behavior, not real behavior. See ADR-007.
 
-### Principle 4: Idempotent Seed Data
+### Principle 4 : Idempotent Seed Data
 
 **All seed data operations must be idempotent.** Re-running seed should be safe.
 
@@ -59,7 +81,7 @@ This rulebook defines comprehensive testing standards for database cleanup, test
 
 **Rationale:** Idempotency enables safe test setup and debug workflows.
 
-### Principle 5: Loud Test Failures
+### Principle 5 : Loud Test Failures
 
 **Every test failure must include descriptive context.** Silent failures are forbidden.
 
@@ -70,8 +92,6 @@ This rulebook defines comprehensive testing standards for database cleanup, test
 - Use `expect()` with context, never `unwrap()`
 
 **Rationale:** Context-free failures waste debugging time.
-
-## Database Selection Matrix
 
 ### When to Use In-Memory SQLite
 
@@ -168,9 +188,7 @@ if config.database.wipe_and_seed {
 
 **CRITICAL:** Config-based databases are for manual testing only, never for automated tests.
 
-## Database Cleanup Mechanisms
-
-### Mechanism 1: TempDir Drop (File-Based)
+### Mechanism 1 : TempDir Drop (File-Based)
 
 **How It Works:**
 1. Test creates TempDir instance
@@ -201,7 +219,7 @@ async fn test_something() {
 - No manual cleanup needed
 - File system guarantees
 
-### Mechanism 2: Connection Pool Drop (In-Memory)
+### Mechanism 2 : Connection Pool Drop (In-Memory)
 
 **How It Works:**
 1. Test creates SqlitePool to :memory:
@@ -234,7 +252,7 @@ async fn test_something() {
 - Works even if test panics
 - No disk I/O
 
-### Mechanism 3: Explicit Wipe (Manual Testing Only)
+### Mechanism 3 : Explicit Wipe (Manual Testing Only)
 
 **How It Works:**
 1. Debug run starts
@@ -270,9 +288,7 @@ if config.development.wipe_and_seed {
 - Idempotent (safe to run multiple times)
 - Respects foreign key constraints
 
-## Seed Data Standards
-
-### Standard 1: Idempotent Operations
+### Standard 1 : Idempotent Operations
 
 **Requirement:** Seed functions must be safe to run multiple times.
 
@@ -299,12 +315,12 @@ pub async fn seed_users(pool: &SqlitePool) -> Result<()> {
 }
 ```
 
-### Standard 2: Seed Data Contract
+### Standard 2 : Seed Data Contract
 
 **Requirement:** Document seed data in tests/readme.md Responsibility Table.
 
 **Format:**
-```markdown
+```
 ### Seed Data Contract
 
 | Entity | Count | Purpose |
@@ -317,7 +333,7 @@ pub async fn seed_users(pool: &SqlitePool) -> Result<()> {
 
 **Rationale:** Tests depend on seed data structure. Document it as test contract.
 
-### Standard 3: Seed Data Organization
+### Standard 3 : Seed Data Organization
 
 **Requirement:** Seed functions organized by entity, called in dependency order.
 
@@ -338,7 +354,7 @@ async fn seed_provider_keys(pool: &SqlitePool) -> Result<()> { /* ... */ }
 async fn seed_api_tokens(pool: &SqlitePool) -> Result<()> { /* ... */ }
 ```
 
-### Standard 4: Wipe in Reverse Order
+### Standard 4 : Wipe in Reverse Order
 
 **Requirement:** Deletion must respect foreign key constraints.
 
@@ -356,8 +372,6 @@ pub async fn wipe_database(pool: &SqlitePool) -> Result<()> {
 }
 ```
 
-## Database Path Conventions
-
 ### Dual-Path Architecture
 
 Iron Runtime uses a dual-path approach for database files:
@@ -370,7 +384,7 @@ Iron Runtime uses a dual-path approach for database files:
 - Project-level Makefile enforces consistent naming (dev_tokens.db)
 - Environment variables allow production overrides
 
-### Convention 1: Canonical Path (Standalone Use)
+### Convention 1 : Canonical Path (Standalone Use)
 
 **Pattern:** `./iron.db`
 
@@ -397,7 +411,7 @@ cargo run  # Creates ./iron.db (or uses DATABASE_URL if set)
 url = "sqlite:///./iron.db?mode=rwc"  # Canonical path
 ```
 
-### Convention 2: Project Convention (Makefile-Enforced)
+### Convention 2 : Project Convention (Makefile-Enforced)
 
 **Pattern:** `./dev_{module}.db`
 
@@ -425,7 +439,7 @@ DB_PATH="${1:-./iron.db}"  # Canonical default, overridable
 
 **Gitignore:** `*.db` pattern covers both canonical and convention paths
 
-### Convention 2: Test Databases
+### Convention 2 : Test Databases
 
 **Pattern:** `{tempdir}/test.db` or `:memory:`
 
@@ -442,7 +456,7 @@ let db_url = "sqlite::memory:?cache=shared";
 
 **Key Requirement:** Never use fixed paths for test databases.
 
-### Convention 3: Production Databases
+### Convention 3 : Production Databases
 
 **Pattern:** Environment variable `DATABASE_URL`
 
@@ -454,9 +468,7 @@ let db_url = std::env::var("DATABASE_URL")
 
 **Fallback:** None. Production must set DATABASE_URL explicitly.
 
-## Manual Testing Procedures
-
-### Procedure 1: Fresh Database Setup
+### Procedure 1 : Fresh Database Setup
 
 **Use Case:** Starting fresh debug session with clean seed data.
 
@@ -477,7 +489,7 @@ make db-seed   # Creates fresh database with seed data
 4. Seed data populated
 5. Database ready for manual testing
 
-### Procedure 2: Database Inspection
+### Procedure 2 : Database Inspection
 
 **Use Case:** Examining database state during debugging.
 
@@ -495,7 +507,7 @@ sqlite3 ./dev_tokens.db
 SELECT * FROM api_tokens; -- Inspect data
 ```
 
-### Procedure 3: Partial Reset
+### Procedure 3 : Partial Reset
 
 **Use Case:** Keep database but reset data only.
 
@@ -511,7 +523,7 @@ iron-cli db seed    # Repopulate seed data
 - Want to test seed data changes
 - Faster than full db-reset-seed
 
-### Procedure 4: Debug Run with Config
+### Procedure 4 : Debug Run with Config
 
 **Use Case:** Starting application with automatic wipe+seed.
 
@@ -534,9 +546,7 @@ cargo run -- --config config.dev.toml
 # Database wiped and seeded automatically
 ```
 
-## Test Organization Patterns
-
-### Pattern 1: Common Test Infrastructure
+### Pattern 1 : Common Test Infrastructure
 
 **Location:** `tests/common/mod.rs`
 
@@ -561,7 +571,7 @@ pub async fn create_test_database() -> SqlitePool {
 }
 ```
 
-### Pattern 2: Test File Organization
+### Pattern 2 : Test File Organization
 
 **Structure:** Organize by domain, not by test methodology.
 
@@ -579,12 +589,12 @@ tests/
 
 **Rationale:** Domain organization reflects how developers think about features.
 
-### Pattern 3: Test Documentation
+### Pattern 3 : Test Documentation
 
 **Requirement:** Every tests/ directory must have readme.md with Responsibility Table.
 
 **Minimum Content:**
-```markdown
+```
 ### Tests Responsibility Table
 
 | File | Responsibility |
@@ -605,9 +615,7 @@ tests/
 [Document as per Seed Data Standards]
 ```
 
-## Bug Fix Testing Standards
-
-### Standard 1: Bug Reproducer Tests
+### Standard 1 : Bug Reproducer Tests
 
 **Requirement:** Every bug fix must include bug reproducer test.
 
@@ -620,7 +628,7 @@ fn test_describe_specific_bug() {
 }
 ```
 
-### Standard 2: Bug Documentation Format
+### Standard 2 : Bug Documentation Format
 
 **Requirement:** Bug reproducer must include 5-section documentation.
 
@@ -654,7 +662,7 @@ fn test_specific_bug_description() { /* ... */ }
 - **Traceable:** Reference issue-NNN for full context
 - **Concise:** Focus on critical insights only
 
-### Standard 3: Source Code Fix Comment
+### Standard 3 : Source Code Fix Comment
 
 **Requirement:** Fixed code must include 3-field comment.
 
@@ -681,7 +689,7 @@ pub fn hash_token(token: &str) -> String {
 }
 ```
 
-## Integration with Existing Standards
+### Related Documents : References
 
 This rulebook integrates with:
 
@@ -690,7 +698,7 @@ This rulebook integrates with:
 - **codebase_hygiene.rulebook.md:** Disabled test format and fragile test detection
 - **organizational_principles.rulebook.md:** Anti-duplication and unique responsibility
 
-## Enforcement Checklist
+### Pre-Merge Verification : Checklist
 
 Before merging code, verify:
 
@@ -704,9 +712,7 @@ Before merging code, verify:
 - [ ] No manual cleanup required
 - [ ] Tests can run in parallel without conflicts
 
-## Known Pitfalls
-
-### Pitfall 1: Forgetting to Return TempDir
+### Pitfall 1 : Forgetting to Return TempDir
 
 **Problem:** Returning only SqlitePool, TempDir dropped immediately.
 
@@ -726,7 +732,7 @@ pub async fn create_test_db() -> (SqlitePool, TempDir) {
 }
 ```
 
-### Pitfall 2: Shared In-Memory Database Without cache=shared
+### Pitfall 2 : Shared In-Memory Database Without cacheshared
 
 **Problem:** Multiple connections see different databases.
 
@@ -738,7 +744,7 @@ pub async fn create_test_db() -> (SqlitePool, TempDir) {
 "sqlite::memory:?cache=shared"
 ```
 
-### Pitfall 3: Non-Idempotent Seed
+### Pitfall 3 : Non-Idempotent Seed
 
 **Problem:** Running seed twice causes unique constraint violations.
 
@@ -750,7 +756,7 @@ INSERT INTO users (username) VALUES ('admin');
 INSERT OR IGNORE INTO users (username) VALUES ('admin');
 ```
 
-### Pitfall 4: Deleting in Wrong Order
+### Pitfall 4 : Deleting in Wrong Order
 
 **Problem:** Foreign key constraints violated during wipe.
 
@@ -764,6 +770,6 @@ DELETE FROM api_tokens;
 DELETE FROM users;
 ```
 
-## Revision History
+### v10 : Initial Release
 
 - **v1.0 (2025-12-11):** Initial version based on iron_token_manager and iron_control_api patterns

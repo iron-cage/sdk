@@ -15,13 +15,9 @@ Repository-specific rulebook for Iron Runtime project capturing lessons learned 
 This rulebook establishes Iron Runtime-specific standards based on organizational governance principles and lessons learned from systematic compliance audits:
 
 1. **Anti-Duplication Principle**: Every piece of knowledge exists in exactly ONE location. Test docs for bug understanding, code comments for implementation decisions, module docs for cross-file concerns, specification for requirements (see organizational_principles.rulebook.md).
-
 2. **Unique Responsibility Principle**: Every file answers exactly ONE question. Files with same responsibility in same directory must be consolidated (see organizational_principles.rulebook.md).
-
 3. **Hierarchical Separation**: Two-level enforcement (directory + file) guarantees non-overlap. Different directories = guaranteed no responsibility overlap (see organizational_principles.rulebook.md).
-
 4. **File Creation Protocol Compliance**: ALL subdirectories containing .rs files must have readme.md with Responsibility Table documenting every file. No exceptions (learned from Phase 5 audit).
-
 5. **No Mocking Policy**: Use real implementations in tests. Real databases via iron_test_db, real CLI execution via process spawn, real HTTP servers on random ports (established pattern across test infrastructure).
 
 ### Scope
@@ -44,11 +40,12 @@ Defines Iron Runtime project-specific development standards, common mistake patt
 - Language-agnostic code style rules (see code_style.rulebook.md)
 - Generic test organization principles (see test_organization.rulebook.md)
 - General file structure conventions (see files_structure.rulebook.md)
+- Project-specific implementations (see project rulebook.md)
 
 **Applicability:**
 Rust-specific with project-specific architectural patterns. Applies to all Iron Runtime crates (iron_cli, iron_control_api, iron_token_manager, iron_types, iron_secrets, iron_runtime). Standards derived from actual audit findings, not theoretical requirements. Mandatory for all new development and recommended for existing code improvements.
 
-### Quick Reference Summary
+### Rules Index
 
 | Group | Rule | Description |
 |-------|------|-------------|
@@ -133,7 +130,7 @@ Before creating ANY file, follow this mandatory workflow:
 Responsibility Tables must follow strict two-column format with single-sentence responsibilities.
 
 **Format:**
-```markdown
+```
 | File | Responsibility |
 |------|----------------|
 | `mod.rs` | Export module public interface |
@@ -431,20 +428,16 @@ Classify unwraps into risk categories before determining if replacement needed.
    - Protected by `#[cfg(test)]` with `compile_error!` guards
    - Never compiles in production
    - Example: `unwrap()` in test setup code
-
 2. **Infallible Operations** - ACCEPTED
    - Operations that mathematically cannot fail
    - Example: `.and_hms_opt(0, 0, 0).unwrap()` (midnight)
-
 3. **Documentation Examples** - ACCEPTED
    - Code in doc comments not executed
    - Example: Module-level examples in `//!` comments
-
 4. **Handler-Validated Parameters** - BORDERLINE
    - Safe by architectural contract
    - Fragile if validation changes
    - Example: Adapter extracting handler-validated parameters
-
 5. **User Input Without Validation** - HIGH RISK
    - Must be replaced immediately
    - Example: `.unwrap()` on user-provided strings
