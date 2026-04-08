@@ -31,7 +31,7 @@ use crate::{
 };
 use iron_secrets::crypto::{mask_api_key, CryptoService};
 use iron_token_manager::provider_key_storage::{
-  ProviderKeyMetadata, ProviderKeyStorage, ProviderType,
+  CreateKeyParams, ProviderKeyMetadata, ProviderKeyStorage, ProviderType,
 };
 
 /// Provider management state
@@ -318,6 +318,129 @@ fn check_manage_provider_keys(role_str: &str) -> Result<(), crate::error::ApiErr
 /// Maximum number of provider keys a single user may create per provider
 const MAX_KEYS_PER_USER_PER_PROVIDER: i64 = 20;
 
+/// Verify that the given key exists and belongs to the user.
+///
+/// Returns the key metadata on success, or a 404 JSON response if the key
+/// is missing or owned by a different user.
+async fn verify_key_ownership(
+  storage: &ProviderKeyStorage,
+  key_id: i64,
+  user_id: &str,
+) -> Result<ProviderKeyMetadata, axum::response::Response> {
+  let metadata = storage.get_key_metadata(key_id).await.map_err(|_| {
+    (
+      StatusCode::NOT_FOUND,
+      Json(serde_json::json!({ "error": "Provider key not found" })),
+    )
+      .into_response()
+  })?;
+
+  if metadata.user_id != user_id {
+    return Err(
+      (
+        StatusCode::NOT_FOUND,
+        Json(serde_json::json!({ "error": "Provider key not found" })),
+      )
+        .into_response(),
+    );
+  }
+
+  Ok(metadata)
+}
+
+/// Verify that the caller owns the given project.
+///
+/// Returns `Ok(())` on success, or a JSON error response (404 / 500).
+async fn verify_project_ownership(
+  storage: &ProviderKeyStorage,
+  project_id: &str,
+  user_id: &str,
+) -> Result<(), axum::response::Response> {
+  // Verify project ownership — query api_tokens to confirm the caller owns this project.
+  // Return 404 (not 403) to avoid leaking whether the project exists.
+  match storage.verify_project_owner(project_id, user_id).await {
+    Ok(true) => Ok(()),
+    Ok(false) => Err(
+      (
+        StatusCode::NOT_FOUND,
+        Json(serde_json::json!({ "error": "Project not found" })),
+      )
+        .into_response(),
+    ),
+    Err(_) => Err(
+      (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(serde_json::json!({ "error": "Failed to verify project ownership" })),
+      )
+        .into_response(),
+    ),
+  }
+}
+
+/// Validate the update request fields and convert them into the forms expected
+/// by `update_key_fields`.
+///
+/// Validated update fields: `(description, base_url, spending_cap)`.
+type UpdateFields<'a> = (Option<Option<&'a str>>, Option<Option<&'a str>>, Option<Option<i64>>);
+
+/// Returns `(description, base_url, spending_cap)` on success, or a JSON error
+/// response if validation fails.
+#[allow(clippy::result_large_err)]
+fn validate_update_fields(
+  request: &UpdateProviderKeyRequest,
+) -> Result<UpdateFields<'_>, axum::response::Response> {
+  // Validate base_url scheme if provided
+  if let Some(ref url) = request.base_url {
+    if !url.is_empty() && !url.starts_with("https://") {
+      return Err(
+        crate::error::ApiError::BadRequest("base_url must use HTTPS".into()).into_response(),
+      );
+    }
+  }
+
+  // Validate spending_cap_usd is non-negative if provided
+  if let Some(Some(cap)) = request.spending_cap_usd {
+    if cap < 0.0 {
+      return Err(
+        crate::error::ApiError::BadRequest(
+          "spending_cap_usd must be greater than or equal to 0".into(),
+        )
+        .into_response(),
+      );
+    }
+  }
+
+  // description is Option<Option<String>>: None = skip, Some(None) = clear, Some(Some(s)) = set.
+  let description = request.description.as_ref().map(|opt| opt.as_deref());
+  // qqq: [Low] empty string is a sentinel to clear
+  // base_url — undocumented and inconsistent with
+  // description field semantics
+  let base_url = request
+    .base_url
+    .as_deref()
+    .map(|u| if u.is_empty() { None } else { Some(u) });
+
+  // Validate and convert spending cap: None = skip, Some(None) = remove, Some(Some(v)) = set.
+  let spending_cap = match request.spending_cap_usd {
+    None => None,
+    Some(None) => Some(None),
+    Some(Some(usd)) => match validate_and_convert_spending_cap(usd) {
+      Ok(v) => Some(Some(v)),
+      Err(msg) => {
+        return Err(
+          (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": msg })),
+          )
+            .into_response(),
+        );
+      }
+    },
+  };
+
+  Ok((description, base_url, spending_cap))
+}
+
 /// POST /api/providers
 ///
 /// Create new AI provider key
@@ -362,15 +485,15 @@ pub async fn create_provider_key(
   // Atomic count + insert inside BEGIN IMMEDIATE to prevent TOCTOU quota race.
   let key_id = state
     .storage
-    .create_key_within_quota(
+    .create_key_within_quota(&CreateKeyParams {
       provider,
-      &encrypted.ciphertext_base64(),
-      &encrypted.nonce_base64(),
-      request.base_url.as_deref(),
-      request.description.as_deref(),
-      &claims.sub,
-      MAX_KEYS_PER_USER_PER_PROVIDER,
-    )
+      encrypted_api_key: &encrypted.ciphertext_base64(),
+      encryption_nonce: &encrypted.nonce_base64(),
+      base_url: request.base_url.as_deref(),
+      description: request.description.as_deref(),
+      user_id: &claims.sub,
+      max_keys: MAX_KEYS_PER_USER_PER_PROVIDER,
+    })
     .await
     .map_err(|e| {
       if matches!(e, iron_token_manager::error::TokenError::KeyQuotaExceeded) {
@@ -519,67 +642,18 @@ pub async fn update_provider_key(
   }
 
   // Verify ownership
-  let Ok(metadata) = state.storage.get_key_metadata(key_id).await else {
-    return (
-      StatusCode::NOT_FOUND,
-      Json(serde_json::json!({
-        "error": "Provider key not found"
-      })),
-    )
-      .into_response();
-  };
-
-  if metadata.user_id != claims.sub {
-    return (
-      StatusCode::NOT_FOUND,
-      Json(serde_json::json!({
-        "error": "Provider key not found"
-      })),
-    )
-      .into_response();
+  if let Err(resp) = verify_key_ownership(&state.storage, key_id, &claims.sub).await {
+    return resp;
   }
 
-  // Validate base_url scheme if provided
-  if let Some(ref url) = request.base_url {
-    if !url.is_empty() && !url.starts_with("https://") {
-      return crate::error::ApiError::BadRequest("base_url must use HTTPS".into()).into_response();
-    }
-  }
-
-  // Validate spending_cap_usd is non-negative if provided
-  if let Some(Some(cap)) = request.spending_cap_usd {
-    if cap < 0.0 {
-      return crate::error::ApiError::BadRequest(
-        "spending_cap_usd must be greater than or equal to 0".into(),
-      )
-      .into_response();
-    }
-  }
+  // Validate request fields and convert to storage types
+  let (description, base_url, spending_cap) =
+    match validate_update_fields(&request) {
+      Ok(fields) => fields,
+      Err(resp) => return resp,
+    };
 
   // Apply all field updates atomically via update_key_fields.
-  // description is Option<Option<String>>: None = skip, Some(None) = clear, Some(Some(s)) = set.
-  let description = request.description.as_ref().map(|opt| opt.as_deref());
-  // qqq: [Low] empty string is a sentinel to clear
-  // base_url — undocumented and inconsistent with
-  // description field semantics
-  let base_url = request.base_url.as_deref().map(|u| if u.is_empty() { None } else { Some(u) });
-
-  // Validate and convert spending cap: None = skip, Some(None) = remove, Some(Some(v)) = set.
-  let spending_cap = match request.spending_cap_usd {
-    None => None,
-    Some(None) => Some(None),
-    Some(Some(usd)) => match validate_and_convert_spending_cap(usd) {
-      Ok(v) => Some(Some(v)),
-      Err(msg) => {
-        return (
-          StatusCode::BAD_REQUEST,
-          Json(serde_json::json!({ "error": msg })),
-        )
-          .into_response();
-      }
-    },
-  };
-
   if state
     .storage
     .update_key_fields(key_id, description, base_url, request.is_enabled, spending_cap)
@@ -686,52 +760,15 @@ pub async fn assign_provider_to_project(
   }
 
   // Verify key ownership
-  let Ok(metadata) = state
-    .storage
-    .get_key_metadata(request.provider_key_id)
-    .await
-  else {
-    return (
-      StatusCode::NOT_FOUND,
-      Json(serde_json::json!({
-        "error": "Provider key not found"
-      })),
-    )
-      .into_response();
-  };
-
-  if metadata.user_id != claims.sub {
-    return (
-      StatusCode::NOT_FOUND,
-      Json(serde_json::json!({
-        "error": "Provider key not found"
-      })),
-    )
-      .into_response();
+  if let Err(resp) =
+    verify_key_ownership(&state.storage, request.provider_key_id, &claims.sub).await
+  {
+    return resp;
   }
 
-  // Verify project ownership — query api_tokens to confirm the caller owns this project.
-  // Return 404 (not 403) to avoid leaking whether the project exists.
-  match state.storage.verify_project_owner(&project_id, &claims.sub).await {
-    Ok(true) => {}
-    Ok(false) => {
-      return (
-        StatusCode::NOT_FOUND,
-        Json(serde_json::json!({
-          "error": "Project not found"
-        })),
-      )
-        .into_response();
-    }
-    Err(_) => {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({
-          "error": "Failed to verify project ownership"
-        })),
-      )
-        .into_response();
-    }
+  // Verify project ownership
+  if let Err(resp) = verify_project_ownership(&state.storage, &project_id, &claims.sub).await {
+    return resp;
   }
 
   // qqq: [Medium] no UNIQUE(project_id) constraint —

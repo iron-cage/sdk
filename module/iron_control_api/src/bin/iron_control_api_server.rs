@@ -449,32 +449,32 @@ async fn main() -> Result<(), Box<dyn Error>> {
       // and could expose unguarded API key paths.
       if env::var("IRON_ALLOW_DEV_KEYS").is_ok() {
         tracing::error!(
-          "❌ CRITICAL: IRON_ALLOW_DEV_KEYS is set in a production environment"
+          "[CRITICAL] CRITICAL: IRON_ALLOW_DEV_KEYS is set in a production environment"
         );
-        tracing::error!("❌ This variable is a development-only bypass that must NEVER be");
-        tracing::error!("❌ enabled in production. Remove it from your environment and");
-        tracing::error!("❌ ensure every agent has an explicit provider_key_id assigned.");
-        tracing::error!("❌ REFUSING TO START SERVER");
+        tracing::error!("[CRITICAL] This variable is a development-only bypass that must NEVER be");
+        tracing::error!("[CRITICAL] enabled in production. Remove it from your environment and");
+        tracing::error!("[CRITICAL] ensure every agent has an explicit provider_key_id assigned.");
+        tracing::error!("[CRITICAL] REFUSING TO START SERVER");
         panic!("Production deployment blocked: IRON_ALLOW_DEV_KEYS must not be set in production");
       }
 
       // Block startup if any insecure defaults detected
       if !insecure_secrets.is_empty() {
         tracing::error!(
-          "❌ CRITICAL SECURITY ERROR: Production deployment with insecure default secrets"
+          "[CRITICAL] CRITICAL SECURITY ERROR: Production deployment with insecure default secrets"
         );
-        tracing::error!("❌ The following secrets are using INSECURE DEFAULT VALUES:");
+        tracing::error!("[CRITICAL] The following secrets are using INSECURE DEFAULT VALUES:");
         for secret in &insecure_secrets {
-          tracing::error!("❌   - {}", secret);
+          tracing::error!("[CRITICAL]   - {}", secret);
         }
         tracing::error!("");
-        tracing::error!("❌ REFUSING TO START SERVER");
-        tracing::error!("❌ Generate secure secrets with:");
-        tracing::error!("❌   JWT_SECRET=$(openssl rand -hex 32)");
-        tracing::error!("❌   IC_TOKEN_SECRET=$(openssl rand -hex 32)");
-        tracing::error!("❌   IP_TOKEN_KEY=$(openssl rand -hex 32)");
+        tracing::error!("[CRITICAL] REFUSING TO START SERVER");
+        tracing::error!("[CRITICAL] Generate secure secrets with:");
+        tracing::error!("[CRITICAL]   JWT_SECRET=$(openssl rand -hex 32)");
+        tracing::error!("[CRITICAL]   IC_TOKEN_SECRET=$(openssl rand -hex 32)");
+        tracing::error!("[CRITICAL]   IP_TOKEN_KEY=$(openssl rand -hex 32)");
         tracing::error!("");
-        tracing::error!("❌ See secret/readme.md for complete setup instructions");
+        tracing::error!("[CRITICAL] See secret/readme.md for complete setup instructions");
         panic!(
           "Production deployment blocked: {} insecure default secret(s) detected",
           insecure_secrets.len()

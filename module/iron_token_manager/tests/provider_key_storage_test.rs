@@ -274,21 +274,21 @@ async fn project_assignment() {
 async fn get_nonexistent_key_returns_error() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let result = storage.get_key(99999).await;
-  assert!(result.is_err(), "get_key for nonexistent ID must return Err");
+  assert!(matches!(result, Err(iron_token_manager::error::TokenError::NotFound)), "get_key for nonexistent ID must return Err(NotFound)");
 }
 
 #[tokio::test]
 async fn get_nonexistent_key_metadata_returns_error() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let result = storage.get_key_metadata(99999).await;
-  assert!(result.is_err(), "get_key_metadata for nonexistent ID must return Err");
+  assert!(matches!(result, Err(iron_token_manager::error::TokenError::NotFound)), "get_key_metadata for nonexistent ID must return Err(NotFound)");
 }
 
 #[tokio::test]
 async fn delete_nonexistent_key_returns_error() {
   let (storage, _db) = common::create_test_provider_storage().await;
   let result = storage.delete_key(99999).await;
-  assert!(result.is_err(), "delete_key for nonexistent ID must return Err");
+  assert!(matches!(result, Err(iron_token_manager::error::TokenError::NotFound)), "delete_key for nonexistent ID must return Err(NotFound)");
 }
 
 #[tokio::test]
@@ -297,7 +297,7 @@ async fn update_key_fields_nonexistent_returns_error() {
   let result = storage
     .update_key_fields(99999, Some(Some("desc")), None, None, None)
     .await;
-  assert!(result.is_err(), "update_key_fields for nonexistent ID must return Err");
+  assert!(matches!(result, Err(iron_token_manager::error::TokenError::NotFound)), "update_key_fields for nonexistent ID must return Err(NotFound)");
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -371,7 +371,7 @@ async fn get_project_key_deterministic_multiple_assignments() {
 
   storage.assign_to_project(key_a, "proj_det").await.unwrap();
   // Small sleep ensures key_b gets a later assigned_at timestamp
-  //qqq: [Medium] timing-dependent — 2ms sleep may collide on slow CI; inject explicit assigned_at timestamps instead of relying on wall-clock ordering
+  // qqq: [Medium] timing-dependent — 2ms sleep may collide on slow CI; inject explicit assigned_at timestamps instead of relying on wall-clock ordering
   tokio::time::sleep(core::time::Duration::from_millis(2)).await;
   storage.assign_to_project(key_b, "proj_det").await.unwrap();
 

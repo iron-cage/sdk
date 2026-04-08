@@ -93,6 +93,28 @@ pub struct SpendingSummary {
   pub cap_microdollars: Option<i64>,
 }
 
+/// Parameters for creating a provider key within quota.
+///
+/// Groups the arguments for [`ProviderKeyStorage::create_key_within_quota`]
+/// to avoid long parameter lists.
+#[derive(Debug)]
+pub struct CreateKeyParams<'a> {
+  /// Provider type (openai, anthropic, etc.)
+  pub provider: ProviderType,
+  /// Encrypted API key (base64)
+  pub encrypted_api_key: &'a str,
+  /// Encryption nonce (base64)
+  pub encryption_nonce: &'a str,
+  /// Optional custom base URL
+  pub base_url: Option<&'a str>,
+  /// Human-friendly description
+  pub description: Option<&'a str>,
+  /// Owner user ID
+  pub user_id: &'a str,
+  /// Maximum number of keys allowed per user per provider
+  pub max_keys: i64,
+}
+
 /// Full provider key record (includes encrypted data)
 #[derive(Debug, Clone)]
 pub struct ProviderKeyRecord {
@@ -152,7 +174,7 @@ impl ProviderKeyStorage {
   ) -> Result<i64> {
     let now_ms = current_time_ms();
 
-    //qqq: [Low] no UNIQUE(user_id, provider, encrypted_api_key) constraint — same plaintext key can be registered multiple times for the same provider
+    // qqq: [Low] no UNIQUE(user_id, provider, encrypted_api_key) constraint — same plaintext key can be registered multiple times for the same provider
     let result = sqlx::query(
       "INSERT INTO ai_provider_keys \
        ( provider, encrypted_api_key, encryption_nonce, base_url, description, user_id, created_at ) \
@@ -241,7 +263,7 @@ impl ProviderKeyStorage {
   /// Returns error if database query fails
   pub async fn list_keys(&self, user_id: &str) -> Result<Vec<ProviderKeyMetadata>> {
     let rows = sqlx::query(
-      //qqq: [Low] no covering index for sort — (user_id, created_at) composite index would eliminate sort step; negligible at current 20-key quota
+      // qqq: [Low] no covering index for sort — (user_id, created_at) composite index would eliminate sort step; negligible at current 20-key quota
       "SELECT id, provider, base_url, description, is_enabled, created_at, \
        last_used_at, balance_cents, balance_updated_at, user_id, \
        spending_cap_microdollars, spending_used_microdollars \
@@ -316,13 +338,7 @@ impl ProviderKeyStorage {
   ///
   /// # Arguments
   ///
-  /// * `provider` - Provider type (openai, anthropic)
-  /// * `encrypted_api_key` - Encrypted API key (base64)
-  /// * `encryption_nonce` - Encryption nonce (base64)
-  /// * `base_url` - Optional custom base URL
-  /// * `description` - Optional description
-  /// * `user_id` - Owner user ID
-  /// * `max_keys` - Maximum number of keys allowed per user per provider
+  /// * `params` - Grouped creation parameters (see [`CreateKeyParams`])
   ///
   /// # Returns
   ///
@@ -333,19 +349,9 @@ impl ProviderKeyStorage {
   ///
   /// Returns [`TokenError::KeyQuotaExceeded`] if quota is already reached,
   /// or a database error if the transaction fails.
-  #[allow(clippy::too_many_arguments)] // transactional helper; params are all required for atomic count+insert
-  pub async fn create_key_within_quota(
-    &self,
-    provider: ProviderType,
-    encrypted_api_key: &str,
-    encryption_nonce: &str,
-    base_url: Option<&str>,
-    description: Option<&str>,
-    user_id: &str,
-    max_keys: i64,
-  ) -> Result<i64> {
+  pub async fn create_key_within_quota(&self, params: &CreateKeyParams<'_>) -> Result<i64> {
     let now_ms = current_time_ms();
-    let provider_str = provider.as_str();
+    let provider_str = params.provider.as_str();
 
     // Acquire a raw connection so we can issue BEGIN IMMEDIATE ourselves.
     // pool.begin() emits BEGIN (deferred); we need BEGIN IMMEDIATE to block
@@ -358,17 +364,7 @@ impl ProviderKeyStorage {
       .map_err(TokenError::Database)?;
 
     let result = self
-      .create_key_within_quota_inner(
-        &mut conn,
-        provider_str,
-        encrypted_api_key,
-        encryption_nonce,
-        base_url,
-        description,
-        user_id,
-        max_keys,
-        now_ms,
-      )
+      .create_key_within_quota_inner(&mut conn, params, provider_str, now_ms)
       .await;
 
     match result {
@@ -387,29 +383,23 @@ impl ProviderKeyStorage {
     }
   }
 
-  #[allow(clippy::too_many_arguments)] // internal helper called only by create_key_within_quota
   async fn create_key_within_quota_inner(
     &self,
     conn: &mut sqlx::pool::PoolConnection<sqlx::Sqlite>,
+    params: &CreateKeyParams<'_>,
     provider_str: &str,
-    encrypted_api_key: &str,
-    encryption_nonce: &str,
-    base_url: Option<&str>,
-    description: Option<&str>,
-    user_id: &str,
-    max_keys: i64,
     now_ms: i64,
   ) -> Result<i64> {
     let count: i64 = sqlx::query_scalar(
       "SELECT COUNT(*) FROM ai_provider_keys WHERE user_id = $1 AND provider = $2",
     )
-    .bind(user_id)
+    .bind(params.user_id)
     .bind(provider_str)
     .fetch_one(&mut **conn)
     .await
     .map_err(TokenError::Database)?;
 
-    if count >= max_keys {
+    if count >= params.max_keys {
       return Err(TokenError::KeyQuotaExceeded);
     }
 
@@ -419,11 +409,11 @@ impl ProviderKeyStorage {
        VALUES ( $1, $2, $3, $4, $5, $6, $7 )",
     )
     .bind(provider_str)
-    .bind(encrypted_api_key)
-    .bind(encryption_nonce)
-    .bind(base_url)
-    .bind(description)
-    .bind(user_id)
+    .bind(params.encrypted_api_key)
+    .bind(params.encryption_nonce)
+    .bind(params.base_url)
+    .bind(params.description)
+    .bind(params.user_id)
     .bind(now_ms)
     .execute(&mut **conn)
     .await
@@ -577,7 +567,7 @@ impl ProviderKeyStorage {
     }
     let rows = query.fetch_all(&self.pool).await.map_err(TokenError::Database)?;
     let mut map: HashMap<i64, Vec<String>> = HashMap::new();
-    //qqq: [Low] result order within each key's project list is non-deterministic — add ORDER BY project_id if stable ordering matters
+    // qqq: [Low] result order within each key's project list is non-deterministic — add ORDER BY project_id if stable ordering matters
     for (key_id, project_id) in rows {
       map.entry(key_id).or_default().push(project_id);
     }
@@ -604,7 +594,7 @@ impl ProviderKeyStorage {
   /// # Errors
   ///
   /// Returns error if database query fails
-  //qqq: [Low] idx_ai_provider_keys_user_id is now redundant — composite index (026) subsumes it; drop old index in a follow-up migration to reduce write amplification
+  // qqq: [Low] idx_ai_provider_keys_user_id is now redundant — composite index (026) subsumes it; drop old index in a follow-up migration to reduce write amplification
   pub async fn get_keys_by_owner_and_provider(
     &self,
     user_id: &str,
@@ -952,22 +942,32 @@ impl ProviderKeyStorage {
     .map_err(TokenError::Database)
   }
 
-  /// Increment the current monthly spend in `usage_limits` for a user.
+  /// Atomically increment the current monthly spend in `usage_limits` for a user.
+  ///
+  /// Only increments if the result would not exceed `max_cost_microdollars_per_month`.
+  /// Returns `Ok(())` if the increment succeeded, `Err` if the cap would be exceeded
+  /// or no `usage_limits` row exists for this user.
   ///
   /// # Errors
   ///
-  /// Returns error if database update fails
+  /// Returns error if the monthly cap would be exceeded or database update fails
   pub async fn increment_usage_limits(&self, user_id: &str, amount: i64) -> Result<()> {
-    sqlx::query(
+    let result = sqlx::query(
       "UPDATE usage_limits \
        SET current_cost_microdollars_this_month = current_cost_microdollars_this_month + ? \
-       WHERE user_id = ?",
+       WHERE user_id = ? \
+       AND (max_cost_microdollars_per_month IS NULL \
+            OR current_cost_microdollars_this_month + ? <= max_cost_microdollars_per_month)",
     )
     .bind(amount)
     .bind(user_id)
+    .bind(amount)
     .execute(&self.pool)
     .await
     .map_err(TokenError::Database)?;
+    if result.rows_affected() == 0 {
+      return Err(TokenError::SpendingCapExceeded);
+    }
     Ok(())
   }
 }

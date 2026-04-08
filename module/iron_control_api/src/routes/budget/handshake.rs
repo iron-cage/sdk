@@ -113,6 +113,61 @@ pub struct HandshakeResponse {
   pub expires_at: Option<i64>,
 }
 
+/// Refund reservations on error: restore agent budget, reverse provider key spending,
+/// and optionally reverse `usage_limits` debit.
+///
+/// `context` is a short string describing which step failed (used in log messages).
+async fn refund_reservations(
+  state: &BudgetState,
+  agent_id: i64,
+  key_id: i64,
+  budget_to_grant: i64,
+  context: &str,
+  reverse_usage_limits_owner: Option<&str>,
+) {
+  if let Err(e) = state
+    .agent_budget_manager
+    .restore_reserved_budget(agent_id, budget_to_grant)
+    .await
+  {
+    tracing::error!(
+      "Failed to refund reserved budget after {}: {}",
+      context,
+      e
+    );
+  }
+  if let Err(e) = state
+    .provider_key_storage
+    .adjust_spending(key_id, budget_to_grant, 0)
+    .await
+  {
+    tracing::error!(
+      "Failed to reverse provider key spending reservation for key {}: {}",
+      key_id,
+      e
+    );
+  }
+  if let Some(owner_id) = reverse_usage_limits_owner {
+    if let Err(e) = sqlx::query(
+      "UPDATE usage_limits \
+       SET current_cost_microdollars_this_month = \
+       current_cost_microdollars_this_month - ? \
+       WHERE user_id = ?"
+    )
+    .bind(budget_to_grant)
+    .bind(owner_id)
+    .execute(&state.db_pool)
+    .await
+    {
+      tracing::warn!(
+        "Failed to reverse usage_limits debit after {} (owner={}, amount={}): {}. \
+         usage_limits may be inconsistent — manual reconciliation may be required.",
+        context, owner_id, budget_to_grant, e
+      );
+    }
+  }
+}
+
 /// POST /api/budget/handshake
 ///
 /// Budget handshake: IC Token → IP Token exchange
@@ -566,12 +621,7 @@ pub async fn handshake(
     // audit reconciliation
     // aaa: Known limitation — refund both agent budget and provider
     // key spending (reserve_spending already ran).
-    if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
-      tracing::error!("Failed to refund reserved budget after key base64 decode failure: {}", e);
-    }
-    if let Err(e) = state.provider_key_storage.adjust_spending(key_id, budget_to_grant, 0).await {
-      tracing::error!("Failed to reverse provider key spending reservation for key {}: {}", key_id, e);
-    }
+    refund_reservations(&state, agent_id, key_id, budget_to_grant, "key base64 decode failure", None).await;
     return (
       StatusCode::INTERNAL_SERVER_ERROR,
       Json(serde_json::json!({ "error": "Key storage error" })),
@@ -584,12 +634,7 @@ pub async fn handshake(
     Err(err) => {
       tracing::error!("Failed to decrypt provider API key: {:?}", err);
       // Refund both agent budget and provider key spending (reserve_spending already ran).
-      if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
-        tracing::error!("Failed to refund reserved budget after provider key decryption failure: {}", e);
-      }
-      if let Err(e) = state.provider_key_storage.adjust_spending(key_id, budget_to_grant, 0).await {
-        tracing::error!("Failed to reverse provider key spending reservation for key {}: {}", key_id, e);
-      }
+      refund_reservations(&state, agent_id, key_id, budget_to_grant, "provider key decryption failure", None).await;
       return (
         StatusCode::INTERNAL_SERVER_ERROR,
         Json(serde_json::json!({ "error": "Failed to decrypt provider key" })),
@@ -605,12 +650,7 @@ pub async fn handshake(
     // audit reconciliation
     // aaa: Known limitation — refund both agent budget and provider
     // key spending (reserve_spending already ran).
-    if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
-      tracing::error!("Failed to refund reserved budget after IP token encryption failure: {}", e);
-    }
-    if let Err(e) = state.provider_key_storage.adjust_spending(key_id, budget_to_grant, 0).await {
-      tracing::error!("Failed to reverse provider key spending reservation for key {}: {}", key_id, e);
-    }
+    refund_reservations(&state, agent_id, key_id, budget_to_grant, "IP token encryption failure", None).await;
     return (
       StatusCode::INTERNAL_SERVER_ERROR,
       Json(serde_json::json!({ "error": "Failed to encrypt IP Token" })),
@@ -630,12 +670,7 @@ pub async fn handshake(
     // audit reconciliation
     // aaa: Known limitation — refund both agent budget and provider
     // key spending (reserve_spending already ran).
-    if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
-      tracing::error!("Failed to refund reserved budget after usage_limits update failure: {}", e);
-    }
-    if let Err(e) = state.provider_key_storage.adjust_spending(key_id, budget_to_grant, 0).await {
-      tracing::error!("Failed to reverse provider key spending reservation for key {}: {}", key_id, e);
-    }
+    refund_reservations(&state, agent_id, key_id, budget_to_grant, "usage_limits update failure", None).await;
     return (
       StatusCode::INTERNAL_SERVER_ERROR,
       Json( serde_json::json!({ "error": "Failed to update usage limits" }) ),
@@ -658,30 +693,8 @@ pub async fn handshake(
     // audit reconciliation
     // aaa: Known limitation — refund both agent budget and provider
     // key spending (reserve_spending already ran).
-    if let Err(e) = state.agent_budget_manager.restore_reserved_budget(agent_id, budget_to_grant).await {
-      tracing::error!("Failed to refund reserved budget after lease creation failure: {}", e);
-    }
-    if let Err(e) = state.provider_key_storage.adjust_spending(key_id, budget_to_grant, 0).await {
-      tracing::error!("Failed to reverse provider key spending reservation for key {}: {}", key_id, e);
-    }
     // usage_limits was already debited above; attempt a compensating reversal
-    if let Err(e) = sqlx::query(
-      "UPDATE usage_limits \
-       SET current_cost_microdollars_this_month = \
-       current_cost_microdollars_this_month - ? \
-       WHERE user_id = ?"
-    )
-    .bind(budget_to_grant)
-    .bind(&owner_id)
-    .execute(&state.db_pool)
-    .await
-    {
-      tracing::warn!(
-        "Failed to reverse usage_limits debit after lease creation failure (owner={}, amount={}): {}. \
-         usage_limits may be inconsistent — manual reconciliation may be required.",
-        owner_id, budget_to_grant, e
-      );
-    }
+    refund_reservations(&state, agent_id, key_id, budget_to_grant, "lease creation failure", Some(&owner_id)).await;
     return (
       StatusCode::INTERNAL_SERVER_ERROR,
       Json(serde_json::json!({ "error": "Failed to create budget lease" })),
