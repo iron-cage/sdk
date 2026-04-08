@@ -14,7 +14,10 @@
 | limit_enforcer.rs | Enforces usage constraints |
 | migrations.rs | Applies database migrations with guards |
 | provider_adapter.rs | Wraps LLM provider clients with tracking |
-| provider_key_storage.rs | Stores encrypted AI provider API keys |
+| provider_key_storage.rs | Types, structs, and shared helpers for provider key storage |
+| provider_key_storage/key_crud.rs | CRUD operations, quota-guarded creation, and field updates for provider keys |
+| provider_key_storage/key_projects.rs | Key-to-project assignment, unassignment, and batch lookups |
+| provider_key_storage/key_spending.rs | Spending caps, reserve/adjust flow, and usage limit enforcement |
 | rate_limiter.rs | Implements token bucket rate limiting |
 | seed.rs | Seeds database with sample development data |
 | storage.rs | Persists token data to database |

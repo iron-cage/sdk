@@ -25,13 +25,13 @@ use serde::{Deserialize, Serialize};
 use sqlx::sqlite::SqlitePoolOptions;
 
 use crate::{
-  error::{JsonBody, ValidationError},
+  error::{ApiError, JsonBody, ValidationError},
   jwt_auth::AuthenticatedUser,
   rbac::{Permission, PermissionChecker},
 };
 use iron_secrets::crypto::{mask_api_key, CryptoService};
 use iron_token_manager::provider_key_storage::{
-  ProviderKeyMetadata, ProviderKeyStorage, ProviderType,
+  CreateKeyParams, ProviderKeyMetadata, ProviderKeyStorage, ProviderType,
 };
 
 /// Provider management state
@@ -173,6 +173,12 @@ impl CreateProviderKeyRequest {
           character: "NULL".to_owned(),
         });
       }
+      if !base_url.is_empty() && !base_url.starts_with("https://") {
+        return Err(ValidationError::InvalidFormat {
+          field: "base_url".to_owned(),
+          expected: "URL must use the https scheme".to_owned(),
+        });
+      }
     }
 
     // Validate description if provided
@@ -200,11 +206,13 @@ impl CreateProviderKeyRequest {
 pub struct UpdateProviderKeyRequest {
   /// Updated base URL override
   pub base_url: Option<String>,
-  /// Updated human-readable description
-  pub description: Option<String>,
+  /// Updated human-readable description (None = skip, Some(None) = clear, Some(Some(s)) = set)
+  #[serde(default)]
+  pub description: Option<Option<String>>,
   /// Enable or disable this key
   pub is_enabled: Option<bool>,
   /// Spending cap in USD (None = don't change, Some(None) = remove cap, Some(Some(x)) = set cap)
+  #[serde(default)]
   pub spending_cap_usd: Option<Option<f64>>,
 }
 
@@ -291,210 +299,281 @@ fn validate_and_convert_spending_cap(usd: f64) -> Result<i64, &'static str> {
   if usd < 0.0 {
     return Err("spending_cap_usd must be non-negative");
   }
+  // Guard against f64-to-i64 saturation: a very large float would silently
+  // become i64::MAX (~$9.2 quadrillion), effectively removing the cap.
+  const MAX_SPENDING_CAP_USD: f64 = 1_000_000.0;
+  if usd > MAX_SPENDING_CAP_USD {
+    return Err("spending_cap_usd exceeds the maximum allowed value ($1,000,000)");
+  }
   Ok(usd_to_microdollars(usd))
 }
 
 /// Check if user has `ManageProviderKeys` permission
-fn check_manage_provider_keys(role_str: &str) -> Result<(), impl IntoResponse> {
+fn check_manage_provider_keys(role_str: &str) -> Result<(), ApiError> {
   let role = iron_types::Role::from_str(role_str).map_err(|_| {
-    (
-      StatusCode::FORBIDDEN,
-      Json(serde_json::json!({ "error": format!("Invalid role: {role_str}") })),
-    )
+    ApiError::Forbidden(format!("Invalid role: {role_str}"))
   })?;
   let checker = PermissionChecker::new();
   if checker.has_permission(role, Permission::ManageProviderKeys) {
     Ok(())
   } else {
-    Err((
-      StatusCode::FORBIDDEN,
-      Json(serde_json::json!({
-        "error": "Insufficient permissions: ManageProviderKeys required"
-      })),
+    Err(ApiError::Forbidden(
+      "Insufficient permissions: ManageProviderKeys required".into(),
     ))
   }
 }
 
-/// Error response for disabled feature
-fn feature_disabled_response() -> impl IntoResponse {
-  (
-    StatusCode::SERVICE_UNAVAILABLE,
-    Json(serde_json::json!({
-      "error": "AI Provider Keys feature is disabled. Set IRON_SECRETS_MASTER_KEY environment variable to enable."
-    })),
-  )
+/// Maximum number of provider keys a single user may create per provider
+const MAX_KEYS_PER_USER_PER_PROVIDER: i64 = 20;
+
+/// Verify that the given key exists and belongs to the user.
+///
+/// Returns the key metadata on success, or a 404 JSON response if the key
+/// is missing or owned by a different user.
+async fn verify_key_ownership(
+  storage: &ProviderKeyStorage,
+  key_id: i64,
+  user_id: &str,
+) -> Result<ProviderKeyMetadata, axum::response::Response> {
+  let metadata = storage.get_key_metadata(key_id).await.map_err(|_| {
+    (
+      StatusCode::NOT_FOUND,
+      Json(serde_json::json!({ "error": "Provider key not found" })),
+    )
+      .into_response()
+  })?;
+
+  if metadata.user_id != user_id {
+    return Err(
+      (
+        StatusCode::NOT_FOUND,
+        Json(serde_json::json!({ "error": "Provider key not found" })),
+      )
+        .into_response(),
+    );
+  }
+
+  Ok(metadata)
+}
+
+/// Verify that the caller owns the given project.
+///
+/// Returns `Ok(())` on success, or a JSON error response (404 / 500).
+async fn verify_project_ownership(
+  storage: &ProviderKeyStorage,
+  project_id: &str,
+  user_id: &str,
+) -> Result<(), axum::response::Response> {
+  // Verify project ownership — query api_tokens to confirm the caller owns this project.
+  // Return 404 (not 403) to avoid leaking whether the project exists.
+  match storage.verify_project_owner(project_id, user_id).await {
+    Ok(true) => Ok(()),
+    Ok(false) => Err(
+      (
+        StatusCode::NOT_FOUND,
+        Json(serde_json::json!({ "error": "Project not found" })),
+      )
+        .into_response(),
+    ),
+    Err(_) => Err(
+      (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(serde_json::json!({ "error": "Failed to verify project ownership" })),
+      )
+        .into_response(),
+    ),
+  }
+}
+
+/// Validate the update request fields and convert them into the forms expected
+/// by `update_key_fields`.
+///
+/// Validated update fields: `(description, base_url, spending_cap)`.
+type UpdateFields<'a> = (Option<Option<&'a str>>, Option<Option<&'a str>>, Option<Option<i64>>);
+
+/// Returns `(description, base_url, spending_cap)` on success, or a JSON error
+/// response if validation fails.
+#[allow(clippy::result_large_err)] // The Err variant is axum::response::Response, which is large by design as it carries full HTTP response data for API validation errors
+fn validate_update_fields(
+  request: &UpdateProviderKeyRequest,
+) -> Result<UpdateFields<'_>, axum::response::Response> {
+  // Validate base_url if provided (length, NULL bytes, HTTPS scheme)
+  if let Some(ref url) = request.base_url {
+    if url.len() > CreateProviderKeyRequest::MAX_BASE_URL_LENGTH {
+      return Err(
+        ApiError::BadRequest(format!(
+          "base_url exceeds maximum length of {} characters",
+          CreateProviderKeyRequest::MAX_BASE_URL_LENGTH
+        ))
+        .into_response(),
+      );
+    }
+    if url.contains('\0') {
+      return Err(
+        ApiError::BadRequest("base_url must not contain NULL bytes".into()).into_response(),
+      );
+    }
+    if !url.is_empty() && !url.starts_with("https://") {
+      return Err(
+        ApiError::BadRequest("base_url must use HTTPS".into()).into_response(),
+      );
+    }
+  }
+
+  // Validate description if provided (length, NULL bytes)
+  if let Some(Some(ref desc)) = request.description {
+    if desc.len() > CreateProviderKeyRequest::MAX_DESCRIPTION_LENGTH {
+      return Err(
+        ApiError::BadRequest(format!(
+          "description exceeds maximum length of {} characters",
+          CreateProviderKeyRequest::MAX_DESCRIPTION_LENGTH
+        ))
+        .into_response(),
+      );
+    }
+    if desc.contains('\0') {
+      return Err(
+        ApiError::BadRequest("description must not contain NULL bytes".into()).into_response(),
+      );
+    }
+  }
+
+  // description is Option<Option<String>>: None = skip, Some(None) = clear, Some(Some(s)) = set.
+  let description = request.description.as_ref().map(|opt| opt.as_deref());
+  // qqq: [Low] empty string is a sentinel to clear
+  // base_url — undocumented and inconsistent with
+  // description field semantics
+  // aaa: The asymmetry is intentional. base_url is a URL field where NULL in
+  // the DB means "use the provider default endpoint", so the wire format uses
+  // Some("") to mean "revert to default" rather than requiring a nested
+  // Option<Option<String>> like description. The validation above already
+  // rejects non-empty non-HTTPS strings, so "" is the only special value. A
+  // comment in the OpenAPI doc (or the field's doc-comment on the request
+  // struct) is the right place to expose this; changing the storage interface
+  // would be a larger refactor with no behaviour change for callers.
+  let base_url = request
+    .base_url
+    .as_deref()
+    .map(|u| if u.is_empty() { None } else { Some(u) });
+
+  // Validate and convert spending cap: None = skip, Some(None) = remove, Some(Some(v)) = set.
+  let spending_cap = match request.spending_cap_usd {
+    None => None,
+    Some(None) => Some(None),
+    Some(Some(usd)) => match validate_and_convert_spending_cap(usd) {
+      Ok(v) => Some(Some(v)),
+      Err(msg) => {
+        return Err(
+          (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": msg })),
+          )
+            .into_response(),
+        );
+      }
+    },
+  };
+
+  Ok((description, base_url, spending_cap))
 }
 
 /// POST /api/providers
 ///
 /// Create new AI provider key
+///
+/// # Errors
+///
+/// Returns `ApiError` on validation failure, quota exceeded, or database error.
 pub async fn create_provider_key(
   State(state): State<ProvidersState>,
   AuthenticatedUser(claims): AuthenticatedUser,
   JsonBody(request): JsonBody<CreateProviderKeyRequest>,
-) -> impl IntoResponse {
-  // RBAC: require ManageProviderKeys permission
-  if let Err(resp) = check_manage_provider_keys(&claims.role) {
-    return resp.into_response();
-  }
+) -> crate::error::ApiResult<impl IntoResponse> {
+  check_manage_provider_keys(&claims.role)?;
 
-  // Check if crypto is enabled
-  let Some(crypto) = &state.crypto else {
-    return feature_disabled_response().into_response();
-  };
-
-  // Validate request
-  if let Err(validation_error) = request.validate() {
-    return (
-      StatusCode::BAD_REQUEST,
-      Json(serde_json::json!({
-        "error": validation_error.to_string()
-      })),
+  // qqq: [Low] 503 implies transient failure —
+  // 501 Not Implemented is more accurate for a missing
+  // configuration
+  // aaa: 503 Service Unavailable is kept deliberately. The feature is disabled
+  // because a runtime secret (IRON_SECRETS_MASTER_KEY) is absent, not because
+  // the endpoint itself is unimplemented. An operator can re-enable the feature
+  // by supplying the key and restarting the service, making the failure
+  // genuinely transient from the client's perspective. 501 Not Implemented
+  // would incorrectly suggest the server will never support the operation.
+  let crypto = state.crypto.as_ref().ok_or_else(|| {
+    ApiError::ServiceUnavailable(
+      "AI Provider Keys feature is disabled. Set IRON_SECRETS_MASTER_KEY to enable.".into(),
     )
-      .into_response();
-  }
+  })?;
 
-  // Parse provider type
+  request.validate().map_err(|e| ApiError::BadRequest(e.to_string()))?;
+
   let provider = match request.provider.as_str() {
     "openai" => ProviderType::OpenAI,
     "anthropic" => ProviderType::Anthropic,
     "gemini" => ProviderType::Gemini,
     "xai" => ProviderType::XAI,
-    _ => {
-      return (
-        StatusCode::BAD_REQUEST,
-        Json(serde_json::json!({
-          "error": "Invalid provider type"
-        })),
-      )
-        .into_response();
-    }
+    _ => return Err(ApiError::BadRequest("Invalid provider type".into())),
   };
 
-  // Encrypt API key
-  let Ok(encrypted) = crypto.encrypt(&request.api_key) else {
-    return (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json(serde_json::json!({
-        "error": "Failed to encrypt API key"
-      })),
-    )
-      .into_response();
-  };
-
-  // Create masked key for response
   let masked_key = mask_api_key(&request.api_key);
 
-  let Ok(keys) = state.storage.get_keys_by_provider(provider).await else {
-    return (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json(serde_json::json!({
-        "error": "Failed to get provider keys"
-      })),
-    )
-      .into_response();
-  };
-  let key_id = if keys.is_empty() {
-    match state
-      .storage
-      .create_key(
-        provider,
-        &encrypted.ciphertext_base64(),
-        &encrypted.nonce_base64(),
-        request.base_url.as_deref(),
-        request.description.as_deref(),
-        &claims.sub,
-      )
-      .await
-    {
-      Ok(id) => id,
-      Err(_) => {
-        return (
-          StatusCode::INTERNAL_SERVER_ERROR,
-          Json(serde_json::json!({
-            "error": "Failed to create provider key"
-          })),
-        )
-          .into_response();
-      }
-    }
-  } else {
-    match state
-      .storage
-      .update_key(
-        keys[0],
-        provider,
-        &encrypted.ciphertext_base64(),
-        &encrypted.nonce_base64(),
-        request.base_url.as_deref(),
-        request.description.as_deref(),
-        &claims.sub,
-      )
-      .await
-    {
-      Ok(id) => id,
-      Err(_) => {
-        return (
-          StatusCode::INTERNAL_SERVER_ERROR,
-          Json(serde_json::json!({
-            "error": "Failed to update provider key"
-          })),
-        )
-          .into_response();
-      }
-    }
-  };
+  let encrypted = crypto
+    .encrypt(&request.api_key)
+    .map_err(|_| ApiError::Internal("Failed to encrypt API key".into()))?;
 
-  // If a spending cap was requested, set it atomically as part of creation.
-  // This eliminates the uncapped window that would exist if the caller had to
-  // make a separate PUT request after creating the key.
-  if let Some(cap_usd) = request.spending_cap_usd {
-    let cap_microdollars = match validate_and_convert_spending_cap(cap_usd) {
-      Ok(v) => v,
-      Err(msg) => {
-        return (
-          StatusCode::BAD_REQUEST,
-          Json(serde_json::json!({ "error": msg })),
+  // Atomic count + insert inside BEGIN IMMEDIATE to prevent TOCTOU quota race.
+  let key_id = state
+    .storage
+    .create_key_within_quota(&CreateKeyParams {
+      provider,
+      encrypted_api_key: &encrypted.ciphertext_base64(),
+      encryption_nonce: &encrypted.nonce_base64(),
+      base_url: request.base_url.as_deref(),
+      description: request.description.as_deref(),
+      user_id: &claims.sub,
+      max_keys: MAX_KEYS_PER_USER_PER_PROVIDER,
+    })
+    .await
+    .map_err(|e| {
+      if matches!(e, iron_token_manager::error::TokenError::KeyQuotaExceeded) {
+        ApiError::TooManyRequests(
+          format!(
+            "Key quota exceeded: maximum {MAX_KEYS_PER_USER_PER_PROVIDER} keys per provider",
+          ),
         )
-          .into_response();
+      } else {
+        ApiError::Internal("Failed to create provider key".into())
       }
-    };
-    if state
+    })?;
+
+  // If a spending cap was requested, set it right after creation.
+  // On failure, delete the key to avoid leaving an uncapped key behind.
+  if let Some(cap_usd) = request.spending_cap_usd {
+    let cap_microdollars = validate_and_convert_spending_cap(cap_usd)
+      .map_err(|msg| ApiError::BadRequest(msg.to_string()))?;
+    if let Err(e) = state
       .storage
       .set_spending_cap(key_id, Some(cap_microdollars))
       .await
-      .is_err()
     {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({
-          "error": "Failed to set spending cap"
-        })),
-      )
-        .into_response();
+      tracing::error!("Failed to set spending cap on key {key_id}, cleaning up: {e}");
+      let _ = state.storage.delete_key(key_id).await;
+      return Err(ApiError::Internal("Failed to set spending cap".into()));
     }
   }
 
-  // Get metadata for response
-  let Ok(metadata) = state.storage.get_key_metadata(key_id).await else {
-    return (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json(serde_json::json!({
-        "error": "Failed to retrieve provider key metadata"
-      })),
-    )
-      .into_response();
-  };
+  // Get metadata for response (after spending cap is set, so response reflects it)
+  let metadata = state
+    .storage
+    .get_key_metadata(key_id)
+    .await
+    .map_err(|_| ApiError::Internal("Failed to retrieve provider key metadata".into()))?;
 
-  (
+  Ok((
     StatusCode::CREATED,
-    Json(ProviderKeyResponse::from_metadata(
-      metadata,
-      masked_key,
-      vec![],
-    )),
-  )
-    .into_response()
+    Json(ProviderKeyResponse::from_metadata(metadata, masked_key, vec![])),
+  ))
 }
 
 /// GET /api/providers
@@ -504,6 +583,11 @@ pub async fn list_provider_keys(
   State(state): State<ProvidersState>,
   AuthenticatedUser(claims): AuthenticatedUser,
 ) -> impl IntoResponse {
+  // RBAC: require ManageProviderKeys permission
+  if let Err(resp) = check_manage_provider_keys(&claims.role) {
+    return resp.into_response();
+  }
+
   let Ok(keys) = state.storage.list_keys(&claims.sub).await else {
     return (
       StatusCode::INTERNAL_SERVER_ERROR,
@@ -514,22 +598,21 @@ pub async fn list_provider_keys(
       .into_response();
   };
 
-  // For each key, fetch assigned projects and build response
+  let key_ids: Vec<i64> = keys.iter().map(|m| m.id).collect();
+  let mut all_projects = state
+    .storage
+    .get_all_key_projects(&key_ids)
+    .await
+    .unwrap_or_else(|e| {
+      tracing::error!(
+        "Failed to fetch project assignments: {e}"
+      );
+      std::collections::HashMap::new()
+    });
   let mut responses: Vec<ProviderKeyResponse> = Vec::with_capacity(keys.len());
-
   for meta in keys {
-    // Fetch projects assigned to this key
-    let assigned_projects = state
-      .storage
-      .get_key_projects(meta.id)
-      .await
-      .unwrap_or_default();
-
-    responses.push(ProviderKeyResponse::from_metadata(
-      meta,
-      "***",
-      assigned_projects,
-    ));
+    let assigned_projects = all_projects.remove(&meta.id).unwrap_or_default();
+    responses.push(ProviderKeyResponse::from_metadata(meta, "***", assigned_projects));
   }
 
   (StatusCode::OK, Json(responses)).into_response()
@@ -543,6 +626,11 @@ pub async fn get_provider_key(
   AuthenticatedUser(claims): AuthenticatedUser,
   Path(key_id): Path<i64>,
 ) -> impl IntoResponse {
+  // RBAC: require ManageProviderKeys permission
+  if let Err(resp) = check_manage_provider_keys(&claims.role) {
+    return resp.into_response();
+  }
+
   let Ok(metadata) = state.storage.get_key_metadata(key_id).await else {
     return (
       StatusCode::NOT_FOUND,
@@ -597,102 +685,33 @@ pub async fn update_provider_key(
   }
 
   // Verify ownership
-  let Ok(metadata) = state.storage.get_key_metadata(key_id).await else {
-    return (
-      StatusCode::NOT_FOUND,
-      Json(serde_json::json!({
-        "error": "Provider key not found"
-      })),
-    )
-      .into_response();
-  };
-
-  if metadata.user_id != claims.sub {
-    return (
-      StatusCode::NOT_FOUND,
-      Json(serde_json::json!({
-        "error": "Provider key not found"
-      })),
-    )
-      .into_response();
+  if let Err(resp) = verify_key_ownership(&state.storage, key_id, &claims.sub).await {
+    return resp;
   }
 
-  // Update fields if provided
-  if let Some(ref description) = request.description {
-    if state
-      .storage
-      .update_description(key_id, Some(description))
-      .await
-      .is_err()
-    {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({
-          "error": "Failed to update description"
-        })),
-      )
-        .into_response();
-    }
-  }
+  // Validate request fields and convert to storage types
+  let (description, base_url, spending_cap) =
+    match validate_update_fields(&request) {
+      Ok(fields) => fields,
+      Err(resp) => return resp,
+    };
 
-  if let Some(ref base_url) = request.base_url {
-    let url = if base_url.is_empty() {
-      None
+  // Apply all field updates atomically via update_key_fields.
+  if let Err(e) = state
+    .storage
+    .update_key_fields(key_id, description, base_url, request.is_enabled, spending_cap)
+    .await
+  {
+    let (status, msg) = if matches!(e, iron_token_manager::error::TokenError::NotFound) {
+      (StatusCode::NOT_FOUND, "Provider key not found")
     } else {
-      Some(base_url.as_str())
+      (StatusCode::INTERNAL_SERVER_ERROR, "Failed to update provider key")
     };
-    if state.storage.update_base_url(key_id, url).await.is_err() {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({
-          "error": "Failed to update base_url"
-        })),
-      )
-        .into_response();
-    }
-  }
-
-  if let Some(is_enabled) = request.is_enabled {
-    if state.storage.set_enabled(key_id, is_enabled).await.is_err() {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({
-          "error": "Failed to update is_enabled"
-        })),
-      )
-        .into_response();
-    }
-  }
-
-  if let Some(spending_cap) = request.spending_cap_usd {
-    // Validate the cap value before converting; None means "remove the cap".
-    let cap_microdollars = match spending_cap {
-      None => None,
-      Some(usd) => match validate_and_convert_spending_cap(usd) {
-        Ok(v) => Some(v),
-        Err(msg) => {
-          return (
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({ "error": msg })),
-          )
-            .into_response();
-        }
-      },
-    };
-    if state
-      .storage
-      .set_spending_cap(key_id, cap_microdollars)
-      .await
-      .is_err()
-    {
-      return (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(serde_json::json!({
-          "error": "Failed to update spending_cap"
-        })),
-      )
-        .into_response();
-    }
+    return (
+      status,
+      Json(serde_json::json!({ "error": msg })),
+    )
+      .into_response();
   }
 
   // Get updated metadata
@@ -774,46 +793,155 @@ pub async fn delete_provider_key(
 /// POST `/api/projects/{project_id}/provider`
 ///
 /// Assign provider key to project
-///
-/// Returns 501 until project ownership can be properly enforced.
-#[allow(clippy::unused_async)] // async required by axum handler signature
 pub async fn assign_provider_to_project(
-  _state: State<ProvidersState>,
-  _claims: AuthenticatedUser,
-  _path: Path<String>,
-  _request: JsonBody<AssignProviderRequest>,
+  State(state): State<ProvidersState>,
+  AuthenticatedUser(claims): AuthenticatedUser,
+  Path(project_id): Path<String>,
+  JsonBody(request): JsonBody<AssignProviderRequest>,
 ) -> impl IntoResponse {
-  // Projects are not yet implemented as first-class entities.
-  // Return 501 until project ownership can be properly enforced.
-  // TODO: implement once projects table exists (tracks owner_id).
-  (
-    StatusCode::NOT_IMPLEMENTED,
-    Json(serde_json::json!({
-      "error": "project assignment is not yet implemented"
-    })),
-  )
-    .into_response()
+  // RBAC: require ManageProviderKeys permission
+  if let Err(resp) = check_manage_provider_keys(&claims.role) {
+    return resp.into_response();
+  }
+
+  // Verify key ownership
+  if let Err(resp) =
+    verify_key_ownership(&state.storage, request.provider_key_id, &claims.sub).await
+  {
+    return resp;
+  }
+
+  // Verify project ownership
+  if let Err(resp) = verify_project_ownership(&state.storage, &project_id, &claims.sub).await {
+    return resp;
+  }
+
+  // qqq: [Medium] no UNIQUE(project_id) constraint —
+  // a project can accumulate multiple key assignments;
+  // active key is resolved by most-recent assigned_at
+  // aaa: This is intentional. The storage layer treats the most-recently
+  // inserted row (highest assigned_at) as the active key for a project,
+  // effectively making assignment history an append-only audit log. A hard
+  // UNIQUE constraint would prevent re-assigning a project to the same key
+  // after an intermediate assignment, and would require a DELETE+INSERT
+  // pair instead of a simple INSERT. If unbounded growth becomes a concern, a
+  // periodic cleanup job (or an ON CONFLICT REPLACE constraint together with a
+  // schema migration) can be introduced without changing the API contract.
+  // Assign to project
+  match state
+    .storage
+    .assign_to_project(request.provider_key_id, &project_id)
+    .await
+  {
+    Ok(()) => StatusCode::OK.into_response(),
+    Err(_) => (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json(serde_json::json!({
+        "error": "Failed to assign provider key to project"
+      })),
+    )
+      .into_response(),
+  }
 }
 
 /// DELETE `/api/projects/{project_id}/provider`
 ///
 /// Unassign provider key from project
 ///
-/// Returns 501 until project ownership can be properly enforced.
-#[allow(clippy::unused_async)] // async required by axum handler signature
+/// Requires the `ManageProviderKeys` permission.
 pub async fn unassign_provider_from_project(
-  _state: State<ProvidersState>,
-  _claims: AuthenticatedUser,
-  _path: Path<String>,
+  State(state): State<ProvidersState>,
+  AuthenticatedUser(claims): AuthenticatedUser,
+  Path(project_id): Path<String>,
 ) -> impl IntoResponse {
-  // Projects are not yet implemented as first-class entities.
-  // Return 501 until project ownership can be properly enforced.
-  // TODO: implement once projects table exists (tracks owner_id).
-  (
-    StatusCode::NOT_IMPLEMENTED,
-    Json(serde_json::json!({
-      "error": "project unassignment is not yet implemented"
-    })),
-  )
-    .into_response()
+  // RBAC: require ManageProviderKeys permission
+  if let Err(resp) = check_manage_provider_keys(&claims.role) {
+    return resp.into_response();
+  }
+
+  // Get the current assignment to verify it exists
+  let provider_key_id = match state.storage.get_project_key(&project_id).await {
+    Ok(Some(id)) => id,
+    Ok(None) => {
+      return (
+        StatusCode::NOT_FOUND,
+        Json(serde_json::json!({
+          "error": "No provider key assigned to this project"
+        })),
+      )
+        .into_response();
+    }
+    Err(_) => {
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(serde_json::json!({
+          "error": "Failed to query project assignment"
+        })),
+      )
+        .into_response();
+    }
+  };
+
+  // Verify ownership — only the key owner may remove the assignment
+  let Ok(metadata) = state.storage.get_key_metadata(provider_key_id).await else {
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json(serde_json::json!({
+        "error": "Failed to verify key ownership"
+      })),
+    )
+      .into_response();
+  };
+
+  // qqq: [Low] returns 403 on wrong owner; assign
+  // returns 404 — inconsistent; 404 is preferable
+  // to not leak key existence
+  // aaa: Fixed — now returns 404, consistent with get/update/delete/assign endpoints.
+  if metadata.user_id != claims.sub {
+    return (
+      StatusCode::NOT_FOUND,
+      Json(serde_json::json!({
+        "error": "No provider key assigned to this project"
+      })),
+    )
+      .into_response();
+  }
+
+  // Verify project ownership — return 404 to avoid leaking project existence
+  match state.storage.verify_project_owner(&project_id, &claims.sub).await {
+    Ok(true) => {}
+    Ok(false) => {
+      return (
+        StatusCode::NOT_FOUND,
+        Json(serde_json::json!({
+          "error": "Project not found"
+        })),
+      )
+        .into_response();
+    }
+    Err(_) => {
+      return (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(serde_json::json!({
+          "error": "Failed to verify project ownership"
+        })),
+      )
+        .into_response();
+    }
+  }
+
+  match state
+    .storage
+    .unassign_from_project(provider_key_id, &project_id)
+    .await
+  {
+    Ok(()) => StatusCode::NO_CONTENT.into_response(),
+    Err(_) => (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json(serde_json::json!({
+        "error": "Failed to unassign provider key from project"
+      })),
+    )
+      .into_response(),
+  }
 }

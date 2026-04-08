@@ -280,7 +280,7 @@ async fn test_report_usage_negative_tokens() {
   seed_agent_with_budget(&pool, 111, 100_000_000).await;
 
   let state = create_test_budget_state(pool.clone()).await;
-  let ic_token = create_ic_token(&pool, 1, &state.ic_token_manager).await;
+  let ic_token = create_ic_token(&pool, 111, &state.ic_token_manager).await;
 
   // Create lease first
   let app1 = create_budget_router(state.clone()).await;
@@ -371,7 +371,7 @@ async fn test_report_usage_negative_cost() {
   seed_agent_with_budget(&pool, 112, 100_000_000).await;
 
   let state = create_test_budget_state(pool.clone()).await;
-  let ic_token = create_ic_token(&pool, 1, &state.ic_token_manager).await;
+  let ic_token = create_ic_token(&pool, 112, &state.ic_token_manager).await;
 
   // Create lease first
   let app1 = create_budget_router(state.clone()).await;
@@ -510,7 +510,7 @@ async fn test_report_usage_zero_cost_cached_response() {
   seed_agent_with_budget(&pool, 113, 100_000_000).await;
 
   let state = create_test_budget_state(pool.clone()).await;
-  let ic_token = create_ic_token(&pool, 1, &state.ic_token_manager).await;
+  let ic_token = create_ic_token(&pool, 113, &state.ic_token_manager).await;
 
   // Create lease first
   let app1 = create_budget_router(state.clone()).await;

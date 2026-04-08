@@ -8,7 +8,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_ic_token_hash
   ON agents (ic_token_hash)
   WHERE ic_token_hash IS NOT NULL;
 
-CREATE TABLE IF NOT EXISTS _migration_027_completed (applied_at INTEGER NOT NULL);
-INSERT INTO _migration_027_completed (applied_at) VALUES (strftime('%s', 'now') * 1000);
+CREATE TABLE IF NOT EXISTS _migration_030_completed (applied_at INTEGER NOT NULL);
+INSERT INTO _migration_030_completed (applied_at) VALUES (strftime('%s', 'now') * 1000);
 
 COMMIT;

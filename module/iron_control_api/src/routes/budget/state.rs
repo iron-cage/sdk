@@ -82,7 +82,22 @@ impl BudgetState {
     crypto_service: Option<Arc<CryptoService>>,
     ic_token_rate_limiter: IcTokenRateLimiter,
   ) -> Result<Self, Box<dyn core::error::Error>> {
-    let db_pool = SqlitePool::connect(database_url).await?;
+    // Enforce referential integrity on every connection in this pool.
+    // SQLite disables FK enforcement by default; PRAGMA must be re-issued per
+    // connection. Using after_connect (not a one-shot .execute(&pool)) ensures
+    // ALL pool connections have FK enforcement, not just the first one.
+    let db_pool = sqlx::sqlite::SqlitePoolOptions::new()
+      .after_connect(|conn, _| {
+        Box::pin(async move {
+          sqlx::query("PRAGMA foreign_keys = ON")
+            .execute(conn)
+            .await?;
+          Ok(())
+        })
+      })
+      .connect(database_url)
+      .await?;
+
     let ip_token_crypto = Arc::new(IpTokenCrypto::new(ip_token_key)?);
     let provider_key_crypto = Arc::new(CryptoService::new(provider_key_master)?);
     let lease_manager = Arc::new(LeaseManager::from_pool(db_pool.clone()));

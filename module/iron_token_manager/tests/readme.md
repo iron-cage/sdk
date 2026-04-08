@@ -18,6 +18,7 @@ tests/
 ├── database_schema.rs          # Database schema validation tests (5 tests)
 ├── database_initialization.rs  # Database initialization tests (1 test)
 ├── seed_data_validation.rs     # Seed data validation tests (20 tests)
+├── provider_key_storage_test.rs # Provider key storage operations tests
 ├── common/                     # Shared test utilities
 ├── fixtures/                   # Test data and reference docs
 └── manual/                     # Manual testing procedures
@@ -36,6 +37,7 @@ tests/
 | `database_schema.rs` | Test database schema correctness | Schema creation → Table validation | Table creation, column structure, indexes, foreign keys, CASCADE DELETE, uniqueness constraints, CHECK constraints | NOT business logic (limit_enforcer.rs, usage_tracker.rs), NOT token operations (token_storage.rs), NOT cost calculations (cost_calculator.rs), NOT rate limiting (rate_limiter.rs) |
 | `database_initialization.rs` | Test database initialization and isolation | Database setup → Isolated test databases | Test database creation, schema application, fixture loading, test isolation, parallel test safety | NOT schema definition (database_schema.rs), NOT seed data validation (seed_data_validation.rs), NOT business logic tests |
 | `seed_data_validation.rs` | Test seed data correctness and consistency | Seed script execution → Data validation | Seed data counts, user properties, provider keys, foreign key integrity, password hashes, consistent reproducibility | NOT seed implementation (src/seed.rs), NOT schema validation (database_schema.rs), NOT database initialization (database_initialization.rs) |
+| `provider_key_storage_test.rs` | Test provider key storage operations | Provider key operations → Database state | CRUD operations, spending caps, project assignments, quota enforcement | NOT token storage (token_storage.rs), NOT usage tracking (usage_tracker.rs), NOT cost calculation (cost_calculator.rs), NOT schema creation (database_schema.rs) |
 | `common/` | Provide shared test utilities and fixtures | Test utilities → Reusable test helpers | Test database creation, common assertions, test data builders, shared setup/teardown | NOT actual tests (test files), NOT production code (src/), NOT seed data implementation |
 | `fixtures/` | Store test data and reference documentation | Test scenarios → Static test data | Seed data reference documentation, expected test outputs, sample payloads | NOT test implementations, NOT production fixtures, NOT dynamic test data generation |
 | `manual/` | Document manual testing procedures | Manual test scenarios → Testing instructions | Manual verification scripts, layer verification procedures (task 1.3), operational testing | NOT automated tests (test files), NOT production procedures (docs/operations/)
@@ -120,6 +122,12 @@ tests/
   - Password hash consistency (bcrypt cost=12)
   - API token relationships and deactivation states
   - Edge cases: Inactive users, token limits, reproducibility
+
+- **Provider Key Storage (`provider_key_storage_test.rs`)**
+  - CRUD operations: Create, retrieve, update, delete provider keys
+  - Spending caps: Setting and enforcing per-key spend limits
+  - Project assignments: Associating provider keys with projects
+  - Quota enforcement: Blocking usage when quotas are exceeded
 
 ## Test Methodology
 

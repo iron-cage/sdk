@@ -17,6 +17,7 @@ pub mod corner_cases;
 pub mod error_format;
 pub mod fixtures;
 pub mod http;
+pub mod providers;
 pub mod source_analysis;
 pub mod sql_injection_helpers;
 pub mod test_db;
@@ -219,6 +220,13 @@ pub async fn is_token_blacklisted(pool: &SqlitePool, token_id: &str) -> bool {
 pub fn verify_password(password: &str, hash: &str) -> bool {
   bcrypt::verify(password, hash).expect("LOUD FAILURE: Failed to verify password hash")
 }
+
+/// Mutex to serialize tests that read/write `IRON_ALLOW_DEV_KEYS`.
+///
+/// `std::env::set_var` / `remove_var` are not thread-safe across threads.
+/// Any test that sets this env var must hold this guard for the duration of the call.
+#[allow(dead_code)]
+pub static DEV_KEY_ENV_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 #[cfg(test)]
 mod tests {

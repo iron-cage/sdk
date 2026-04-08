@@ -108,7 +108,7 @@ async fn create_agents_router() -> (Router, SqlitePool, String, String, String, 
   let user_token = create_test_access_token(
     &user_id,
     "regular_user@mail.com",
-    "user",
+    "developer",
     "test_jwt_secret_key_for_testing_12345",
   );
 

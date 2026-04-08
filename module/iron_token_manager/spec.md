@@ -37,6 +37,12 @@ Manages API token lifecycle and user account management for Iron Cage with secur
 - Budget change request CRUD (create, get, list, approve, reject)
 - Budget modification history tracking
 - Atomic budget application with transaction guarantees
+- Multi-key provider support (users can own up to 20 keys per provider)
+- Per-user per-provider quota enforcement (atomic via BEGIN IMMEDIATE transaction)
+- Key-to-project assignment and bulk project lookup
+- Per-key spending caps with reserve/adjust two-phase commit pattern
+- Ownership verification for project-key assignment
+- User-level monthly spending limits (usage_limits table)
 
 **Out of Scope:**
 - OAuth2/OIDC integration (future enhancement)
@@ -227,6 +233,78 @@ println!( "Total: ${}, Spent: ${}, Remaining: ${}",
   budget.total_allocated, budget.total_spent, budget.budget_remaining );
 ```
 
+### Multi-Key Provider Management
+
+```rust
+use iron_token_manager::provider_key_storage::{
+  ProviderKeyStorage, ProviderType, CreateKeyParams,
+};
+use sqlx::SqlitePool;
+
+let pool = SqlitePool::connect("./tokens.db").await?;
+let storage = ProviderKeyStorage::new(pool);
+
+// Create a key with quota guard (atomic, enforces MAX_KEYS_PER_USER_PER_PROVIDER = 20)
+let params = CreateKeyParams {
+  provider: ProviderType::OpenAI,
+  encrypted_api_key: "<base64-ciphertext>",
+  encryption_nonce: "<base64-nonce>",
+  base_url: None,
+  description: Some("Production key"),
+  user_id: "user-001",
+  max_keys: 20,
+};
+let key_id = storage.create_key_within_quota(&params).await?;
+// Returns TokenError::KeyQuotaExceeded if user already has 20 OpenAI keys
+
+// List all keys owned by a user
+let keys = storage.list_keys("user-001").await?;
+
+// Query keys for a specific owner + provider
+let ids = storage.get_keys_by_owner_and_provider("user-001", ProviderType::Anthropic).await?;
+let count = storage.count_keys_by_owner_and_provider("user-001", ProviderType::Anthropic).await?;
+
+// Assign / unassign a key to a project
+storage.assign_to_project(key_id, "project-xyz").await?;
+storage.unassign_from_project(key_id, "project-xyz").await?;
+
+// Query project ↔ key relationships
+let assigned_key = storage.get_project_key("project-xyz").await?; // most recently assigned
+let projects = storage.get_key_projects(key_id).await?;
+
+// Batch project lookup for multiple keys (single query, chunked at 999)
+let map: HashMap<i64, Vec<String>> = storage
+  .get_all_key_projects(&[key_id, other_id]).await?;
+
+// Verify project ownership before assigning keys
+let is_owner = storage.verify_project_owner("project-xyz", "user-001").await?;
+
+// Spending cap management
+storage.set_spending_cap(key_id, Some(5_000_000)).await?; // $5 cap
+
+// Two-phase spending: reserve before LLM call, adjust after
+storage.reserve_spending(key_id, 100_000).await?; // +$0.10 estimated
+// ... call LLM ...
+storage.adjust_spending(key_id, 100_000, 87_000).await?; // actual was $0.087, refund delta
+
+// Lookup agent owner
+let owner: Option<String> = storage.get_agent_owner_id(agent_id).await?;
+
+// User-level monthly spending limits
+let limits = storage.get_usage_limits("user-001").await?; // (max, current)
+storage.increment_usage_limits("user-001", 50_000).await?;
+// Returns TokenError::SpendingCapExceeded if monthly cap would be breached
+
+// Update mutable fields (None = leave unchanged, Some(None) = clear nullable field)
+storage.update_key_fields(
+  key_id,
+  Some(Some("Updated description")), // description
+  None,                               // base_url: unchanged
+  Some(true),                         // is_enabled
+  Some(Some(10_000_000)),             // spending_cap: $10
+).await?;
+```
+
 ### Budget Request Workflow (Protocol 012)
 
 ```rust
@@ -285,28 +363,34 @@ budget_request::reject_budget_request(
 ```
 iron_token_manager/
 ├── src/
-│   ├── lib.rs                  # Public API, TokenManager
-│   ├── token_generator.rs      # Cryptographic token generation
-│   ├── storage.rs              # SQLite persistence layer
-│   ├── user_service.rs         # User management service (CRUD, audit logging)
-│   ├── usage_tracker.rs        # Usage tracking and quota enforcement
-│   ├── rate_limiter.rs         # Token bucket rate limiting
-│   ├── limit_enforcer.rs       # Quota enforcement logic
-│   ├── cost_calculator.rs      # Cost calculation (uses iron_cost)
-│   ├── trace_storage.rs        # Trace storage for debugging
-│   ├── provider_adapter.rs     # Adapter for external providers
-│   ├── lease_manager.rs        # Budget lease management (Protocol 005)
-│   ├── agent_budget.rs         # Agent budget tracking (Protocol 005)
-│   ├── budget_request.rs       # Budget request workflow (Protocol 012)
-│   └── error.rs                # Error types
-├── migrations/                 # SQLite schema migrations
-│   ├── 005_enhance_users_table.sql        # User management fields
-│   ├── 006_create_user_audit_log.sql      # Audit logging
-│   ├── 009_create_budget_leases.sql       # Budget leases table (Protocol 005)
-│   ├── 010_create_agent_budgets.sql       # Agent budgets table (Protocol 005)
-│   ├── 011_create_budget_requests.sql     # Budget change requests (Protocol 012)
-│   └── 012_create_budget_history.sql      # Budget modification history (Protocol 012)
-├── tests/                      # Integration tests
+│   ├── lib.rs                      # Public API, TokenManager
+│   ├── token_generator.rs          # Cryptographic token generation
+│   ├── storage.rs                  # SQLite persistence layer
+│   ├── user_service.rs             # User management service (CRUD, audit logging)
+│   ├── usage_tracker.rs            # Usage tracking and quota enforcement
+│   ├── rate_limiter.rs             # Token bucket rate limiting
+│   ├── limit_enforcer.rs           # Quota enforcement logic
+│   ├── cost_calculator.rs          # Cost calculation (uses iron_cost)
+│   ├── trace_storage.rs            # Trace storage for debugging
+│   ├── provider_adapter.rs         # Adapter for external providers
+│   ├── provider_key_storage.rs     # Multi-key provider key storage (CRUD, quota, spending)
+│   ├── lease_manager.rs            # Budget lease management (Protocol 005)
+│   ├── agent_budget.rs             # Agent budget tracking (Protocol 005)
+│   ├── budget_request.rs           # Budget request workflow (Protocol 012)
+│   └── error.rs                    # Error types
+├── migrations/                     # SQLite schema migrations
+│   ├── 005_enhance_users_table.sql                     # User management fields
+│   ├── 006_create_user_audit_log.sql                   # Audit logging
+│   ├── 009_create_budget_leases.sql                    # Budget leases table (Protocol 005)
+│   ├── 010_create_agent_budgets.sql                    # Agent budgets table (Protocol 005)
+│   ├── 011_create_budget_requests.sql                  # Budget change requests (Protocol 012)
+│   ├── 012_create_budget_history.sql                   # Budget modification history (Protocol 012)
+│   ├── 026_add_provider_keys_user_provider_index.sql   # Composite index (user_id, provider)
+│   ├── 027_backfill_agent_provider_key_id.sql          # Backfill agent → key links
+│   ├── 028_add_spending_used_non_negative_guard.sql    # BEFORE UPDATE trigger (non-negative spending)
+│   ├── 029_add_spending_constraints.sql                # Spending non-negative enforcement
+│   └── 030_add_agent_token_index.sql                   # Unique index on agents.ic_token_hash
+├── tests/                          # Integration tests
 ├── Cargo.toml
 └── readme.md
 ```
@@ -349,6 +433,20 @@ iron_token_manager/
 - Password management (BCrypt hashing, reset, force change)
 - Audit logging (all operations tracked)
 - Self-modification prevention (can't delete/change own role)
+
+**ProviderKeyStorage (Multi-Key Provider Support):**
+- Multi-key CRUD: one user can own up to `MAX_KEYS_PER_USER_PER_PROVIDER = 20` keys per provider
+- `create_key_within_quota`: atomic quota-guarded creation via `BEGIN IMMEDIATE` transaction (blocks TOCTOU races)
+- `CreateKeyParams` struct groups all creation fields to avoid long parameter lists
+- `update_key_fields`: single atomic UPDATE for description, base_url, is_enabled, spending_cap — pass `None` to skip a field
+- Key-to-project assignment: `assign_to_project`, `unassign_from_project`, `get_project_key` (most-recent, deterministic), `get_key_projects`
+- Batch project lookup: `get_all_key_projects` returns `HashMap<key_id, Vec<project_id>>`, chunked at 999 to respect SQLite bind-parameter limit
+- Ownership verification: `verify_project_owner` queries `api_tokens` for (project_id, user_id) existence
+- Owner-scoped queries: `get_keys_by_owner_and_provider`, `count_keys_by_owner_and_provider`
+- Agent integration: `get_agent_owner_id`, `get_agent_provider_key_id`
+- Spending caps (microdollar precision): `set_spending_cap`, `increment_spending`, `reserve_spending` / `adjust_spending` two-phase pattern
+- Usage limits: `get_usage_limits`, `increment_usage_limits` — guards monthly cap in `usage_limits` table
+- `SpendingSummary` struct: `(used_microdollars, cap_microdollars)` for single-key spending snapshot
 
 **LeaseManager (Protocol 005):**
 - Budget lease CRUD operations
@@ -514,6 +612,39 @@ FOREIGN KEY (related_request_id) REFERENCES budget_change_requests(id) ON DELETE
 
 **Audit Trail:** All budget modifications are recorded in this table, including manual changes and request-driven changes. The `related_request_id` links history records to their originating requests.
 
+### ai_provider_keys Table
+
+| Column | Type | Constraints | Purpose |
+|--------|------|-------------|---------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | Unique key ID |
+| provider | TEXT | NOT NULL | Provider type (openai, anthropic, gemini, xai) |
+| encrypted_api_key | TEXT | NOT NULL | Encrypted API key (base64, AES-256-GCM) |
+| encryption_nonce | TEXT | NOT NULL | Encryption nonce (base64) |
+| base_url | TEXT | NULL | Optional custom base URL |
+| description | TEXT | NULL | Human-friendly description |
+| is_enabled | INTEGER | NOT NULL, DEFAULT 1 | 0=disabled, 1=enabled |
+| created_at | INTEGER | NOT NULL | Creation timestamp (milliseconds since epoch) |
+| last_used_at | INTEGER | NULL | Last used timestamp (milliseconds since epoch) |
+| balance_cents | INTEGER | NULL | Provider-reported balance in cents |
+| balance_updated_at | INTEGER | NULL | When balance was last fetched |
+| user_id | TEXT | NOT NULL | Owner user ID |
+| spending_cap_microdollars | INTEGER | NULL | Spending cap in microdollars (NULL = unlimited) |
+| spending_used_microdollars | INTEGER | NOT NULL, DEFAULT 0 | Cumulative spending in microdollars (non-negative, enforced by trigger) |
+
+**Multi-key invariant:** A user may own at most `MAX_KEYS_PER_USER_PER_PROVIDER = 20` rows per `(user_id, provider)` pair. This limit is enforced atomically by `create_key_within_quota` via a `BEGIN IMMEDIATE` transaction that serialises the COUNT check and the INSERT.
+
+**Non-negative guard:** Migrations 028 and 029 install a `BEFORE UPDATE` trigger (`trg_spending_used_non_negative` / `trg_spending_non_negative`) that aborts any UPDATE that would set `spending_used_microdollars < 0`.
+
+### project_provider_key_assignments Table
+
+| Column | Type | Constraints | Purpose |
+|--------|------|-------------|---------|
+| project_id | TEXT | NOT NULL | Project identifier |
+| provider_key_id | INTEGER | NOT NULL, FOREIGN KEY (ai_provider_keys.id) | Assigned key |
+| assigned_at | INTEGER | NOT NULL | Assignment timestamp (milliseconds since epoch) |
+
+**Query semantics:** `get_project_key` uses `ORDER BY assigned_at DESC LIMIT 1` so it always returns the most recently assigned key when multiple assignments exist for the same project.
+
 ### Indexes
 
 ```sql
@@ -532,7 +663,30 @@ CREATE INDEX idx_user_audit_operation ON user_audit_log(operation);
 CREATE INDEX idx_budget_requests_status ON budget_change_requests(status);
 CREATE INDEX idx_budget_requests_agent ON budget_change_requests(agent_id);
 CREATE INDEX idx_budget_history_agent ON budget_modification_history(agent_id);
+-- Migration 026: composite index for quota COUNT and owner-scoped queries
+CREATE INDEX idx_ai_provider_keys_user_provider ON ai_provider_keys(user_id, provider);
+-- Migration 030: unique partial index on IC token hash (excludes NULL rows)
+CREATE UNIQUE INDEX idx_agents_ic_token_hash ON agents(ic_token_hash)
+  WHERE ic_token_hash IS NOT NULL;
 ```
+
+---
+
+## Error Types
+
+All storage operations return `Result<T, TokenError>`. The variants relevant to provider key management are:
+
+| Variant | Description | Typical HTTP mapping |
+|---------|-------------|----------------------|
+| `Generic` | Unspecified internal error | 500 |
+| `NotFound` | Row does not exist in the database | 404 |
+| `Database(sqlx::Error)` | Raw database error; preserves FK constraint details | 500 |
+| `KeyQuotaExceeded` | Creating a new key would exceed `MAX_KEYS_PER_USER_PER_PROVIDER` (20) | 429 |
+| `SpendingCapExceeded` | Spending increment would exceed the per-key or per-user monthly cap | 403 |
+| `UnknownProvider(String)` | An unrecognised provider string was read from the database | 500 |
+| `Validation { field, reason }` | Input failed a business-rule check (e.g. empty user_id) | 422 |
+
+**Design note:** `Database(sqlx::Error)` intentionally preserves the underlying sqlx error so callers can distinguish FK constraint violations (SQLITE_CONSTRAINT) from transient I/O failures. Earlier code used a bare `Generic` variant that discarded all error details; that pattern is now deprecated in favour of `Database(e)`.
 
 ---
 
@@ -685,6 +839,20 @@ async fn my_test_with_data() {
   - ✅ Database schema (budget_change_requests, budget_modification_history)
   - ✅ 19 Protocol 012 API tests (all passing)
   - ✅ 15 Protocol 012 storage tests (all passing)
+- ✅ Multi-Key Provider Support (feat/multi-ip-keys)
+  - ✅ Users can own up to 20 provider keys per provider (MAX_KEYS_PER_USER_PER_PROVIDER)
+  - ✅ Atomic quota-guarded key creation via BEGIN IMMEDIATE transaction (TOCTOU-safe)
+  - ✅ CreateKeyParams struct for ergonomic key creation interface
+  - ✅ Key-to-project assignment: assign_to_project, unassign_from_project, get_project_key, get_key_projects
+  - ✅ Batch project lookup: get_all_key_projects (HashMap, chunked at 999 for SQLite limit)
+  - ✅ Ownership verification: verify_project_owner
+  - ✅ Owner-scoped queries: get_keys_by_owner_and_provider, count_keys_by_owner_and_provider
+  - ✅ Agent integration: get_agent_owner_id, get_agent_provider_key_id
+  - ✅ Spending caps: set_spending_cap, increment_spending, reserve_spending, adjust_spending
+  - ✅ Usage limits: get_usage_limits, increment_usage_limits (monthly cap guard)
+  - ✅ Atomic field updates: update_key_fields (description, base_url, is_enabled, spending_cap)
+  - ✅ New error variants: KeyQuotaExceeded, SpendingCapExceeded, UnknownProvider, Validation, NotFound
+  - ✅ Migrations 026–030 (user_provider index, agent backfill, non-negative spending guard, spending constraints, agent IC token index)
 
 **Pending:**
 - 📋 PostgreSQL migration for production mode
@@ -766,6 +934,26 @@ async fn my_test_with_data() {
 ---
 
 ## Revision History
+
+- **2026-04-08 (v0.1.4):** Multi-Key Provider Support (feat/multi-ip-keys)
+  - Users can now own multiple provider keys per provider (previously 1:1); quota capped at MAX_KEYS_PER_USER_PER_PROVIDER = 20
+  - CreateKeyParams struct: groups all key-creation fields to avoid long argument lists
+  - create_key_within_quota: atomic quota check + INSERT via BEGIN IMMEDIATE transaction (TOCTOU-safe)
+  - Key-to-project assignment API: assign_to_project, unassign_from_project, get_project_key (most-recent, deterministic), get_key_projects
+  - Batch project lookup: get_all_key_projects returns HashMap<key_id, Vec<project_id>>, chunked at 999 for SQLite parameter limit
+  - Ownership verification: verify_project_owner queries api_tokens for (project_id, user_id)
+  - Owner-scoped queries: get_keys_by_owner_and_provider, count_keys_by_owner_and_provider
+  - Agent integration: get_agent_owner_id, get_agent_provider_key_id
+  - Spending caps: set_spending_cap; reserve_spending / adjust_spending two-phase commit pattern
+  - Usage limits: get_usage_limits, increment_usage_limits with monthly cap guard
+  - Atomic field updates: update_key_fields replaces separate set_enabled / update_description / update_base_url methods
+  - New error variants: NotFound (explicit row-not-found), KeyQuotaExceeded, UnknownProvider(String), Validation{field, reason}
+  - Database schema: ai_provider_keys table with spending columns; project_provider_key_assignments table
+  - Migration 026: composite index idx_ai_provider_keys_user_provider(user_id, provider)
+  - Migration 027: backfill agent.provider_key_id for existing agents (links to most-recent active key by owner)
+  - Migration 028: BEFORE UPDATE trigger trg_spending_used_non_negative (non-negative spending guard)
+  - Migration 029: additional non-negative spending constraint trigger (belt-and-suspenders)
+  - Migration 030: UNIQUE partial index idx_agents_ic_token_hash (excludes NULL rows)
 
 - **2025-12-11 (v0.1.3):** Protocol 012 (Budget Request Workflow)
   - Budget change request CRUD operations (create, get by ID, list with filters)

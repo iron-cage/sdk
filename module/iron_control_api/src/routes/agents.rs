@@ -22,7 +22,17 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use sqlx::{Row, SqlitePool};
 
-use crate::jwt_auth::AuthenticatedUser;
+use crate::jwt_auth::{AccessTokenClaims, AuthenticatedUser};
+use crate::rbac::Role;
+
+/// Parse role from claims, returning 401 for unrecognized roles.
+fn parse_role(
+  claims: &AccessTokenClaims,
+) -> Result<Role, (StatusCode, String)> {
+  use core::str::FromStr;
+  Role::from_str(&claims.role)
+    .map_err(|_| (StatusCode::UNAUTHORIZED, format!("Unrecognized role: {}", claims.role)))
+}
 
 /// Agent record from the database
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
@@ -103,7 +113,11 @@ pub async fn list_agents(
   State(pool): State<SqlitePool>,
   user: AuthenticatedUser,
 ) -> Result<Json<Vec<Agent>>, (StatusCode, String)> {
-  let mut agents = if user.0.role == "admin" {
+  let is_admin = parse_role(&user.0)
+    .map_err(|e| tracing::warn!("Failed to parse role for user {}: {}", user.0.sub, e.1))
+    .ok()
+    == Some(Role::Admin);
+  let mut agents = if is_admin {
     // Admin sees all agents
     sqlx::query_as::<_, Agent>(
       r"
@@ -198,7 +212,7 @@ pub async fn get_agent(
   .ok_or((StatusCode::NOT_FOUND, "Agent not found".to_string()))?;
 
   // Check if user has access (admin or owns the agent)
-  if user.0.role != "admin" && agent.owner_id != user.0.sub {
+  if parse_role(&user.0)? != Role::Admin && agent.owner_id != user.0.sub {
     return Err((
       StatusCode::FORBIDDEN,
       "You don't have access to this agent".to_string(),
@@ -225,7 +239,7 @@ pub async fn create_agent(
   Json(req): Json<CreateAgentRequest>,
 ) -> Result<(StatusCode, Json<Agent>), (StatusCode, String)> {
   // Only admins can create agents
-  if user.0.role != "admin" {
+  if parse_role(&user.0)? != Role::Admin {
     return Err((
       StatusCode::FORBIDDEN,
       "Only administrators can create agents".to_string(),
@@ -239,7 +253,9 @@ pub async fn create_agent(
     ));
   }
 
-  // Validate provider key exists and fetch provider name
+  // Validate provider key exists and fetch provider name.
+  // No AND user_id = ? filter: admin-only gate (line 228) prevents non-admin access.
+  // Admins can legitimately assign any key to any agent.
   let provider_row =
     sqlx::query(r"SELECT provider FROM ai_provider_keys WHERE id = ? AND is_enabled = 1")
       .bind(req.provider_key_id)
@@ -272,10 +288,10 @@ pub async fn create_agent(
   })?;
 
   let created_at = chrono::Utc::now().timestamp_millis();
-  let is_admin = user.0.role == "admin";
 
   // Only admins can assign agents to other users
-  if req.owner_id.is_some() && !is_admin {
+  // (parse_role already succeeded at line 242; only admins reach here)
+  if req.owner_id.is_some() && parse_role(&user.0)? != Role::Admin {
     return Err((
       StatusCode::FORBIDDEN,
       "Only admins can assign agents to other users".to_string(),
@@ -379,7 +395,7 @@ pub async fn update_agent(
   Json(req): Json<UpdateAgentRequest>,
 ) -> Result<Json<Agent>, (StatusCode, String)> {
   // Only admins can update agents
-  if user.0.role != "admin" {
+  if parse_role(&user.0)? != Role::Admin {
     return Err((
       StatusCode::FORBIDDEN,
       "Only administrators can update agents".to_string(),
@@ -440,6 +456,8 @@ pub async fn update_agent(
   // Update provider_key_id if provided (Some(Some(id)) sets; Some(None) clears)
   if let Some(provider_key_id_opt) = req.provider_key_id {
     if let Some(key_id) = provider_key_id_opt {
+      // No AND user_id = ? filter: admin-only gate (line 386) prevents non-admin access.
+      // Admins can legitimately assign any key to any agent.
       let provider_row =
         sqlx::query(r"SELECT provider FROM ai_provider_keys WHERE id = ? AND is_enabled = 1")
           .bind(key_id)
@@ -583,7 +601,7 @@ pub async fn delete_agent(
   user: AuthenticatedUser,
 ) -> Result<StatusCode, (StatusCode, String)> {
   // Only admins can delete agents
-  if user.0.role != "admin" {
+  if parse_role(&user.0)? != Role::Admin {
     return Err((
       StatusCode::FORBIDDEN,
       "Only administrators can delete agents".to_string(),
@@ -623,7 +641,7 @@ pub async fn update_agent_budget(
   user: AuthenticatedUser,
   Json(req): Json<UpdateAgentBudgetRequest>,
 ) -> Result<Json<AgentBudgetResponse>, (StatusCode, String)> {
-  if user.0.role != "admin" {
+  if parse_role(&user.0)? != Role::Admin {
     return Err((
       StatusCode::FORBIDDEN,
       "Only administrators can update agent budgets".to_string(),
@@ -755,7 +773,7 @@ pub async fn get_agent_tokens(
   };
 
   // Check if user has access (admin or owns the agent)
-  if user.0.role != "admin" && owner_id != user.0.sub {
+  if parse_role(&user.0)? != Role::Admin && owner_id != user.0.sub {
     return Err((
       StatusCode::FORBIDDEN,
       "You don't have access to this agent".to_string(),
@@ -763,7 +781,11 @@ pub async fn get_agent_tokens(
   }
 
   // Get tokens based on user role
-  let rows = if user.0.role == "admin" {
+  let is_admin = parse_role(&user.0)
+    .map_err(|e| tracing::warn!("Failed to parse role for user {}: {}", user.0.sub, e.1))
+    .ok()
+    == Some(Role::Admin);
+  let rows = if is_admin {
     // Admin sees all tokens for this agent
     sqlx::query(
       r"

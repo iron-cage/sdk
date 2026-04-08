@@ -463,6 +463,130 @@ Before running manual tests:
 
 **Pass/Fail:** ___
 
+### 8. Provider Key Management API
+
+#### 8.1 Create Provider Key
+
+**Purpose:** Verify POST /api/v1/providers creates a new provider key and returns its ID.
+
+**Steps:**
+1. Create key: `curl -X POST http://localhost:3000/api/v1/providers -H "Content-Type: application/json" -d '{"provider":"openai","encrypted_key":"enc_abc","nonce":"nonce_xyz","label":"My Key","user_id":"user_001"}'`
+2. Verify 201 Created response with `id` field
+3. Save `id` for subsequent tests
+
+**Expected Result:**
+- Response contains unique `id`
+- Key stored in database
+
+**Pass/Fail:** ___
+
+#### 8.2 List Provider Keys
+
+**Purpose:** Verify GET /api/v1/providers returns all keys for the authenticated user.
+
+**Steps:**
+1. Create at least two keys via test 8.1 for the same user
+2. List keys: `curl http://localhost:3000/api/v1/providers`
+3. Verify 200 OK with array containing both keys
+4. Verify no encrypted key material is exposed in response
+
+**Expected Result:**
+- All user keys returned
+- Sensitive fields (encrypted_key, nonce) not included in list response
+
+**Pass/Fail:** ___
+
+#### 8.3 Get Provider Key by ID
+
+**Purpose:** Verify GET /api/v1/providers/:id returns metadata for a specific key.
+
+**Steps:**
+1. Use `id` from test 8.1
+2. Get key: `curl http://localhost:3000/api/v1/providers/{id}`
+3. Verify 200 OK with correct `id`, `provider`, `label`, `user_id`
+4. Query non-existent ID: `curl http://localhost:3000/api/v1/providers/999999`
+5. Verify 404 Not Found
+
+**Expected Result:**
+- Valid ID returns key metadata
+- Non-existent ID returns 404
+
+**Pass/Fail:** ___
+
+#### 8.4 Update Provider Key
+
+**Purpose:** Verify PUT /api/v1/providers/:id updates mutable fields.
+
+**Steps:**
+1. Use `id` from test 8.1
+2. Update label: `curl -X PUT http://localhost:3000/api/v1/providers/{id} -H "Content-Type: application/json" -d '{"label":"Updated Label"}'`
+3. Verify 200 OK
+4. Get key: `curl http://localhost:3000/api/v1/providers/{id}`
+5. Verify `label` is "Updated Label"
+6. Try update on non-existent ID: `curl -X PUT http://localhost:3000/api/v1/providers/999999 ...`
+7. Verify 404 Not Found
+
+**Expected Result:**
+- Update persists across subsequent GETs
+- Non-existent ID returns 404
+
+**Pass/Fail:** ___
+
+#### 8.5 Delete Provider Key
+
+**Purpose:** Verify DELETE /api/v1/providers/:id removes the key.
+
+**Steps:**
+1. Create a key via test 8.1 and save `id`
+2. Delete: `curl -X DELETE http://localhost:3000/api/v1/providers/{id}`
+3. Verify 204 No Content
+4. Get deleted key: `curl http://localhost:3000/api/v1/providers/{id}`
+5. Verify 404 Not Found
+6. Delete non-existent ID again
+7. Verify 404 Not Found
+
+**Expected Result:**
+- Delete returns 204
+- Subsequent GET returns 404
+- Second delete returns 404 (not idempotent)
+
+**Pass/Fail:** ___
+
+#### 8.6 Assign Provider Key to Project
+
+**Purpose:** Verify POST /api/v1/projects/:project_id/provider assigns a key to a project.
+
+**Steps:**
+1. Create a key via test 8.1 and save `id` as `key_id`
+2. Assign: `curl -X POST http://localhost:3000/api/v1/projects/proj-1/provider -H "Content-Type: application/json" -d '{"key_id":{key_id}}'`
+3. Verify 200 OK or 201 Created
+4. Get key: `curl http://localhost:3000/api/v1/providers/{key_id}`
+5. Verify key is associated with `proj-1`
+
+**Expected Result:**
+- Assignment succeeds
+- Key reflects project association
+
+**Pass/Fail:** ___
+
+#### 8.7 Unassign Provider Key from Project
+
+**Purpose:** Verify DELETE /api/v1/projects/:project_id/provider removes the key assignment.
+
+**Steps:**
+1. Use assignment from test 8.6
+2. Unassign: `curl -X DELETE http://localhost:3000/api/v1/projects/proj-1/provider`
+3. Verify 204 No Content
+4. Get key and verify no longer associated with `proj-1`
+5. Unassign again (no key assigned)
+6. Verify 404 or 204 (document actual behavior)
+
+**Expected Result:**
+- Unassignment succeeds
+- Key no longer associated with project
+
+**Pass/Fail:** ___
+
 ## Corner Case Verification Checklist
 
 This section documents exhaustive corner cases across all API functionality. Each corner case must be manually verified before production release.

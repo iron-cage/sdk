@@ -579,7 +579,7 @@ async fn test_e2e_disabled_provider_key_returns_403() {
   // Disable the provider key
   let storage = ProviderKeyStorage::new(pool.clone());
   storage
-    .set_enabled(key_id, false)
+    .update_key_fields(key_id, None, None, Some(false), None)
     .await
     .expect("Failed to disable provider key");
 

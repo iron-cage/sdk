@@ -221,17 +221,19 @@ impl core::error::Error for CryptoError {}
 /// Mask an API key for display (never show full key)
 ///
 /// # Rules
-/// - len <= 8: "***"
-/// - len > 8: "first4...last3"
+/// - `char_count` <= 8: `"***"`
+/// - `char_count` > 8: `"first4...last3"`
+///
+/// Slices by character count to avoid panicking on multibyte UTF-8 input.
 #[must_use]
 pub fn mask_api_key(key: &str) -> String {
-  let len = key.len();
+  let char_count = key.chars().count();
 
-  if len <= 8 {
+  if char_count <= 8 {
     return "***".to_string();
   }
 
-  let prefix = &key[..4];
-  let suffix = &key[len - 3..];
+  let prefix: String = key.chars().take(4).collect();
+  let suffix: String = key.chars().rev().take(3).collect::<String>().chars().rev().collect();
   format!("{prefix}...{suffix}")
 }
