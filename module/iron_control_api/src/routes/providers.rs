@@ -397,8 +397,22 @@ type UpdateFields<'a> = (Option<Option<&'a str>>, Option<Option<&'a str>>, Optio
 fn validate_update_fields(
   request: &UpdateProviderKeyRequest,
 ) -> Result<UpdateFields<'_>, axum::response::Response> {
-  // Validate base_url scheme if provided
+  // Validate base_url if provided (length, NULL bytes, HTTPS scheme)
   if let Some(ref url) = request.base_url {
+    if url.len() > CreateProviderKeyRequest::MAX_BASE_URL_LENGTH {
+      return Err(
+        ApiError::BadRequest(format!(
+          "base_url exceeds maximum length of {} characters",
+          CreateProviderKeyRequest::MAX_BASE_URL_LENGTH
+        ))
+        .into_response(),
+      );
+    }
+    if url.contains('\0') {
+      return Err(
+        ApiError::BadRequest("base_url must not contain NULL bytes".into()).into_response(),
+      );
+    }
     if !url.is_empty() && !url.starts_with("https://") {
       return Err(
         ApiError::BadRequest("base_url must use HTTPS".into()).into_response(),
@@ -406,14 +420,20 @@ fn validate_update_fields(
     }
   }
 
-  // Validate spending_cap_usd is non-negative if provided
-  if let Some(Some(cap)) = request.spending_cap_usd {
-    if cap < 0.0 {
+  // Validate description if provided (length, NULL bytes)
+  if let Some(Some(ref desc)) = request.description {
+    if desc.len() > CreateProviderKeyRequest::MAX_DESCRIPTION_LENGTH {
       return Err(
-        ApiError::BadRequest(
-          "spending_cap_usd must be greater than or equal to 0".into(),
-        )
+        ApiError::BadRequest(format!(
+          "description exceeds maximum length of {} characters",
+          CreateProviderKeyRequest::MAX_DESCRIPTION_LENGTH
+        ))
         .into_response(),
+      );
+    }
+    if desc.contains('\0') {
+      return Err(
+        ApiError::BadRequest("description must not contain NULL bytes".into()).into_response(),
       );
     }
   }
@@ -527,17 +547,20 @@ pub async fn create_provider_key(
       }
     })?;
 
-  // If a spending cap was requested, set it atomically as part of creation.
-  // This eliminates the uncapped window that would exist if the caller had to
-  // make a separate PUT request after creating the key.
+  // If a spending cap was requested, set it right after creation.
+  // On failure, delete the key to avoid leaving an uncapped key behind.
   if let Some(cap_usd) = request.spending_cap_usd {
     let cap_microdollars = validate_and_convert_spending_cap(cap_usd)
       .map_err(|msg| ApiError::BadRequest(msg.to_string()))?;
-    state
+    if let Err(e) = state
       .storage
       .set_spending_cap(key_id, Some(cap_microdollars))
       .await
-      .map_err(|_| ApiError::Internal("Failed to set spending cap".into()))?;
+    {
+      tracing::error!("Failed to set spending cap on key {key_id}, cleaning up: {e}");
+      let _ = state.storage.delete_key(key_id).await;
+      return Err(ApiError::Internal("Failed to set spending cap".into()));
+    }
   }
 
   // Get metadata for response (after spending cap is set, so response reflects it)

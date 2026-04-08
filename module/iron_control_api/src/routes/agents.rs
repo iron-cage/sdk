@@ -288,13 +288,10 @@ pub async fn create_agent(
   })?;
 
   let created_at = chrono::Utc::now().timestamp_millis();
-  let is_admin = parse_role(&user.0)
-    .map_err(|e| tracing::warn!("Failed to parse role for user {}: {}", user.0.sub, e.1))
-    .ok()
-    == Some(Role::Admin);
 
   // Only admins can assign agents to other users
-  if req.owner_id.is_some() && !is_admin {
+  // (parse_role already succeeded at line 242; only admins reach here)
+  if req.owner_id.is_some() && parse_role(&user.0)? != Role::Admin {
     return Err((
       StatusCode::FORBIDDEN,
       "Only admins can assign agents to other users".to_string(),

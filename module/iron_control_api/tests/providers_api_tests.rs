@@ -3,6 +3,7 @@
 //! Test Matrix:
 //! | Test Name                          | Purpose                    | Verification       |
 //! |------------------------------------|----------------------------|--------------------|
+//! | create_…_requires_manage_perm      | RBAC: dev cannot create    | 403 Forbidden      |
 //! | list_…_requires_manage_permission  | RBAC: dev cannot list      | 403 Forbidden      |
 //! | get_…_requires_manage_permission   | RBAC: dev cannot get       | 403 Forbidden      |
 //! | update_…_requires_manage_perm      | RBAC: dev cannot update    | 403 Forbidden      |
@@ -93,6 +94,35 @@ fn bearer_developer(user_id: &str) -> String {
 // ─────────────────────────────────────────────────────────────────
 // RBAC tests — developer role blocked from all provider endpoints
 // ─────────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn create_provider_key_requires_manage_permission() {
+  let pool = setup_test_db().await;
+  let state = make_providers_state(&pool).await;
+
+  let body = json!({
+    "provider": "openai",
+    "api_key": "sk-test-key-1234"
+  });
+  let resp = build_full_router(state)
+    .oneshot(
+      Request::builder()
+        .method(Method::POST)
+        .uri("/api/v1/providers")
+        .header("content-type", "application/json")
+        .header("authorization", bearer_developer("user_a"))
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    resp.status(),
+    StatusCode::FORBIDDEN,
+    "Developer role must not be allowed to create provider keys"
+  );
+}
 
 #[tokio::test]
 async fn list_provider_keys_requires_manage_permission() {

@@ -10,7 +10,11 @@ use super::{
 };
 
 impl ProviderKeyStorage {
-  /// Create a new provider key
+  /// Create a new provider key **without quota enforcement**.
+  ///
+  /// **WARNING:** This method bypasses the per-user-per-provider quota check.
+  /// Production code should use [`create_key_within_quota`] instead. This
+  /// method is kept public only for test setup in downstream crates.
   ///
   /// # Arguments
   ///
@@ -28,6 +32,7 @@ impl ProviderKeyStorage {
   /// # Errors
   ///
   /// Returns error if database insert fails
+  #[doc(hidden)]
   pub async fn create_key(
     &self,
     provider: ProviderType,

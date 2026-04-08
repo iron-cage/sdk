@@ -447,7 +447,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
       // agent_1 during handshake — a development convenience that must never
       // be active in production as it bypasses the key-assignment requirement
       // and could expose unguarded API key paths.
-      if env::var("IRON_ALLOW_DEV_KEYS").is_ok() {
+      if env::var("IRON_ALLOW_DEV_KEYS").ok().filter(|v| v != "0" && v != "false" && !v.is_empty()).is_some() {
         tracing::error!(
           "[CRITICAL] CRITICAL: IRON_ALLOW_DEV_KEYS is set in a production environment"
         );

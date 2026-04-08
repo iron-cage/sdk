@@ -199,10 +199,10 @@ impl ProviderKeyStorage {
   /// # Errors
   ///
   /// Returns error if database query fails
-  pub async fn get_agent_provider_key_id(&self, agent_id: i64) -> Result<Option<i64>> {
+  pub async fn get_agent_provider_key_id(&self, agent_id: i64) -> Result<Option<Option<i64>>> {
     sqlx::query_scalar("SELECT provider_key_id FROM agents WHERE id = ?")
       .bind(agent_id)
-      .fetch_one(&self.pool)
+      .fetch_optional(&self.pool)
       .await
       .map_err(TokenError::Database)
   }
@@ -276,7 +276,17 @@ impl ProviderKeyStorage {
     .await
     .map_err(TokenError::Database)?;
     if result.rows_affected() == 0 {
-      return Err(TokenError::SpendingCapExceeded);
+      // Distinguish: row missing vs. cap condition blocked the update
+      let exists: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM usage_limits WHERE user_id = ?)")
+          .bind(user_id)
+          .fetch_one(&self.pool)
+          .await
+          .map_err(TokenError::Database)?;
+      if exists {
+        return Err(TokenError::SpendingCapExceeded);
+      }
+      return Err(TokenError::NotFound);
     }
     Ok(())
   }

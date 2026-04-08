@@ -219,8 +219,8 @@ async fn test_all_migrations_have_guards() {
   let pool = db.pool().clone();
   core::mem::forget(db);
 
-  // Verify guard tables exist for all migrations (001-028)
-  let guard_tables: Vec<String> = (1..=28)
+  // Verify guard tables exist for all migrations (001-030)
+  let guard_tables: Vec<String> = (1..=30)
     .map(|n| format!("_migration_{n:03}_completed"))
     .collect();
 

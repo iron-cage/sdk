@@ -413,13 +413,22 @@ pub async fn handshake(
       }
     }
     None => {
-      // Use the provider key assigned to this agent
+      // Use the provider key assigned to this agent.
+      // Outer Option: None = agent not found; Inner Option: None = no key assigned.
       let assigned_key_id: Option<i64> = match state
         .provider_key_storage
         .get_agent_provider_key_id(agent_id)
         .await
       {
-        Ok(id) => id,
+        Ok(Some(id)) => id,
+        Ok(None) => {
+          // Agent not found — same generic error as missing owner_id
+          return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({ "error": "Budget handshake failed" })),
+          )
+            .into_response();
+        }
         Err(err) => {
           tracing::error!("Database error fetching agent provider_key_id: {}", err);
           return (
@@ -434,7 +443,7 @@ pub async fn handshake(
         Some(id) => id,
         None => {
           // No key assigned; allow auto-creation only for agent_1 when dev mode is explicitly enabled
-          if agent_id == 1 && std::env::var("IRON_ALLOW_DEV_KEYS").is_ok() {
+          if agent_id == 1 && std::env::var("IRON_ALLOW_DEV_KEYS").ok().filter(|v| v != "0" && v != "false" && !v.is_empty()).is_some() {
             tracing::warn!(
               "IRON_ALLOW_DEV_KEYS: auto-creating dev provider key for agent_1 (provider={})",
               provider_type
