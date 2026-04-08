@@ -42,7 +42,7 @@ function isActive(path: string): boolean {
 function navLinkClass(path: string): string {
   return cn(
     'flex items-center px-3 py-1.5 text-base rounded-[8px] text-tertiary',
-    isActive(path) ? 'bg-border/80 font-medium' : 'hover:bg-border/50',
+    isActive(path) ? 'bg-border/80 font-medium' : 'hover:bg-border/50'
   )
 }
 
@@ -85,11 +85,7 @@ async function handleLogout() {
       <nav class="px-2 py-3 flex-1 overflow-y-auto space-y-3">
         <!-- Dashboard -->
         <div>
-          <router-link
-            to="/dashboard"
-            :class="navLinkClass('/dashboard')"
-            @click="handleNavClick"
-          >
+          <router-link to="/dashboard" :class="navLinkClass('/dashboard')" @click="handleNavClick">
             <IconHome class="w-4 h-4 mr-2 flex-shrink-0" />
             Dashboard
           </router-link>
@@ -102,32 +98,23 @@ async function handleLogout() {
             @click="workspaceOpen = !workspaceOpen"
           >
             <span>Workspace</span>
-            <IconChevronDown class="w-3 h-3 transition-transform duration-150" :class="workspaceOpen ? '' : '-rotate-90'" />
+            <IconChevronDown
+              class="w-3 h-3 transition-transform duration-150"
+              :class="workspaceOpen ? '' : '-rotate-90'"
+            />
           </button>
-          <div v-show="workspaceOpen" class="mt-0.5 space-y-0.5 ">
-            <router-link
-              to="/agents"
-              :class="navLinkClass('/agents')"
-              @click="handleNavClick"
-            >
+          <div v-show="workspaceOpen" class="mt-0.5 space-y-0.5">
+            <router-link to="/agents" :class="navLinkClass('/agents')" @click="handleNavClick">
               <IconCog class="w-4 h-4 mr-2 flex-shrink-0" />
               Agents
             </router-link>
 
-            <router-link
-              to="/usage"
-              :class="navLinkClass('/usage')"
-              @click="handleNavClick"
-            >
+            <router-link to="/usage" :class="navLinkClass('/usage')" @click="handleNavClick">
               <IconBarChart class="w-4 h-4 mr-2 flex-shrink-0" />
               Analytics
             </router-link>
 
-            <router-link
-              to="/budgets"
-              :class="navLinkClass('/budgets')"
-              @click="handleNavClick"
-            >
+            <router-link to="/budgets" :class="navLinkClass('/budgets')" @click="handleNavClick">
               <IconCoin class="w-4 h-4 mr-2 flex-shrink-0" />
               Budgets
             </router-link>
@@ -137,12 +124,16 @@ async function handleLogout() {
         <!-- Admin group -->
         <div v-if="authStore.isAdmin">
           <button
-              class="flex items-center gap-2 w-full px-3 py-1 text-xs font-medium tracking-wider hover:text-foreground opacity-70"           @click="adminOpen = !adminOpen"
+            class="flex items-center gap-2 w-full px-3 py-1 text-xs font-medium tracking-wider hover:text-foreground opacity-70"
+            @click="adminOpen = !adminOpen"
           >
             <span>Admin</span>
-            <IconChevronDown class="w-3 h-3 transition-transform duration-150" :class="adminOpen ? '' : '-rotate-90'" />
+            <IconChevronDown
+              class="w-3 h-3 transition-transform duration-150"
+              :class="adminOpen ? '' : '-rotate-90'"
+            />
           </button>
-          <div v-show="adminOpen" class="mt-0.5 space-y-0.5 ">
+          <div v-show="adminOpen" class="mt-0.5 space-y-0.5">
             <router-link
               to="/providers"
               :class="navLinkClass('/providers')"
@@ -152,11 +143,7 @@ async function handleLogout() {
               Providers
             </router-link>
 
-            <router-link
-              to="/users"
-              :class="navLinkClass('/users')"
-              @click="handleNavClick"
-            >
+            <router-link to="/users" :class="navLinkClass('/users')" @click="handleNavClick">
               <IconUsers class="w-4 h-4 mr-2 flex-shrink-0" />
               Users
             </router-link>
@@ -175,18 +162,18 @@ async function handleLogout() {
           leave-from-class="opacity-100 translate-y-0"
           leave-to-class="opacity-0 translate-y-1"
         >
-        <div
-          v-if="userMenuOpen"
-          class="absolute bottom-full left-2 right-2 mb-1 bg-background border border-border rounded-[8px] shadow-md overflow-hidden"
-        >
-          <button
-            class="flex items-center gap-2 w-full px-3 py-2 text-base text-tertiary hover:bg-border/50 text-left"
-            @click="handleLogout"
+          <div
+            v-if="userMenuOpen"
+            class="absolute bottom-full left-2 right-2 mb-1 bg-background border border-border rounded-[8px] shadow-md overflow-hidden"
           >
-            <IconLogOut class="w-4 h-4 flex-shrink-0" />
-            Sign out
-          </button>
-        </div>
+            <button
+              class="flex items-center gap-2 w-full px-3 py-2 text-base text-tertiary hover:bg-border/50 text-left"
+              @click="handleLogout"
+            >
+              <IconLogOut class="w-4 h-4 flex-shrink-0" />
+              Sign out
+            </button>
+          </div>
         </Transition>
 
         <!-- Trigger button -->
@@ -199,13 +186,18 @@ async function handleLogout() {
           <!-- Name -->
           <span class="text-base text-tertiary truncate flex-1">{{ authStore.username }}</span>
           <!-- Chevron -->
-          <IconChevronDown class="w-3 h-3 text-muted-foreground transition-transform duration-150 flex-shrink-0" :class="userMenuOpen ? 'rotate-180' : ''" />
+          <IconChevronDown
+            class="w-3 h-3 text-muted-foreground transition-transform duration-150 flex-shrink-0"
+            :class="userMenuOpen ? 'rotate-180' : ''"
+          />
         </button>
       </div>
     </div>
 
     <!-- Main content -->
-    <div class="lg:ml-56 lg:my-[8px] lg:mr-[8px] rounded-[8px] h-screen lg:h-[calc(100vh-16px)] border border-border overflow-hidden bg-background flex flex-col">
+    <div
+      class="lg:ml-56 lg:my-[8px] lg:mr-[8px] rounded-[8px] h-screen lg:h-[calc(100vh-16px)] border border-border overflow-hidden bg-background flex flex-col"
+    >
       <!-- Mobile header -->
       <div class="lg:hidden h-12 flex items-center px-3 border-b border-border shrink-0">
         <button

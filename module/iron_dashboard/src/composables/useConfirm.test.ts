@@ -3,7 +3,14 @@ import { useConfirm } from './useConfirm'
 
 describe('useConfirm', () => {
   it('sets modal state when openConfirm is called', () => {
-    const { showConfirmModal, confirmTitle, confirmDescription, confirmLabel, confirmVariant, openConfirm } = useConfirm()
+    const {
+      showConfirmModal,
+      confirmTitle,
+      confirmDescription,
+      confirmLabel,
+      confirmVariant,
+      openConfirm,
+    } = useConfirm()
 
     openConfirm('Delete', 'Are you sure?', 'Yes', () => {}, 'destructive')
 
@@ -39,7 +46,7 @@ describe('useConfirm', () => {
 
     let resolved = false
     openConfirm('Test', 'Test', 'OK', async () => {
-      await new Promise(r => setTimeout(r, 1))
+      await new Promise((r) => setTimeout(r, 1))
       resolved = true
     })
 

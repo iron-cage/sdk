@@ -100,9 +100,9 @@ export interface Agent {
 
 export interface AgentBudgetResponse {
   agent_id: number
-  total_allocated: number    // microdollars
-  total_spent: number        // microdollars
-  budget_remaining: number   // microdollars
+  total_allocated: number // microdollars
+  total_spent: number // microdollars
+  budget_remaining: number // microdollars
 }
 
 // IC Token types
@@ -336,9 +336,14 @@ export function useApi() {
 
   async function startLogoutSequence(): Promise<never> {
     if (!_logoutPromise) {
-      _logoutPromise = authStore.logout()
-        .then(() => { router.replace('/login') })
-        .finally(() => { _logoutPromise = null })
+      _logoutPromise = authStore
+        .logout()
+        .then(() => {
+          router.replace('/login')
+        })
+        .finally(() => {
+          _logoutPromise = null
+        })
     }
     await _logoutPromise
     throw new Error('Session expired')
@@ -365,7 +370,9 @@ export function useApi() {
     if (response.status === 401 && authStore.refreshToken) {
       try {
         if (!_refreshPromise) {
-          _refreshPromise = authStore.refresh().finally(() => { _refreshPromise = null })
+          _refreshPromise = authStore.refresh().finally(() => {
+            _refreshPromise = null
+          })
         }
         await _refreshPromise
         const newAuth = authStore.getAuthHeader()
@@ -451,7 +458,10 @@ export function useApi() {
     })
   }
 
-  async function updateProviderKey(id: number, data: UpdateProviderKeyRequest): Promise<ProviderKey> {
+  async function updateProviderKey(
+    id: number,
+    data: UpdateProviderKeyRequest
+  ): Promise<ProviderKey> {
     return fetchApi<ProviderKey>(`/api/v1/providers/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -465,7 +475,13 @@ export function useApi() {
   }
 
   // User API methods
-  async function getUsers(params?: { role?: string; is_active?: boolean; search?: string; page?: number; page_size?: number }): Promise<{ users: User[]; total: number; page: number; page_size: number }> {
+  async function getUsers(params?: {
+    role?: string
+    is_active?: boolean
+    search?: string
+    page?: number
+    page_size?: number
+  }): Promise<{ users: User[]; total: number; page: number; page_size: number }> {
     const query = new URLSearchParams()
     if (params?.role) query.append('role', params.role)
     if (params?.is_active !== undefined) query.append('is_active', String(params.is_active))
@@ -473,7 +489,9 @@ export function useApi() {
     if (params?.page) query.append('page', String(params.page))
     if (params?.page_size) query.append('page_size', String(params.page_size))
 
-    return fetchApi<{ users: User[]; total: number; page: number; page_size: number }>(`/api/v1/users?${query.toString()}`)
+    return fetchApi<{ users: User[]; total: number; page: number; page_size: number }>(
+      `/api/v1/users?${query.toString()}`
+    )
   }
 
   async function createUser(data: CreateUserRequest): Promise<User> {
@@ -511,7 +529,11 @@ export function useApi() {
     })
   }
 
-  async function resetUserPassword(id: string, newPassword: string, forceChange: boolean): Promise<User> {
+  async function resetUserPassword(
+    id: string,
+    newPassword: string,
+    forceChange: boolean
+  ): Promise<User> {
     return fetchApi<User>(`/api/v1/users/${id}/reset-password`, {
       method: 'POST',
       body: JSON.stringify({ new_password: newPassword, force_change: forceChange }),
@@ -538,7 +560,7 @@ export function useApi() {
     providers: string[]
     provider_key_ids: number[]
     initial_budget_microdollars: number
-    owner_id?: string  // Admins can assign to other users
+    owner_id?: string // Admins can assign to other users
   }): Promise<Agent> {
     return fetchApi<Agent>('/api/v1/agents', {
       method: 'POST',
@@ -551,7 +573,7 @@ export function useApi() {
     name?: string
     providers?: string[]
     provider_key_ids?: number[]
-    owner_id?: string  // Admins can reassign to other users
+    owner_id?: string // Admins can reassign to other users
   }): Promise<Agent> {
     const { id, ...updateData } = data
     return fetchApi<Agent>(`/api/v1/agents/${id}`, {
@@ -560,7 +582,10 @@ export function useApi() {
     })
   }
 
-  async function updateAgentBudget(agentId: number, total_allocated_microdollars: number): Promise<AgentBudgetResponse> {
+  async function updateAgentBudget(
+    agentId: number,
+    total_allocated_microdollars: number
+  ): Promise<AgentBudgetResponse> {
     return fetchApi<AgentBudgetResponse>(`/api/v1/agents/${agentId}/budget`, {
       method: 'PUT',
       body: JSON.stringify({ total_allocated_microdollars }),
@@ -676,13 +701,16 @@ export function useApi() {
     return fetchApi(`/api/v1/analytics/events/list${query ? `?${query}` : ''}`, { signal })
   }
 
-  async function getBudgetStatus(filters?: {
-    status?: string
-    threshold?: number
-    agent_id?: number
-    page?: number
-    per_page?: number
-  }, signal?: AbortSignal): Promise<BudgetStatusResponse> {
+  async function getBudgetStatus(
+    filters?: {
+      status?: string
+      threshold?: number
+      agent_id?: number
+      page?: number
+      per_page?: number
+    },
+    signal?: AbortSignal
+  ): Promise<BudgetStatusResponse> {
     const params = new URLSearchParams()
     if (filters?.status) params.append('status', filters.status)
     if (filters?.threshold != null) params.append('threshold', String(filters.threshold))
@@ -719,7 +747,9 @@ export function useApi() {
     if (filters?.provider_id) params.append('provider_id', filters.provider_id)
     if (filters?.provider_key_id) params.append('provider_key_id', String(filters.provider_key_id))
     const query = params.toString()
-    return fetchApi(`/api/v1/analytics/spending/avg-per-request${query ? `?${query}` : ''}`, { signal })
+    return fetchApi(`/api/v1/analytics/spending/avg-per-request${query ? `?${query}` : ''}`, {
+      signal,
+    })
   }
 
   async function getAnalyticsUsageTokensByAgent(
@@ -735,7 +765,9 @@ export function useApi() {
     if (pagination?.page) params.append('page', String(pagination.page))
     if (pagination?.per_page) params.append('per_page', String(pagination.per_page))
     const query = params.toString()
-    return fetchApi(`/api/v1/analytics/usage/tokens/by-agent${query ? `?${query}` : ''}`, { signal })
+    return fetchApi(`/api/v1/analytics/usage/tokens/by-agent${query ? `?${query}` : ''}`, {
+      signal,
+    })
   }
 
   return {

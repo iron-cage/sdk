@@ -13,7 +13,7 @@ export function useConfirm() {
     description: string,
     label: string,
     action: () => void | Promise<void>,
-    variant: 'default' | 'destructive' = 'default',
+    variant: 'default' | 'destructive' = 'default'
   ) {
     confirmTitle.value = title
     confirmDescription.value = description

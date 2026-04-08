@@ -29,7 +29,7 @@ export function getProviderBadgeClass(provider: string): string {
   return cn(
     'text-xs font-medium px-2 py-0.5 rounded-full',
     PROVIDER_BADGE_COLORS[provider] ?? 'bg-muted/80',
-    PROVIDER_BADGE_COLORS[provider] ? 'text-primary-foreground' : 'text-foreground',
+    PROVIDER_BADGE_COLORS[provider] ? 'text-primary-foreground' : 'text-foreground'
   )
 }
 
@@ -50,7 +50,7 @@ export function detectProviderFromKey(key: string): ProviderType | null {
 
 export function generateProviderAlias(
   provider: ProviderType,
-  existingKeys: Array<{ provider: string; alias?: string }>,
+  existingKeys: Array<{ provider: string; alias?: string }>
 ): string {
   const label = getProviderLabel(provider)
   const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

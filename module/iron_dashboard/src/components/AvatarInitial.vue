@@ -19,7 +19,12 @@ function avatarVariant(name: string): string {
 
 <template>
   <span
-    :class="cn('w-6 h-6 rounded-[6px] flex items-center justify-center text-xs font-semibold flex-shrink-0', avatarVariant(props.name))"
+    :class="
+      cn(
+        'w-6 h-6 rounded-[6px] flex items-center justify-center text-xs font-semibold flex-shrink-0',
+        avatarVariant(props.name)
+      )
+    "
   >
     {{ props.name[0]?.toUpperCase() ?? '?' }}
   </span>

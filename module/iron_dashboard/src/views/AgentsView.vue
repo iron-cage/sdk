@@ -57,7 +57,15 @@ const authStore = useAuthStore()
 
 const showCreateModal = ref(false)
 const showUpdateModal = ref(false)
-const { showConfirmModal, confirmTitle, confirmDescription, confirmLabel, confirmVariant, confirmCallback, openConfirm } = useConfirm()
+const {
+  showConfirmModal,
+  confirmTitle,
+  confirmDescription,
+  confirmLabel,
+  confirmVariant,
+  confirmCallback,
+  openConfirm,
+} = useConfirm()
 const name = ref('')
 const selectedProviderKeyIds = ref<number[]>([])
 const addingProviderKeyId = ref<string>('')
@@ -72,7 +80,12 @@ const tokenDialogWarning = ref('')
 const copyMessage = ref('')
 
 // Fetch agents
-const { data: agents, isLoading, error, refetch } = useQuery({
+const {
+  data: agents,
+  isLoading,
+  error,
+  refetch,
+} = useQuery({
   queryKey: ['agents'],
   queryFn: () => api.getAgents(),
 })
@@ -80,7 +93,7 @@ const { data: agents, isLoading, error, refetch } = useQuery({
 // Fetch IC token status per agent — one query per agent, managed by TanStack Query
 const icTokenQueries = useQueries({
   queries: computed(() =>
-    (agents.value ?? []).map(agent => ({
+    (agents.value ?? []).map((agent) => ({
       queryKey: ['ic-token-status', agent.id] as const,
       queryFn: () => api.getIcTokenStatus(agent.id),
       staleTime: 60_000,
@@ -88,12 +101,10 @@ const icTokenQueries = useQueries({
   ),
 })
 
-const icTokenStatusLoading = computed(() =>
-  icTokenQueries.value.some(q => q.isLoading)
-)
+const icTokenStatusLoading = computed(() => icTokenQueries.value.some((q) => q.isLoading))
 
 function getIcTokenStatusFromQuery(agentId: number): IcTokenStatus | undefined {
-  const idx = agents.value?.findIndex(a => a.id === agentId) ?? -1
+  const idx = agents.value?.findIndex((a) => a.id === agentId) ?? -1
   return idx >= 0 ? icTokenQueries.value[idx]?.data : undefined
 }
 
@@ -104,7 +115,7 @@ const { data: providers } = useQuery({
 })
 
 const availableProviderKeys = computed(() =>
-  (providers.value ?? []).filter(p => !selectedProviderKeyIds.value.includes(p.id))
+  (providers.value ?? []).filter((p) => !selectedProviderKeyIds.value.includes(p.id))
 )
 
 function handleAddProviderKey() {
@@ -116,12 +127,10 @@ function handleAddProviderKey() {
 }
 
 function handleRemoveProviderKey(keyId: number) {
-  selectedProviderKeyIds.value = selectedProviderKeyIds.value.filter(id => id !== keyId)
+  selectedProviderKeyIds.value = selectedProviderKeyIds.value.filter((id) => id !== keyId)
 }
 
-const providerKeyMap = computed(() =>
-  new Map(providers.value?.map(p => [p.id, p]) ?? [])
-)
+const providerKeyMap = computed(() => new Map(providers.value?.map((p) => [p.id, p]) ?? []))
 
 function providerKeyLabel(keyId: number): string {
   const key = providerKeyMap.value.get(keyId)
@@ -137,9 +146,7 @@ const { data: users } = useQuery({
 })
 
 // O(1) lookup map — avoids O(n×m) Array.find on every render cycle
-const ownerMap = computed(() =>
-  new Map(users.value?.users.map(u => [u.id, u]) ?? [])
-)
+const ownerMap = computed(() => new Map(users.value?.users.map((u) => [u.id, u]) ?? []))
 
 function ownerEmail(ownerId: string | null | undefined): string {
   if (!ownerId) return '—'
@@ -161,8 +168,13 @@ const tableColumns = computed(() => [
 
 // Create agent mutation
 const createMutation = useMutation({
-  mutationFn: (data: { name: string; providers: string[]; provider_key_ids: number[]; initial_budget_microdollars: number; owner_id?: string }) =>
-    api.createAgent(data),
+  mutationFn: (data: {
+    name: string
+    providers: string[]
+    provider_key_ids: number[]
+    initial_budget_microdollars: number
+    owner_id?: string
+  }) => api.createAgent(data),
   onSuccess: () => {
     showCreateModal.value = false
     name.value = ''
@@ -171,6 +183,7 @@ const createMutation = useMutation({
     initialBudgetUsd.value = undefined
     selectedOwnerId.value = ''
     queryClient.invalidateQueries({ queryKey: ['agents'] })
+    toast.success('Agent created successfully')
   },
   onError: (err) => {
     toast.error(err instanceof Error ? err.message : 'Failed to create agent')
@@ -187,12 +200,18 @@ function resetUpdateForm() {
 
 // Update agent mutation
 const updateMutation = useMutation({
-  mutationFn: (data: { id: number; name: string; providers: string[]; provider_key_ids: number[]; owner_id?: string }) =>
-    api.updateAgent(data),
+  mutationFn: (data: {
+    id: number
+    name: string
+    providers: string[]
+    provider_key_ids: number[]
+    owner_id?: string
+  }) => api.updateAgent(data),
   onSuccess: () => {
     showUpdateModal.value = false
     resetUpdateForm()
     queryClient.invalidateQueries({ queryKey: ['agents'] })
+    toast.success('Agent updated successfully')
   },
   onError: (err) => {
     toast.error(err instanceof Error ? err.message : 'Failed to update agent')
@@ -226,8 +245,10 @@ function handleCreateAgent() {
     return
   }
 
-  const selectedKeys = (providers.value ?? []).filter(p => selectedProviderKeyIds.value.includes(p.id))
-  const uniqueProviders = [...new Set(selectedKeys.map(p => p.provider))]
+  const selectedKeys = (providers.value ?? []).filter((p) =>
+    selectedProviderKeyIds.value.includes(p.id)
+  )
+  const uniqueProviders = [...new Set(selectedKeys.map((p) => p.provider))]
   const budgetMicros = Math.round(initialBudgetUsd.value * 1_000_000)
 
   createMutation.mutate({
@@ -239,7 +260,7 @@ function handleCreateAgent() {
   })
 }
 
-function openUpdateModal(agent: Agent) {
+function handleOpenUpdateModal(agent: Agent) {
   selectedAgent.value = agent
   name.value = agent.name
   selectedProviderKeyIds.value = [...(agent.provider_key_ids ?? [])]
@@ -259,8 +280,10 @@ function handleUpdateAgent() {
     return
   }
 
-  const selectedKeys = (providers.value ?? []).filter(p => selectedProviderKeyIds.value.includes(p.id))
-  const uniqueProviders = [...new Set(selectedKeys.map(p => p.provider))]
+  const selectedKeys = (providers.value ?? []).filter((p) =>
+    selectedProviderKeyIds.value.includes(p.id)
+  )
+  const uniqueProviders = [...new Set(selectedKeys.map((p) => p.provider))]
 
   updateMutation.mutate({
     id: selectedAgent.value.id,
@@ -277,7 +300,7 @@ function handleDeleteAgent(agent: Agent) {
     `Delete "${agent.name}"? This action cannot be undone.`,
     'Delete',
     () => deleteMutation.mutate(agent.id),
-    'destructive',
+    'destructive'
   )
 }
 
@@ -287,14 +310,16 @@ function getIcTokenStatus(agentId: number): IcTokenStatus | undefined {
 
 const generateIcTokenMutation = useMutation({
   mutationFn: (agentId: number) => api.generateIcToken(agentId),
-  onMutate: (agentId) => { tokenActionLoadingId.value = agentId },
+  onMutate: (agentId) => {
+    tokenActionLoadingId.value = agentId
+  },
   onSuccess: (response, agentId) => {
     queryClient.setQueryData(['ic-token-status', agentId], {
       agent_id: agentId,
       has_ic_token: true,
       created_at: response.created_at,
     })
-    const agent = agents.value?.find(a => a.id === agentId)
+    const agent = agents.value?.find((a) => a.id === agentId)
     tokenDialogAgentName.value = agent?.name ?? ''
     tokenDialogValue.value = response.ic_token
     tokenDialogWarning.value = response.warning
@@ -304,19 +329,23 @@ const generateIcTokenMutation = useMutation({
   onError: (err) => {
     toast.error(err instanceof Error ? err.message : 'Failed to generate IC token')
   },
-  onSettled: () => { tokenActionLoadingId.value = null },
+  onSettled: () => {
+    tokenActionLoadingId.value = null
+  },
 })
 
 const regenerateIcTokenMutation = useMutation({
   mutationFn: (agentId: number) => api.regenerateIcToken(agentId),
-  onMutate: (agentId) => { tokenActionLoadingId.value = agentId },
+  onMutate: (agentId) => {
+    tokenActionLoadingId.value = agentId
+  },
   onSuccess: (response, agentId) => {
     queryClient.setQueryData(['ic-token-status', agentId], {
       agent_id: agentId,
       has_ic_token: true,
       created_at: response.created_at,
     })
-    const agent = agents.value?.find(a => a.id === agentId)
+    const agent = agents.value?.find((a) => a.id === agentId)
     tokenDialogAgentName.value = agent?.name ?? ''
     tokenDialogValue.value = response.ic_token
     tokenDialogWarning.value = response.warning || 'Old IC token is now invalid.'
@@ -326,12 +355,16 @@ const regenerateIcTokenMutation = useMutation({
   onError: (err) => {
     toast.error(err instanceof Error ? err.message : 'Failed to regenerate IC token')
   },
-  onSettled: () => { tokenActionLoadingId.value = null },
+  onSettled: () => {
+    tokenActionLoadingId.value = null
+  },
 })
 
 const revokeIcTokenMutation = useMutation({
   mutationFn: (agentId: number) => api.revokeIcToken(agentId),
-  onMutate: (agentId) => { tokenActionLoadingId.value = agentId },
+  onMutate: (agentId) => {
+    tokenActionLoadingId.value = agentId
+  },
   onSuccess: (_data, agentId) => {
     queryClient.setQueryData(['ic-token-status', agentId], {
       agent_id: agentId,
@@ -342,7 +375,9 @@ const revokeIcTokenMutation = useMutation({
   onError: (err) => {
     toast.error(err instanceof Error ? err.message : 'Failed to revoke IC token')
   },
-  onSettled: () => { tokenActionLoadingId.value = null },
+  onSettled: () => {
+    tokenActionLoadingId.value = null
+  },
 })
 
 function handleGenerateIcToken(agent: Agent) {
@@ -354,8 +389,10 @@ function handleRegenerateIcToken(agent: Agent) {
     'Regenerate IC Token',
     `Regenerate IC token for ${agent.name}? The current token will be invalidated immediately.`,
     'Regenerate',
-    () => { regenerateIcTokenMutation.mutate(agent.id) },
-    'destructive',
+    () => {
+      regenerateIcTokenMutation.mutate(agent.id)
+    },
+    'destructive'
   )
 }
 
@@ -364,8 +401,10 @@ function handleRevokeIcToken(agent: Agent) {
     'Revoke IC Token',
     `Revoke IC token for ${agent.name}? Agents using this token will stop working until a new one is generated.`,
     'Revoke',
-    () => { revokeIcTokenMutation.mutate(agent.id) },
-    'destructive',
+    () => {
+      revokeIcTokenMutation.mutate(agent.id)
+    },
+    'destructive'
   )
 }
 
@@ -384,12 +423,13 @@ watch(showUpdateModal, (open) => {
 })
 
 function handleCopyText(text: string, label = 'Copied') {
-  navigator.clipboard?.writeText(text)
+  navigator.clipboard
+    ?.writeText(text)
     ?.then(() => toast.success(label))
     ?.catch(() => toast.error('Copy failed'))
 }
 
-async function copyTokenToClipboard() {
+async function handleCopyTokenToClipboard() {
   if (!tokenDialogValue.value) return
 
   try {
@@ -399,9 +439,7 @@ async function copyTokenToClipboard() {
     const message = _err instanceof Error ? _err.message : 'Copy failed'
     copyMessage.value = message
   }
-
 }
-
 </script>
 
 <template>
@@ -412,7 +450,6 @@ async function copyTokenToClipboard() {
         Create Agent
       </Button>
     </template>
-
 
     <DataTable
       :columns="tableColumns"
@@ -438,9 +475,15 @@ async function copyTokenToClipboard() {
             :aria-label="`Copy agent name: ${agent.name}`"
             :title="agent.name"
             @click="handleCopyText(agent.name, 'Copied name')"
-          >{{ agent.name }}</button>
+          >
+            {{ agent.name }}
+          </button>
         </td>
-        <td v-if="showOwnerColumn" class="px-3 sm:px-6 py-2 text-base text-muted-foreground max-w-[220px] truncate" :title="ownerEmail(agent.owner_id)">
+        <td
+          v-if="showOwnerColumn"
+          class="px-3 sm:px-6 py-2 text-base text-muted-foreground max-w-[220px] truncate"
+          :title="ownerEmail(agent.owner_id)"
+        >
           {{ ownerEmail(agent.owner_id) }}
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">
@@ -462,7 +505,11 @@ async function copyTokenToClipboard() {
                   +{{ agent.provider_key_ids.length - 3 }}
                 </button>
               </PopoverTrigger>
-              <PopoverContent align="start" aria-label="Additional provider keys" class="flex flex-wrap gap-1 max-w-[320px] max-h-[200px] overflow-y-auto">
+              <PopoverContent
+                align="start"
+                aria-label="Additional provider keys"
+                class="flex flex-wrap gap-1 max-w-[320px] max-h-[200px] overflow-y-auto"
+              >
                 <span
                   v-for="keyId in agent.provider_key_ids.slice(3)"
                   :key="keyId"
@@ -476,12 +523,22 @@ async function copyTokenToClipboard() {
           </div>
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">
-          <div v-if="icTokenStatusLoading && !getIcTokenStatus(agent.id)" class="text-muted-foreground">
+          <div
+            v-if="icTokenStatusLoading && !getIcTokenStatus(agent.id)"
+            class="text-muted-foreground"
+          >
             Loading...
           </div>
           <div v-else class="flex gap-1 items-center">
-            <StatusBadge :active="!!getIcTokenStatus(agent.id)?.has_ic_token" active-label="Active" inactive-label="None" />
-            <div v-if="getIcTokenStatus(agent.id)?.created_at" class="text-xs text-muted-foreground max-sm:hidden">
+            <StatusBadge
+              :active="!!getIcTokenStatus(agent.id)?.has_ic_token"
+              active-label="Active"
+              inactive-label="None"
+            />
+            <div
+              v-if="getIcTokenStatus(agent.id)?.created_at"
+              class="text-xs text-muted-foreground max-sm:hidden"
+            >
               {{ formatTimestamp(getIcTokenStatus(agent.id)?.created_at) }}
             </div>
           </div>
@@ -512,7 +569,9 @@ async function copyTokenToClipboard() {
                   @click="handleRegenerateIcToken(agent)"
                 >
                   <IconRefresh />
-                  {{ tokenActionLoadingId === agent.id ? 'Regenerating...' : 'Regenerate IC Token' }}
+                  {{
+                    tokenActionLoadingId === agent.id ? 'Regenerating...' : 'Regenerate IC Token'
+                  }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   :disabled="tokenActionLoadingId === agent.id"
@@ -525,7 +584,7 @@ async function copyTokenToClipboard() {
               </template>
               <template v-if="authStore.isAdmin">
                 <DropdownMenuSeparator />
-                <DropdownMenuItem @click="openUpdateModal(agent)">
+                <DropdownMenuItem @click="handleOpenUpdateModal(agent)">
                   <IconEdit />
                   Edit Agent
                 </DropdownMenuItem>
@@ -550,7 +609,6 @@ async function copyTokenToClipboard() {
           </DialogDescription>
         </DialogHeader>
 
-
         <div class="space-y-4">
           <div class="space-y-1.5">
             <Label for="name">Name</Label>
@@ -570,7 +628,9 @@ async function copyTokenToClipboard() {
                 :key="keyId"
                 class="flex items-center gap-1.5 px-2 py-1 rounded-md border border-border text-sm bg-muted max-w-[190px]"
               >
-                <span class="text-xs text-foreground flex-1 truncate">{{ providerKeyLabel(keyId) }}</span>
+                <span class="text-xs text-foreground flex-1 truncate">{{
+                  providerKeyLabel(keyId)
+                }}</span>
                 <button
                   type="button"
                   :aria-label="`Remove ${providerKeyLabel(keyId)}`"
@@ -596,7 +656,14 @@ async function copyTokenToClipboard() {
                   </SelectItem>
                 </SelectContent>
               </Select>
-              <Button type="button" variant="outline" size="sm" class="shrink-0" :disabled="!addingProviderKeyId || createMutation.isPending.value" @click="handleAddProviderKey">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                class="shrink-0"
+                :disabled="!addingProviderKeyId || createMutation.isPending.value"
+                @click="handleAddProviderKey"
+              >
                 <IconPlus />
               </Button>
             </div>
@@ -625,34 +692,34 @@ async function copyTokenToClipboard() {
                 <SelectValue :placeholder="`Current User (${authStore.username})`" />
               </SelectTrigger>
               <SelectContent class="max-w-[280px]">
-                <SelectItem
-                  v-for="user in users?.users"
-                  :key="user.id"
-                  :value="user.id"
-                >
-                  <span :title="`${user.username} (${user.email || 'no email'})`">{{ user.username }} ({{ user.email || 'no email' }})</span>
+                <SelectItem v-for="user in users?.users" :key="user.id" :value="user.id">
+                  <span :title="`${user.username} (${user.email || 'no email'})`"
+                    >{{ user.username }} ({{ user.email || 'no email' }})</span
+                  >
                 </SelectItem>
               </SelectContent>
             </Select>
-            <p class="text-xs text-muted-foreground">
-              Leave empty to assign to yourself.
-            </p>
+            <p class="text-xs text-muted-foreground">Leave empty to assign to yourself.</p>
           </div>
         </div>
 
         <DialogFooter>
           <Button
-            @click="showCreateModal = false; name = ''; selectedProviderKeyIds = []; addingProviderKeyId = ''; initialBudgetUsd = undefined; selectedOwnerId = ''"
+            @click="
+              showCreateModal = false
+              name = ''
+              selectedProviderKeyIds = []
+              addingProviderKeyId = ''
+              initialBudgetUsd = undefined
+              selectedOwnerId = ''
+            "
             :disabled="createMutation.isPending.value"
             variant="outline"
           >
             <IconX />
             Cancel
           </Button>
-          <Button
-            :disabled="createMutation.isPending.value"
-            @click="handleCreateAgent"
-          >
+          <Button :disabled="createMutation.isPending.value" @click="handleCreateAgent">
             <IconPlus />
             {{ createMutation.isPending.value ? 'Creating...' : 'Create Agent' }}
           </Button>
@@ -665,11 +732,8 @@ async function copyTokenToClipboard() {
       <DialogContent class="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Edit Agent</DialogTitle>
-          <DialogDescription>
-            Update agent details and supported providers.
-          </DialogDescription>
+          <DialogDescription> Update agent details and supported providers. </DialogDescription>
         </DialogHeader>
-
 
         <div class="space-y-4">
           <div class="space-y-1.5">
@@ -690,7 +754,9 @@ async function copyTokenToClipboard() {
                 :key="keyId"
                 class="flex items-center gap-1.5 px-2 py-1 rounded-md border border-border text-sm bg-muted max-w-[190px]"
               >
-                <span class="text-xs text-foreground flex-1 truncate">{{ providerKeyLabel(keyId) }}</span>
+                <span class="text-xs text-foreground flex-1 truncate">{{
+                  providerKeyLabel(keyId)
+                }}</span>
                 <button
                   type="button"
                   :aria-label="`Remove ${providerKeyLabel(keyId)}`"
@@ -716,7 +782,14 @@ async function copyTokenToClipboard() {
                   </SelectItem>
                 </SelectContent>
               </Select>
-              <Button type="button" variant="outline" size="sm" class="shrink-0" :disabled="!addingProviderKeyId || updateMutation.isPending.value" @click="handleAddProviderKey">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                class="shrink-0"
+                :disabled="!addingProviderKeyId || updateMutation.isPending.value"
+                @click="handleAddProviderKey"
+              >
                 <IconPlus />
               </Button>
             </div>
@@ -729,12 +802,10 @@ async function copyTokenToClipboard() {
                 <SelectValue placeholder="Select an owner" />
               </SelectTrigger>
               <SelectContent class="max-w-[280px]">
-                <SelectItem
-                  v-for="user in users?.users"
-                  :key="user.id"
-                  :value="user.id"
-                >
-                  <span :title="`${user.username} (${user.email || 'no email'})`">{{ user.username }} ({{ user.email || 'no email' }})</span>
+                <SelectItem v-for="user in users?.users" :key="user.id" :value="user.id">
+                  <span :title="`${user.username} (${user.email || 'no email'})`"
+                    >{{ user.username }} ({{ user.email || 'no email' }})</span
+                  >
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -745,15 +816,18 @@ async function copyTokenToClipboard() {
           <Button
             :disabled="updateMutation.isPending.value"
             variant="outline"
-            @click="showUpdateModal = false; name = ''; selectedProviderKeyIds = []; addingProviderKeyId = ''; selectedOwnerId = ''"
+            @click="
+              showUpdateModal = false
+              name = ''
+              selectedProviderKeyIds = []
+              addingProviderKeyId = ''
+              selectedOwnerId = ''
+            "
           >
             <IconX />
             Cancel
           </Button>
-          <Button
-            :disabled="updateMutation.isPending.value"
-            @click="handleUpdateAgent"
-          >
+          <Button :disabled="updateMutation.isPending.value" @click="handleUpdateAgent">
             <IconCheck />
             {{ updateMutation.isPending.value ? 'Updating...' : 'Update Agent' }}
           </Button>
@@ -764,21 +838,37 @@ async function copyTokenToClipboard() {
     <!-- IC Token Display Modal -->
     <Dialog
       :open="showTokenDialog"
-      @update:open="(open) => { showTokenDialog = open; if (!open) { tokenDialogValue = ''; tokenDialogAgentName = ''; tokenDialogWarning = ''; copyMessage = '' } }"
+      @update:open="
+        (open) => {
+          showTokenDialog = open
+          if (!open) {
+            tokenDialogValue = ''
+            tokenDialogAgentName = ''
+            tokenDialogWarning = ''
+            copyMessage = ''
+          }
+        }
+      "
     >
       <DialogContent class="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>IC Token for {{ tokenDialogAgentName }}</DialogTitle>
           <DialogDescription>
-            Store this token securely. It is shown only once. Update your agents with this value immediately.
+            Store this token securely. It is shown only once. Update your agents with this value
+            immediately.
           </DialogDescription>
         </DialogHeader>
 
         <div class="space-y-3">
-          <div class="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-foreground">
-            <strong>Important:</strong> {{ tokenDialogWarning || 'Copy this token now — it won\'t be shown again.' }}
+          <div
+            class="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-foreground"
+          >
+            <strong>Important:</strong>
+            {{ tokenDialogWarning || "Copy this token now — it won't be shown again." }}
           </div>
-          <div class="bg-muted border border-border rounded-md p-3 font-mono text-sm break-all select-all">
+          <div
+            class="bg-muted border border-border rounded-md p-3 font-mono text-sm break-all select-all"
+          >
             {{ tokenDialogValue }}
           </div>
           <p v-if="copyMessage" class="text-base text-muted-foreground">
@@ -787,11 +877,20 @@ async function copyTokenToClipboard() {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" @click="showTokenDialog = false; tokenDialogValue = ''; tokenDialogAgentName = ''; tokenDialogWarning = ''; copyMessage = ''">
+          <Button
+            variant="outline"
+            @click="
+              showTokenDialog = false
+              tokenDialogValue = ''
+              tokenDialogAgentName = ''
+              tokenDialogWarning = ''
+              copyMessage = ''
+            "
+          >
             <IconX />
             Close
           </Button>
-          <Button @click="copyTokenToClipboard">
+          <Button @click="handleCopyTokenToClipboard">
             <IconCopy />
             Copy Token
           </Button>

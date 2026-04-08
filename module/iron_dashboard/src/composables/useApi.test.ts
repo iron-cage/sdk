@@ -11,7 +11,10 @@ const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
 function makeJwt(payload: object): string {
-  const seg = btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  const seg = btoa(JSON.stringify(payload))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
   return `header.${seg}.sig`
 }
 
@@ -49,7 +52,9 @@ describe('useApi — _logoutPromise deduplication', () => {
     const logoutSpy = vi.spyOn(authStore, 'logout')
 
     // Mock the refresh call to fail
-    const refreshMock = vi.spyOn(authStore, 'refresh').mockRejectedValue(new Error('Token refresh failed'))
+    const refreshMock = vi
+      .spyOn(authStore, 'refresh')
+      .mockRejectedValue(new Error('Token refresh failed'))
 
     const { useApi } = await import('./useApi')
     const api = useApi()
@@ -62,10 +67,7 @@ describe('useApi — _logoutPromise deduplication', () => {
     })
 
     // Fire two concurrent requests that will both get 401
-    const results = await Promise.allSettled([
-      api.getAgents(),
-      api.getProviderKeys(),
-    ])
+    const results = await Promise.allSettled([api.getAgents(), api.getProviderKeys()])
 
     // Both should reject with 'Session expired'
     expect(results[0].status).toBe('rejected')
@@ -142,10 +144,7 @@ describe('useApi — _logoutPromise deduplication', () => {
     })
 
     // Fire two concurrent requests
-    const results = await Promise.allSettled([
-      api.getAgents(),
-      api.getProviderKeys(),
-    ])
+    const results = await Promise.allSettled([api.getAgents(), api.getProviderKeys()])
 
     expect(results[0].status).toBe('rejected')
     expect(results[1].status).toBe('rejected')

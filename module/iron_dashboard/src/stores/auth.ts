@@ -8,11 +8,11 @@ interface LoginCredentials {
 
 interface AuthTokens {
   user_token: string
-  refresh_token?: string  // backend uses Option<String> with skip_serializing_if
+  refresh_token?: string // backend uses Option<String> with skip_serializing_if
   token_type: string
   expires_in: number
   user: {
-    id: string  // User ID like 'user_admin' - used for FK relations
+    id: string // User ID like 'user_admin' - used for FK relations
     email: string
     role: string
     name: string
@@ -36,8 +36,8 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref<string | null>(null)
   const refreshToken = ref<string | null>(null)
-  const username = ref<string | null>(null)  // display name
-  const userId = ref<string | null>(null)    // FK / ID
+  const username = ref<string | null>(null) // display name
+  const userId = ref<string | null>(null) // FK / ID
   const role = ref<string | null>(null)
   const isAuthenticated = computed(() => !!accessToken.value)
   const isAdmin = computed(() => role.value === 'admin')
@@ -51,9 +51,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     // Treat the literal string "undefined" written by old code as absent
     const validRefreshToken =
-      storedRefreshToken && storedRefreshToken !== 'undefined'
-        ? storedRefreshToken
-        : null
+      storedRefreshToken && storedRefreshToken !== 'undefined' ? storedRefreshToken : null
 
     if (storedAccessToken) {
       accessToken.value = storedAccessToken
@@ -100,7 +98,7 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('refresh_token')
     localStorage.removeItem('username')
     localStorage.removeItem('user_id')
-    localStorage.removeItem('role')  // clean up legacy key
+    localStorage.removeItem('role') // clean up legacy key
   }
 
   // Login
@@ -114,9 +112,9 @@ export const useAuthStore = defineStore('auth', () => {
     })
 
     if (!response.ok) {
-      let msg: string;
+      let msg: string
       try {
-        const body = await response.json();
+        const body = await response.json()
         msg = body?.error?.message ?? body?.error ?? body?.message ?? 'Login failed'
       } catch {
         msg = 'Login failed'
@@ -137,7 +135,7 @@ export const useAuthStore = defineStore('auth', () => {
     const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${refreshToken.value}`,
+        Authorization: `Bearer ${refreshToken.value}`,
       },
     })
 

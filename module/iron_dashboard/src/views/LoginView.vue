@@ -15,12 +15,12 @@ const authStore = useAuthStore()
 
 const email = ref('')
 const password = ref('')
-const loading = ref(false)
+const isLoading = ref(false)
 const loginError = ref('')
 
 async function handleLogin() {
   loginError.value = ''
-  loading.value = true
+  isLoading.value = true
 
   try {
     await authStore.login({
@@ -32,7 +32,7 @@ async function handleLogin() {
     loginError.value = err instanceof Error ? err.message : 'Unexpected error'
     toast.error(loginError.value)
   } finally {
-    loading.value = false
+    isLoading.value = false
   }
 }
 </script>
@@ -45,31 +45,21 @@ async function handleLogin() {
       <form class="space-y-4" @submit.prevent="handleLogin">
         <div class="space-y-2">
           <Label for="email">Email</Label>
-          <Input
-            id="email"
-            v-model="email"
-            type="email"
-            required
-            :disabled="loading"
-          />
+          <Input id="email" v-model="email" type="email" required :disabled="isLoading" />
         </div>
 
         <div class="space-y-2">
           <Label for="password">Password</Label>
-          <Input
-            id="password"
-            v-model="password"
-            type="password"
-            required
-            :disabled="loading"
-          />
+          <Input id="password" v-model="password" type="password" required :disabled="isLoading" />
         </div>
 
-        <p v-if="loginError" role="alert" class="text-sm text-destructive text-center">{{ loginError }}</p>
+        <p v-if="loginError" role="alert" class="text-sm text-destructive text-center">
+          {{ loginError }}
+        </p>
 
-        <Button type="submit" :disabled="loading" class="w-full">
+        <Button type="submit" :disabled="isLoading" class="w-full">
           <IconLogIn />
-          {{ loading ? 'Signing in...' : 'Sign in' }}
+          {{ isLoading ? 'Signing in...' : 'Sign in' }}
         </Button>
       </form>
     </div>

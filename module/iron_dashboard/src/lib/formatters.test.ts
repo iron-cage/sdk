@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  formatTimestamp,
-  formatMicrodollars,
-  formatCostUsd,
-  formatNumber,
-} from './formatters'
+import { formatTimestamp, formatMicrodollars, formatCostUsd, formatNumber } from './formatters'
 
 describe('formatTimestamp', () => {
   it('returns "-" for null', () => {
