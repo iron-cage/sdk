@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::sqlite::SqlitePoolOptions;
 
 use crate::{
-  error::{JsonBody, ValidationError},
+  error::{ApiError, JsonBody, ValidationError},
   jwt_auth::AuthenticatedUser,
   rbac::{Permission, PermissionChecker},
 };
@@ -309,15 +309,15 @@ fn validate_and_convert_spending_cap(usd: f64) -> Result<i64, &'static str> {
 }
 
 /// Check if user has `ManageProviderKeys` permission
-fn check_manage_provider_keys(role_str: &str) -> Result<(), crate::error::ApiError> {
+fn check_manage_provider_keys(role_str: &str) -> Result<(), ApiError> {
   let role = iron_types::Role::from_str(role_str).map_err(|_| {
-    crate::error::ApiError::Forbidden(format!("Invalid role: {role_str}"))
+    ApiError::Forbidden(format!("Invalid role: {role_str}"))
   })?;
   let checker = PermissionChecker::new();
   if checker.has_permission(role, Permission::ManageProviderKeys) {
     Ok(())
   } else {
-    Err(crate::error::ApiError::Forbidden(
+    Err(ApiError::Forbidden(
       "Insufficient permissions: ManageProviderKeys required".into(),
     ))
   }
@@ -401,7 +401,7 @@ fn validate_update_fields(
   if let Some(ref url) = request.base_url {
     if !url.is_empty() && !url.starts_with("https://") {
       return Err(
-        crate::error::ApiError::BadRequest("base_url must use HTTPS".into()).into_response(),
+        ApiError::BadRequest("base_url must use HTTPS".into()).into_response(),
       );
     }
   }
@@ -410,7 +410,7 @@ fn validate_update_fields(
   if let Some(Some(cap)) = request.spending_cap_usd {
     if cap < 0.0 {
       return Err(
-        crate::error::ApiError::BadRequest(
+        ApiError::BadRequest(
           "spending_cap_usd must be greater than or equal to 0".into(),
         )
         .into_response(),
@@ -469,8 +469,6 @@ pub async fn create_provider_key(
   AuthenticatedUser(claims): AuthenticatedUser,
   JsonBody(request): JsonBody<CreateProviderKeyRequest>,
 ) -> crate::error::ApiResult<impl IntoResponse> {
-  use crate::error::ApiError;
-
   check_manage_provider_keys(&claims.role)?;
 
   // qqq: [Low] 503 implies transient failure —

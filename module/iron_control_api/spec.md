@@ -74,8 +74,8 @@ Users with the `ManageProviderKeys` permission can create and manage AI provider
 | `GET` | `/api/v1/providers/:id` | Get details for a specific key |
 | `PUT` | `/api/v1/providers/:id` | Update key fields |
 | `DELETE` | `/api/v1/providers/:id` | Delete a key |
-| `POST` | `/api/v1/providers/:id/projects/:project_id` | Assign key to a project |
-| `DELETE` | `/api/v1/providers/projects/:project_id` | Unassign key from a project |
+| `POST` | `/api/v1/projects/{project_id}/provider` | Assign key to a project |
+| `DELETE` | `/api/v1/projects/{project_id}/provider` | Unassign key from a project |
 
 All endpoints require a valid JWT with the `ManageProviderKeys` RBAC permission. Ownership is always verified: all responses return `404` for missing or foreign keys to avoid leaking key existence.
 
@@ -136,9 +136,9 @@ Verifies ownership then deletes. Returns `204 No Content` on success, `404` if n
 
 ### Project Assignment
 
-**Assign:** `POST /api/v1/providers/:id/projects/:project_id` — assigns key `:id` to project `:project_id`. Both key and project ownership are verified. Assignment history is append-only; the most-recently inserted row (highest `assigned_at`) is the active key for the project.
+**Assign:** `POST /api/v1/projects/{project_id}/provider` — assigns a key to the project. The `provider_key_id` is supplied in the JSON request body (not as a path parameter). Both key and project ownership are verified. Assignment history is append-only; the most-recently inserted row (highest `assigned_at`) is the active key for the project.
 
-**Unassign:** `DELETE /api/v1/providers/projects/:project_id` — removes the active assignment. The key owner is verified before removal. Returns `404` consistently (never `403`) to avoid leaking key or project existence.
+**Unassign:** `DELETE /api/v1/projects/{project_id}/provider` — removes the active assignment. The key owner is verified before removal. Returns `404` consistently (never `403`) to avoid leaking key or project existence.
 
 ### ProviderKeyResponse shape
 

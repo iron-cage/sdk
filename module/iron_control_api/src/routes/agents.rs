@@ -22,14 +22,15 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use sqlx::{Row, SqlitePool};
 
-use crate::jwt_auth::AuthenticatedUser;
+use crate::jwt_auth::{AccessTokenClaims, AuthenticatedUser};
+use crate::rbac::Role;
 
 /// Parse role from claims, returning 401 for unrecognized roles.
 fn parse_role(
-  claims: &crate::jwt_auth::AccessTokenClaims,
-) -> Result<crate::rbac::Role, (StatusCode, String)> {
+  claims: &AccessTokenClaims,
+) -> Result<Role, (StatusCode, String)> {
   use core::str::FromStr;
-  crate::rbac::Role::from_str(&claims.role)
+  Role::from_str(&claims.role)
     .map_err(|_| (StatusCode::UNAUTHORIZED, format!("Unrecognized role: {}", claims.role)))
 }
 
@@ -115,7 +116,7 @@ pub async fn list_agents(
   let is_admin = parse_role(&user.0)
     .map_err(|e| tracing::warn!("Failed to parse role for user {}: {}", user.0.sub, e.1))
     .ok()
-    == Some(crate::rbac::Role::Admin);
+    == Some(Role::Admin);
   let mut agents = if is_admin {
     // Admin sees all agents
     sqlx::query_as::<_, Agent>(
@@ -211,7 +212,7 @@ pub async fn get_agent(
   .ok_or((StatusCode::NOT_FOUND, "Agent not found".to_string()))?;
 
   // Check if user has access (admin or owns the agent)
-  if parse_role(&user.0)? != crate::rbac::Role::Admin && agent.owner_id != user.0.sub {
+  if parse_role(&user.0)? != Role::Admin && agent.owner_id != user.0.sub {
     return Err((
       StatusCode::FORBIDDEN,
       "You don't have access to this agent".to_string(),
@@ -238,7 +239,7 @@ pub async fn create_agent(
   Json(req): Json<CreateAgentRequest>,
 ) -> Result<(StatusCode, Json<Agent>), (StatusCode, String)> {
   // Only admins can create agents
-  if parse_role(&user.0)? != crate::rbac::Role::Admin {
+  if parse_role(&user.0)? != Role::Admin {
     return Err((
       StatusCode::FORBIDDEN,
       "Only administrators can create agents".to_string(),
@@ -290,7 +291,7 @@ pub async fn create_agent(
   let is_admin = parse_role(&user.0)
     .map_err(|e| tracing::warn!("Failed to parse role for user {}: {}", user.0.sub, e.1))
     .ok()
-    == Some(crate::rbac::Role::Admin);
+    == Some(Role::Admin);
 
   // Only admins can assign agents to other users
   if req.owner_id.is_some() && !is_admin {
@@ -397,7 +398,7 @@ pub async fn update_agent(
   Json(req): Json<UpdateAgentRequest>,
 ) -> Result<Json<Agent>, (StatusCode, String)> {
   // Only admins can update agents
-  if parse_role(&user.0)? != crate::rbac::Role::Admin {
+  if parse_role(&user.0)? != Role::Admin {
     return Err((
       StatusCode::FORBIDDEN,
       "Only administrators can update agents".to_string(),
@@ -603,7 +604,7 @@ pub async fn delete_agent(
   user: AuthenticatedUser,
 ) -> Result<StatusCode, (StatusCode, String)> {
   // Only admins can delete agents
-  if parse_role(&user.0)? != crate::rbac::Role::Admin {
+  if parse_role(&user.0)? != Role::Admin {
     return Err((
       StatusCode::FORBIDDEN,
       "Only administrators can delete agents".to_string(),
@@ -643,7 +644,7 @@ pub async fn update_agent_budget(
   user: AuthenticatedUser,
   Json(req): Json<UpdateAgentBudgetRequest>,
 ) -> Result<Json<AgentBudgetResponse>, (StatusCode, String)> {
-  if parse_role(&user.0)? != crate::rbac::Role::Admin {
+  if parse_role(&user.0)? != Role::Admin {
     return Err((
       StatusCode::FORBIDDEN,
       "Only administrators can update agent budgets".to_string(),
@@ -775,7 +776,7 @@ pub async fn get_agent_tokens(
   };
 
   // Check if user has access (admin or owns the agent)
-  if parse_role(&user.0)? != crate::rbac::Role::Admin && owner_id != user.0.sub {
+  if parse_role(&user.0)? != Role::Admin && owner_id != user.0.sub {
     return Err((
       StatusCode::FORBIDDEN,
       "You don't have access to this agent".to_string(),
@@ -786,7 +787,7 @@ pub async fn get_agent_tokens(
   let is_admin = parse_role(&user.0)
     .map_err(|e| tracing::warn!("Failed to parse role for user {}: {}", user.0.sub, e.1))
     .ok()
-    == Some(crate::rbac::Role::Admin);
+    == Some(Role::Admin);
   let rows = if is_admin {
     // Admin sees all tokens for this agent
     sqlx::query(

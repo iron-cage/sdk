@@ -48,7 +48,7 @@ pub async fn make_providers_state(pool: &sqlx::SqlitePool) -> TestProvidersAppSt
   TestProvidersAppState { providers, auth }
 }
 
-/// Generate an admin bearer token (has ManageProviderKeys).
+/// Generate an admin bearer token (has `ManageProviderKeys`).
 #[allow(dead_code)]
 pub fn bearer(user_id: &str) -> String {
   let jwt = JwtSecret::new(TEST_JWT_SECRET.to_string());

@@ -81,7 +81,7 @@ fn build_full_router(state: TestProvidersAppState) -> Router {
     .with_state(state)
 }
 
-/// Developer bearer token (lacks ManageProviderKeys)
+/// Developer bearer token (lacks `ManageProviderKeys`)
 fn bearer_developer(user_id: &str) -> String {
   let jwt = JwtSecret::new(TEST_JWT_SECRET.to_string());
   let token = jwt
@@ -807,7 +807,7 @@ async fn unassign_returns_403_for_wrong_owner() {
 
 /// User A cannot assign their provider key to user B's project.
 ///
-/// The assign endpoint verifies project ownership via api_tokens; if the caller has
+/// The assign endpoint verifies project ownership via `api_tokens`; if the caller has
 /// no token for the target project, the assignment is rejected with 404.
 #[tokio::test]
 async fn cross_tenant_project_assignment_rejected() {

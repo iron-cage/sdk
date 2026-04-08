@@ -186,7 +186,7 @@ async fn delete_key() {
   assert!(result.is_err(), "Getting deleted key should fail");
 }
 
-  #[tokio::test]
+#[tokio::test]
 async fn create_two_keys_same_provider_same_user() {
   let (storage, _db) = common::create_test_provider_storage().await;
 
@@ -391,7 +391,7 @@ async fn get_key_projects_returns_all_assigned_projects() {
 #[tokio::test]
 #[allow(clippy::similar_names)]
 async fn get_project_key_deterministic_multiple_assignments() {
-  let (storage, _db) = common::create_test_provider_storage().await;
+  let (storage, db) = common::create_test_provider_storage().await;
   let key_a = storage
     .create_key(ProviderType::OpenAI, "enc_a", "nonce_a", None, None, "user_001")
     .await
@@ -410,7 +410,7 @@ async fn get_project_key_deterministic_multiple_assignments() {
   .bind("proj_det")
   .bind(key_a)
   .bind(1000_i64)
-  .execute(_db.pool())
+  .execute(db.pool())
   .await
   .unwrap();
 
@@ -421,7 +421,7 @@ async fn get_project_key_deterministic_multiple_assignments() {
   .bind("proj_det")
   .bind(key_b)
   .bind(2000_i64)
-  .execute(_db.pool())
+  .execute(db.pool())
   .await
   .unwrap();
 

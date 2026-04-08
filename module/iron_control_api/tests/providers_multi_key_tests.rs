@@ -360,8 +360,9 @@ async fn perform_handshake(
     .unwrap()
 }
 
-/// Handshake without provider_key_id uses the agent's assigned key
+/// Handshake without `provider_key_id` uses the agent's assigned key
 #[tokio::test]
+#[allow(clippy::similar_names)] // ic_token and ip_token are distinct domain terms
 async fn test_handshake_uses_agent_assigned_key() {
   let pool = setup_test_db().await;
   let state = create_test_budget_state(pool.clone()).await;
@@ -402,7 +403,7 @@ async fn test_handshake_uses_agent_assigned_key() {
   );
 }
 
-/// Explicit provider_key_id owned by another user must return 403 UNAUTHORIZED_KEY_ACCESS
+/// Explicit `provider_key_id` owned by another user must return 403 `UNAUTHORIZED_KEY_ACCESS`
 #[tokio::test]
 async fn test_handshake_rejects_cross_tenant_explicit_key() {
   let pool = setup_test_db().await;
@@ -443,7 +444,7 @@ async fn test_handshake_rejects_cross_tenant_explicit_key() {
   );
 }
 
-/// Handshake with no assigned key and no explicit key → 403 NO_PROVIDER_ASSIGNED
+/// Handshake with no assigned key and no explicit key → 403 `NO_PROVIDER_ASSIGNED`
 #[tokio::test]
 async fn test_handshake_no_assigned_key_returns_403() {
   let pool = setup_test_db().await;
@@ -481,10 +482,10 @@ async fn test_handshake_no_assigned_key_returns_403() {
 
 use common::DEV_KEY_ENV_LOCK;
 
-/// Seed user and update agent_1's owner_id.
+/// Seed user and update `agent_1`'s `owner_id`.
 ///
-/// Migration 018 seeds agent_1 with `owner_id = NULL`. This helper inserts a user
-/// and sets that user as agent_1's owner so the handshake can proceed.
+/// Migration 018 seeds `agent_1` with `owner_id = NULL`. This helper inserts a user
+/// and sets that user as `agent_1`'s owner so the handshake can proceed.
 async fn seed_agent1_owner(pool: &sqlx::SqlitePool, user_id: &str) {
   let now_ms = chrono::Utc::now().timestamp_millis();
   sqlx::query(
@@ -509,7 +510,7 @@ async fn seed_agent1_owner(pool: &sqlx::SqlitePool, user_id: &str) {
     .unwrap();
 }
 
-/// agent_id == 1 without IRON_ALLOW_DEV_KEYS → 403 NO_PROVIDER_ASSIGNED
+/// `agent_id` == 1 without `IRON_ALLOW_DEV_KEYS` → 403 `NO_PROVIDER_ASSIGNED`
 #[tokio::test]
 async fn handshake_dev_key_creation_requires_flag() {
   let pool = setup_test_db().await;
@@ -560,7 +561,7 @@ async fn handshake_dev_key_creation_requires_flag() {
   );
 }
 
-/// agent_id == 1 with IRON_ALLOW_DEV_KEYS set → 200 and valid IC token response
+/// `agent_id` == 1 with `IRON_ALLOW_DEV_KEYS` set → 200 and valid IC token response
 #[tokio::test]
 async fn handshake_dev_key_creation_works_with_flag() {
   let pool = setup_test_db().await;
@@ -610,11 +611,11 @@ async fn handshake_dev_key_creation_works_with_flag() {
   );
 }
 
-/// TOCTOU re-check: agent owned by user_b has a key that belongs to user_a.
+/// TOCTOU re-check: agent owned by `user_b` has a key that belongs to `user_a`.
 ///
-/// The initial ownership check is skipped (no explicit provider_key_id in request).
+/// The initial ownership check is skipped (no explicit `provider_key_id` in request).
 /// After budget reservation, the handler re-validates the fetched key's owner against
-/// the agent's owner. The mismatch must return 403 UNAUTHORIZED_KEY_ACCESS.
+/// the agent's owner. The mismatch must return 403 `UNAUTHORIZED_KEY_ACCESS`.
 #[tokio::test]
 async fn handshake_toctou_recheck_fails_for_wrong_owner() {
   let pool = setup_test_db().await;
@@ -696,7 +697,7 @@ async fn handshake_toctou_recheck_fails_for_wrong_owner() {
 ///   1. Agent is assigned a provider key
 ///   2. The key is hard-deleted from `ai_provider_keys` (ON DELETE SET NULL fires)
 ///   3. Agent's `provider_key_id` is set to NULL (simulating the cascade)
-///   4. Handshake is called — must return 403 NO_PROVIDER_ASSIGNED (or 404)
+///   4. Handshake is called — must return 403 `NO_PROVIDER_ASSIGNED` (or 404)
 ///   5. Budget must remain unchanged
 #[tokio::test]
 async fn handshake_fails_gracefully_after_assigned_key_deleted() {
