@@ -1,5 +1,37 @@
 #![allow(missing_docs)]
 
+//! Test Matrix:
+//! | Test Name                                        | Purpose                                                                 | Verification                                                         |
+//! |--------------------------------------------------|-------------------------------------------------------------------------|----------------------------------------------------------------------|
+//! | create_and_get_key                               | Create a key and retrieve it by ID                                      | All fields (provider, description, user_id, is_enabled, ciphertext)  |
+//! | list_keys_by_user                                | List keys filtered by user_id                                           | Counts per user, cross-user isolation                                |
+//! | enable_disable_key                               | Toggle is_enabled via update_key_fields                                 | is_enabled reflects each update call                                 |
+//! | update_balance                                   | Set balance_cents via update_balance                                    | balance_cents and balance_updated_at are set correctly               |
+//! | delete_key                                       | Delete a key and confirm it is gone                                     | get_key returns Err after deletion                                   |
+//! | create_two_keys_same_provider_same_user          | Two keys for same provider and user are independent                     | IDs are distinct; both retrievable                                   |
+//! | cross_tenant_list_isolation                      | Keys from different users do not bleed into each other's lists          | get_keys_by_owner_and_provider returns only the requesting user's IDs|
+//! | project_assignment                               | Full assign / get / get_key_projects / unassign lifecycle               | get_project_key reflects assignment and unassignment                 |
+//! | get_nonexistent_key_returns_error                | get_key on a missing ID                                                 | Returns Err(NotFound)                                                |
+//! | get_nonexistent_key_metadata_returns_error       | get_key_metadata on a missing ID                                        | Returns Err(NotFound)                                                |
+//! | delete_nonexistent_key_returns_error             | delete_key on a missing ID                                              | Returns Err(NotFound)                                                |
+//! | update_key_fields_nonexistent_returns_error      | update_key_fields on a missing ID                                       | Returns Err(NotFound)                                                |
+//! | assign_and_retrieve_project_key                  | Assign a key to a project then retrieve it                              | get_project_key returns Some(key_id)                                 |
+//! | get_project_key_returns_none_when_unassigned     | Query project with no assignment                                        | get_project_key returns None                                         |
+//! | unassign_project_key                             | Unassign removes the project→key mapping                                | get_project_key returns None after unassignment                      |
+//! | get_key_projects_returns_all_assigned_projects   | Key assigned to multiple projects lists them all                        | get_key_projects returns sorted list of all project IDs              |
+//! | get_project_key_deterministic_multiple_assignments | Two keys assigned to same project; most-recent wins                  | get_project_key returns the key with the later assigned_at           |
+//! | update_key_fields_single_field                   | Update only description, leaving other fields unchanged                 | description updated; is_enabled untouched                            |
+//! | update_key_fields_clear_nullable                 | Clear a nullable field by passing Some(None)                            | description becomes NULL                                             |
+//! | update_key_fields_multiple_fields_atomic         | Update description and is_enabled in one call                           | Both fields reflect the new values                                   |
+//! | update_key_fields_no_change                      | All-None update is a no-op                                              | All fields remain at their original values                           |
+//! | set_spending_cap_and_get_summary                 | Set a spending cap and read it back                                     | cap_microdollars set; used_microdollars is 0                         |
+//! | remove_spending_cap                              | Set then clear a spending cap                                           | cap_microdollars becomes None                                        |
+//! | increment_spending_within_cap                    | Increment spending below the cap                                        | used_microdollars reflects increment                                 |
+//! | increment_spending_exceeds_cap                   | Increment spending past the cap                                         | Returns Err(SpendingCapExceeded)                                     |
+//! | increment_spending_no_cap                        | Large increment with no cap set                                         | Succeeds; used_microdollars reflects full amount                     |
+//! | reserve_and_adjust_spending                      | Reserve an amount then adjust to the actual cost                        | used_microdollars equals actual cost after adjust                    |
+//! | adjust_spending_zero_delta_is_noop               | Adjust where reserved equals actual (zero delta)                       | used_microdollars unchanged; no error                                |
+
 mod common;
 use iron_token_manager::ProviderType;
 
@@ -369,11 +401,29 @@ async fn get_project_key_deterministic_multiple_assignments() {
     .await
     .unwrap();
 
-  storage.assign_to_project(key_a, "proj_det").await.unwrap();
-  // Small sleep ensures key_b gets a later assigned_at timestamp
-  // qqq: [Medium] timing-dependent — 2ms sleep may collide on slow CI; inject explicit assigned_at timestamps instead of relying on wall-clock ordering
-  tokio::time::sleep(core::time::Duration::from_millis(2)).await;
-  storage.assign_to_project(key_b, "proj_det").await.unwrap();
+  // Insert assignments with explicit timestamps so ordering is deterministic
+  // regardless of wall-clock resolution: key_a at t=1000, key_b at t=2000.
+  sqlx::query(
+    "INSERT OR REPLACE INTO project_provider_key_assignments \
+     (project_id, provider_key_id, assigned_at) VALUES (?, ?, ?)",
+  )
+  .bind("proj_det")
+  .bind(key_a)
+  .bind(1000_i64)
+  .execute(_db.pool())
+  .await
+  .unwrap();
+
+  sqlx::query(
+    "INSERT OR REPLACE INTO project_provider_key_assignments \
+     (project_id, provider_key_id, assigned_at) VALUES (?, ?, ?)",
+  )
+  .bind("proj_det")
+  .bind(key_b)
+  .bind(2000_i64)
+  .execute(_db.pool())
+  .await
+  .unwrap();
 
   let assigned = storage.get_project_key("proj_det").await.unwrap();
   assert_eq!(
@@ -522,7 +572,7 @@ async fn increment_spending_exceeds_cap() {
 
   storage.set_spending_cap(key_id, Some(1_000_000)).await.unwrap();
   let result = storage.increment_spending(key_id, 1_000_001).await;
-  assert!(result.is_err(), "Incrementing past the cap must return Err");
+  assert!(matches!(result, Err(iron_token_manager::error::TokenError::SpendingCapExceeded)), "Incrementing past the cap must return Err(SpendingCapExceeded)");
 }
 
 #[tokio::test]

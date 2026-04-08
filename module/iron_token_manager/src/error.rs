@@ -23,7 +23,7 @@ pub enum TokenError {
   /// Database error preserving sqlx details for FK constraint detection
   Database(sqlx::Error),
   /// Operation would exceed the spending cap
-  // qqq: [Info] callers in handshake.rs currently hit a wildcard Err arm — consider explicit match arm returning 402 Payment Required
+  // aaa: explicit match arm added in handshake.rs returning 403 PROVIDER_KEY_SPENDING_CAP_EXCEEDED
   SpendingCapExceeded,
   /// Key creation would exceed the per-user per-provider quota
   KeyQuotaExceeded,

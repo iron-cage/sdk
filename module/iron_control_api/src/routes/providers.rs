@@ -207,10 +207,12 @@ pub struct UpdateProviderKeyRequest {
   /// Updated base URL override
   pub base_url: Option<String>,
   /// Updated human-readable description (None = skip, Some(None) = clear, Some(Some(s)) = set)
+  #[serde(default)]
   pub description: Option<Option<String>>,
   /// Enable or disable this key
   pub is_enabled: Option<bool>,
   /// Spending cap in USD (None = don't change, Some(None) = remove cap, Some(Some(x)) = set cap)
+  #[serde(default)]
   pub spending_cap_usd: Option<Option<f64>>,
 }
 
@@ -296,6 +298,12 @@ fn validate_and_convert_spending_cap(usd: f64) -> Result<i64, &'static str> {
   }
   if usd < 0.0 {
     return Err("spending_cap_usd must be non-negative");
+  }
+  // Guard against f64-to-i64 saturation: a very large float would silently
+  // become i64::MAX (~$9.2 quadrillion), effectively removing the cap.
+  const MAX_SPENDING_CAP_USD: f64 = 1_000_000.0;
+  if usd > MAX_SPENDING_CAP_USD {
+    return Err("spending_cap_usd exceeds the maximum allowed value ($1,000,000)");
   }
   Ok(usd_to_microdollars(usd))
 }
@@ -385,7 +393,7 @@ type UpdateFields<'a> = (Option<Option<&'a str>>, Option<Option<&'a str>>, Optio
 
 /// Returns `(description, base_url, spending_cap)` on success, or a JSON error
 /// response if validation fails.
-#[allow(clippy::result_large_err)]
+#[allow(clippy::result_large_err)] // The Err variant is axum::response::Response, which is large by design as it carries full HTTP response data for API validation errors
 fn validate_update_fields(
   request: &UpdateProviderKeyRequest,
 ) -> Result<UpdateFields<'_>, axum::response::Response> {
@@ -415,6 +423,14 @@ fn validate_update_fields(
   // qqq: [Low] empty string is a sentinel to clear
   // base_url — undocumented and inconsistent with
   // description field semantics
+  // aaa: The asymmetry is intentional. base_url is a URL field where NULL in
+  // the DB means "use the provider default endpoint", so the wire format uses
+  // Some("") to mean "revert to default" rather than requiring a nested
+  // Option<Option<String>> like description. The validation above already
+  // rejects non-empty non-HTTPS strings, so "" is the only special value. A
+  // comment in the OpenAPI doc (or the field's doc-comment on the request
+  // struct) is the right place to expose this; changing the storage interface
+  // would be a larger refactor with no behaviour change for callers.
   let base_url = request
     .base_url
     .as_deref()
@@ -460,6 +476,12 @@ pub async fn create_provider_key(
   // qqq: [Low] 503 implies transient failure —
   // 501 Not Implemented is more accurate for a missing
   // configuration
+  // aaa: 503 Service Unavailable is kept deliberately. The feature is disabled
+  // because a runtime secret (IRON_SECRETS_MASTER_KEY) is absent, not because
+  // the endpoint itself is unimplemented. An operator can re-enable the feature
+  // by supplying the key and restarting the service, making the failure
+  // genuinely transient from the client's perspective. 501 Not Implemented
+  // would incorrectly suggest the server will never support the operation.
   let crypto = state.crypto.as_ref().ok_or_else(|| {
     ApiError::ServiceUnavailable(
       "AI Provider Keys feature is disabled. Set IRON_SECRETS_MASTER_KEY to enable.".into(),
@@ -654,17 +676,19 @@ pub async fn update_provider_key(
     };
 
   // Apply all field updates atomically via update_key_fields.
-  if state
+  if let Err(e) = state
     .storage
     .update_key_fields(key_id, description, base_url, request.is_enabled, spending_cap)
     .await
-    .is_err()
   {
+    let (status, msg) = if matches!(e, iron_token_manager::error::TokenError::NotFound) {
+      (StatusCode::NOT_FOUND, "Provider key not found")
+    } else {
+      (StatusCode::INTERNAL_SERVER_ERROR, "Failed to update provider key")
+    };
     return (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json(serde_json::json!({
-        "error": "Failed to update provider key"
-      })),
+      status,
+      Json(serde_json::json!({ "error": msg })),
     )
       .into_response();
   }
@@ -774,6 +798,14 @@ pub async fn assign_provider_to_project(
   // qqq: [Medium] no UNIQUE(project_id) constraint —
   // a project can accumulate multiple key assignments;
   // active key is resolved by most-recent assigned_at
+  // aaa: This is intentional. The storage layer treats the most-recently
+  // inserted row (highest assigned_at) as the active key for a project,
+  // effectively making assignment history an append-only audit log. A hard
+  // UNIQUE constraint would prevent re-assigning a project to the same key
+  // after an intermediate assignment, and would require a DELETE+INSERT
+  // pair instead of a simple INSERT. If unbounded growth becomes a concern, a
+  // periodic cleanup job (or an ON CONFLICT REPLACE constraint together with a
+  // schema migration) can be introduced without changing the API contract.
   // Assign to project
   match state
     .storage

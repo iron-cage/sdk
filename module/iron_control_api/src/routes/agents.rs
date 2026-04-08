@@ -112,7 +112,11 @@ pub async fn list_agents(
   State(pool): State<SqlitePool>,
   user: AuthenticatedUser,
 ) -> Result<Json<Vec<Agent>>, (StatusCode, String)> {
-  let mut agents = if parse_role(&user.0).map_err(|e| tracing::warn!("Failed to parse role for user {}: {}", user.0.sub, e.1)).ok() == Some(crate::rbac::Role::Admin) {
+  let is_admin = parse_role(&user.0)
+    .map_err(|e| tracing::warn!("Failed to parse role for user {}: {}", user.0.sub, e.1))
+    .ok()
+    == Some(crate::rbac::Role::Admin);
+  let mut agents = if is_admin {
     // Admin sees all agents
     sqlx::query_as::<_, Agent>(
       r"
@@ -283,7 +287,10 @@ pub async fn create_agent(
   })?;
 
   let created_at = chrono::Utc::now().timestamp_millis();
-  let is_admin = parse_role(&user.0).map_err(|e| tracing::warn!("Failed to parse role for user {}: {}", user.0.sub, e.1)).ok() == Some(crate::rbac::Role::Admin);
+  let is_admin = parse_role(&user.0)
+    .map_err(|e| tracing::warn!("Failed to parse role for user {}: {}", user.0.sub, e.1))
+    .ok()
+    == Some(crate::rbac::Role::Admin);
 
   // Only admins can assign agents to other users
   if req.owner_id.is_some() && !is_admin {
@@ -776,7 +783,11 @@ pub async fn get_agent_tokens(
   }
 
   // Get tokens based on user role
-  let rows = if parse_role(&user.0).map_err(|e| tracing::warn!("Failed to parse role for user {}: {}", user.0.sub, e.1)).ok() == Some(crate::rbac::Role::Admin) {
+  let is_admin = parse_role(&user.0)
+    .map_err(|e| tracing::warn!("Failed to parse role for user {}: {}", user.0.sub, e.1))
+    .ok()
+    == Some(crate::rbac::Role::Admin);
+  let rows = if is_admin {
     // Admin sees all tokens for this agent
     sqlx::query(
       r"

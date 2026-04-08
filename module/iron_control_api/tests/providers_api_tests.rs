@@ -14,8 +14,11 @@
 //! | create_rejects_null_byte_in_key    | NULL byte in key rejected  | 400 Bad Request    |
 //! | create_rejects_invalid_provider    | Unknown provider rejected  | 400 Bad Request    |
 //! | create_rejects_description_long    | 501-char desc rejected     | 400 Bad Request    |
+//! | create_rejects_http_base_url       | http:// base_url rejected  | 400 Bad Request    |
+//! | update_rejects_http_base_url       | PUT http:// rejected       | 400 Bad Request    |
 //! | create_disabled_without_master_key | No crypto → 503            | 503 Unavailable    |
 //! | update_provider_key_success        | Update desc & is_enabled   | 200 OK w/ updates  |
+//! | update_description_three_way       | absent=skip,null=clear,set | 3 PUTs verified    |
 //! | delete_provider_key_success        | Delete then GET → 404      | 204 then 404       |
 //! | assign_and_unassign_project_prov   | Assign then unassign       | 200 then 204       |
 //! | get_…_returns_404_for_wrong_owner  | Wrong owner GET            | 404 Not Found      |
@@ -386,6 +389,70 @@ async fn create_rejects_description_too_long() {
 }
 
 #[tokio::test]
+async fn create_rejects_http_base_url() {
+  let pool = setup_test_db().await;
+  let state = make_providers_state(&pool).await;
+
+  let body = json!({
+    "provider": "openai",
+    "api_key": "sk-valid-key-0000000000000000",
+    "base_url": "http://example.com",
+  });
+  let resp = build_full_router(state)
+    .oneshot(
+      Request::builder()
+        .method(Method::POST)
+        .uri("/api/v1/providers")
+        .header("content-type", "application/json")
+        .header("authorization", bearer("user_val"))
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert!(
+    resp.status() == StatusCode::BAD_REQUEST || resp.status() == StatusCode::UNPROCESSABLE_ENTITY,
+    "Non-HTTPS base_url must be rejected with 400 or 422, got {}",
+    resp.status()
+  );
+}
+
+#[tokio::test]
+async fn update_rejects_http_base_url() {
+  let pool = setup_test_db().await;
+  let state = make_providers_state(&pool).await;
+
+  // Create a valid key first so we have a real key_id to update
+  let key_id = state
+    .providers
+    .storage
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, None, "user_upd_http")
+    .await
+    .unwrap();
+
+  let body = json!({ "base_url": "http://example.com" });
+  let resp = build_full_router(state)
+    .oneshot(
+      Request::builder()
+        .method(Method::PUT)
+        .uri(format!("/api/v1/providers/{key_id}"))
+        .header("content-type", "application/json")
+        .header("authorization", bearer("user_upd_http"))
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert!(
+    resp.status() == StatusCode::BAD_REQUEST || resp.status() == StatusCode::UNPROCESSABLE_ENTITY,
+    "Non-HTTPS base_url on PUT must be rejected with 400 or 422, got {}",
+    resp.status()
+  );
+}
+
+#[tokio::test]
 async fn create_disabled_without_master_key() {
   let pool = setup_test_db().await;
   let state = make_providers_state_no_crypto(&pool).await;
@@ -445,6 +512,76 @@ async fn update_provider_key_success() {
   let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
   assert_eq!(json["description"].as_str().unwrap(), "After");
   assert!(!json["is_enabled"].as_bool().unwrap());
+}
+
+/// Verify 3-way description semantics: absent=skip, null=clear, value=set.
+#[tokio::test]
+async fn update_description_three_way_semantics() {
+  let pool = setup_test_db().await;
+  let state = make_providers_state(&pool).await;
+  let key_id = state
+    .providers
+    .storage
+    .create_key(ProviderType::OpenAI, "enc", "nonce", None, Some("Initial"), "owner_3way")
+    .await
+    .unwrap();
+
+  // 1. Absent field → description unchanged ("Initial")
+  let body = json!({ "is_enabled": true });
+  let resp = build_full_router(state.clone())
+    .oneshot(
+      Request::builder()
+        .method(Method::PUT)
+        .uri(format!("/api/v1/providers/{key_id}"))
+        .header("content-type", "application/json")
+        .header("authorization", bearer("owner_3way"))
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+  assert_eq!(resp.status(), StatusCode::OK);
+  let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+  let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+  assert_eq!(json["description"].as_str().unwrap(), "Initial", "absent field must not change description");
+
+  // 2. Explicit null → description cleared
+  let body = json!({ "description": null });
+  let resp = build_full_router(state.clone())
+    .oneshot(
+      Request::builder()
+        .method(Method::PUT)
+        .uri(format!("/api/v1/providers/{key_id}"))
+        .header("content-type", "application/json")
+        .header("authorization", bearer("owner_3way"))
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+  assert_eq!(resp.status(), StatusCode::OK);
+  let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+  let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+  assert!(json["description"].is_null(), "null must clear the description");
+
+  // 3. Explicit value → description set
+  let body = json!({ "description": "Restored" });
+  let resp = build_full_router(state.clone())
+    .oneshot(
+      Request::builder()
+        .method(Method::PUT)
+        .uri(format!("/api/v1/providers/{key_id}"))
+        .header("content-type", "application/json")
+        .header("authorization", bearer("owner_3way"))
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+  assert_eq!(resp.status(), StatusCode::OK);
+  let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+  let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+  assert_eq!(json["description"].as_str().unwrap(), "Restored", "explicit value must set description");
 }
 
 #[tokio::test]

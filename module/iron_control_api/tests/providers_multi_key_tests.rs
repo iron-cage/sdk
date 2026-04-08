@@ -231,72 +231,91 @@ fn build_handshake_router(state: iron_control_api::routes::budget::BudgetState) 
     .with_state(state)
 }
 
-/// Handshake without provider_key_id uses the agent's assigned key
-#[tokio::test]
-async fn test_handshake_uses_agent_assigned_key() {
-  let pool = setup_test_db().await;
-  let state = create_test_budget_state(pool.clone()).await;
-
+/// Helper: insert a single user row into the database.
+async fn seed_user(pool: &sqlx::SqlitePool, user_id: &str, email: &str) {
   let now_ms = chrono::Utc::now().timestamp_millis();
-
-  // Create owner user
   sqlx::query(
     "INSERT OR IGNORE INTO users (id, username, password_hash, email, role, is_active, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)",
   )
-  .bind("owner_h1")
-  .bind("owner_h1")
+  .bind(user_id)
+  .bind(user_id)
   .bind("hash")
-  .bind("owner_h1@example.com")
+  .bind(email)
   .bind("admin")
   .bind(1)
   .bind(now_ms)
-  .execute(&pool)
+  .execute(pool)
   .await
   .unwrap();
+}
 
-  // Create encrypted provider key owned by owner_h1
-  let crypto = state.crypto_service.as_ref().unwrap();
-  let encrypted = crypto.encrypt("sk-agent-assigned-key").unwrap();
-  let provider_key_id: i64 = 9001;
+/// Helper: insert an encrypted `ai_provider_keys` row with a fixed ID.
+///
+/// `crypto` must be the same `CryptoService` used by the `BudgetState` under test so
+/// that the handler can decrypt the key during the handshake.
+async fn seed_provider_key(
+  pool: &sqlx::SqlitePool,
+  crypto: &iron_secrets::crypto::CryptoService,
+  key_id: i64,
+  plaintext: &str,
+  owner_id: &str,
+) {
+  let now_ms = chrono::Utc::now().timestamp_millis();
+  let encrypted = crypto.encrypt(plaintext).unwrap();
   sqlx::query(
     "INSERT INTO ai_provider_keys \
-     (id, provider, encrypted_api_key, encryption_nonce, \
-      is_enabled, created_at, user_id) \
+     (id, provider, encrypted_api_key, encryption_nonce, is_enabled, created_at, user_id) \
      VALUES (?, ?, ?, ?, ?, ?, ?)",
   )
-  .bind(provider_key_id)
+  .bind(key_id)
   .bind("openai")
   .bind(encrypted.ciphertext_base64())
   .bind(encrypted.nonce_base64())
   .bind(1)
   .bind(now_ms)
-  .bind("owner_h1")
-  .execute(&pool)
+  .bind(owner_id)
+  .execute(pool)
   .await
   .unwrap();
+}
 
-  // Create agent owned by owner_h1 with provider_key_id assigned
-  let agent_id: i64 = 901;
+/// Helper: insert an `agents` row.
+///
+/// Pass `provider_key_id = None` to leave the column NULL (no assigned key).
+async fn seed_agent(
+  pool: &sqlx::SqlitePool,
+  agent_id: i64,
+  name: &str,
+  owner_id: &str,
+  provider_key_id: Option<i64>,
+) {
+  let now_ms = chrono::Utc::now().timestamp_millis();
   sqlx::query(
     "INSERT INTO agents (id, name, providers, created_at, owner_id, provider_key_id)
      VALUES (?, ?, ?, ?, ?, ?)",
   )
   .bind(agent_id)
-  .bind("agent_h1")
+  .bind(name)
   .bind("[\"openai\"]")
   .bind(now_ms)
-  .bind("owner_h1")
+  .bind(owner_id)
   .bind(provider_key_id)
-  .execute(&pool)
+  .execute(pool)
   .await
   .unwrap();
+}
 
-  // Seed agent budget
+/// Helper: insert `agent_budgets` and `usage_limits` rows required for handshake to proceed.
+async fn seed_agent_budget_and_limits(
+  pool: &sqlx::SqlitePool,
+  agent_id: i64,
+  owner_id: &str,
+) {
+  let now_ms = chrono::Utc::now().timestamp_millis();
   sqlx::query(
     "INSERT OR IGNORE INTO agent_budgets \
-     (agent_id, total_allocated, total_spent, \
-      budget_remaining, created_at, updated_at) \
+     (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at) \
      VALUES (?, ?, 0, ?, ?, ?)",
   )
   .bind(agent_id)
@@ -304,32 +323,31 @@ async fn test_handshake_uses_agent_assigned_key() {
   .bind(1_000_000_000_i64)
   .bind(now_ms)
   .bind(now_ms)
-  .execute(&pool)
+  .execute(pool)
   .await
   .unwrap();
 
-  // Seed usage limits for owner_h1
   sqlx::query(
     "INSERT OR IGNORE INTO usage_limits \
-     (user_id, max_cost_microdollars_per_month, \
-      current_cost_microdollars_this_month, \
+     (user_id, max_cost_microdollars_per_month, current_cost_microdollars_this_month, \
       created_at, updated_at) \
      VALUES (?, ?, 0, ?, ?)",
   )
-  .bind("owner_h1")
+  .bind(owner_id)
   .bind(10_000_000_000_i64)
   .bind(now_ms)
   .bind(now_ms)
-  .execute(&pool)
+  .execute(pool)
   .await
   .unwrap();
+}
 
-  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
-
-  let app = build_handshake_router(state);
-  let body = json!({ "ic_token": ic_token, "provider": "openai" }); // no provider_key_id
-
-  let resp = app
+/// Helper: fire a POST /api/budget/handshake request and return the response.
+async fn perform_handshake(
+  app: Router,
+  body: serde_json::Value,
+) -> axum::response::Response {
+  app
     .oneshot(
       Request::builder()
         .method(Method::POST)
@@ -339,7 +357,28 @@ async fn test_handshake_uses_agent_assigned_key() {
         .unwrap(),
     )
     .await
-    .unwrap();
+    .unwrap()
+}
+
+/// Handshake without provider_key_id uses the agent's assigned key
+#[tokio::test]
+async fn test_handshake_uses_agent_assigned_key() {
+  let pool = setup_test_db().await;
+  let state = create_test_budget_state(pool.clone()).await;
+
+  let crypto = state.crypto_service.as_ref().unwrap();
+  let provider_key_id: i64 = 9001;
+  let agent_id: i64 = 901;
+
+  seed_user(&pool, "owner_h1", "owner_h1@example.com").await;
+  seed_provider_key(&pool, crypto, provider_key_id, "sk-agent-assigned-key", "owner_h1").await;
+  seed_agent(&pool, agent_id, "agent_h1", "owner_h1", Some(provider_key_id)).await;
+  seed_agent_budget_and_limits(&pool, agent_id, "owner_h1").await;
+
+  let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
+
+  let body = json!({ "ic_token": ic_token, "provider": "openai" }); // no provider_key_id
+  let resp = perform_handshake(build_handshake_router(state), body).await;
 
   assert_eq!(resp.status(), StatusCode::OK, "Handshake with agent-assigned key should succeed");
 
@@ -369,113 +408,26 @@ async fn test_handshake_rejects_cross_tenant_explicit_key() {
   let pool = setup_test_db().await;
   let state = create_test_budget_state(pool.clone()).await;
 
-  let now_ms = chrono::Utc::now().timestamp_millis();
-
-  // Create two users: owner_h2 owns the agent; owner_other owns the key
-  for (uid, email) in [("owner_h2", "owner_h2@example.com"), ("owner_other", "other@example.com")] {
-    sqlx::query(
-      "INSERT OR IGNORE INTO users (id, username, password_hash, email, role, is_active, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)",
-    )
-    .bind(uid)
-    .bind(uid)
-    .bind("hash")
-    .bind(email)
-    .bind("admin")
-    .bind(1)
-    .bind(now_ms)
-    .execute(&pool)
-    .await
-    .unwrap();
-  }
-
-  // Key owned by owner_other (not agent's owner)
-  let other_key_id: i64 = 9002;
   let crypto = state.crypto_service.as_ref().unwrap();
-  let encrypted = crypto.encrypt("sk-other-user-key").unwrap();
-  sqlx::query(
-    "INSERT INTO ai_provider_keys \
-     (id, provider, encrypted_api_key, encryption_nonce, \
-      is_enabled, created_at, user_id) \
-     VALUES (?, ?, ?, ?, ?, ?, ?)",
-  )
-  .bind(other_key_id)
-  .bind("openai")
-  .bind(encrypted.ciphertext_base64())
-  .bind(encrypted.nonce_base64())
-  .bind(1)
-  .bind(now_ms)
-  .bind("owner_other")
-  .execute(&pool)
-  .await
-  .unwrap();
-
-  // Agent owned by owner_h2 (different from key owner)
+  let other_key_id: i64 = 9002;
   let agent_id: i64 = 902;
-  sqlx::query(
-    "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)",
-  )
-  .bind(agent_id)
-  .bind("agent_h2")
-  .bind("[\"openai\"]")
-  .bind(now_ms)
-  .bind("owner_h2")
-  .execute(&pool)
-  .await
-  .unwrap();
 
-  // Seed agent budget
-  sqlx::query(
-    "INSERT OR IGNORE INTO agent_budgets \
-     (agent_id, total_allocated, total_spent, \
-      budget_remaining, created_at, updated_at) \
-     VALUES (?, ?, 0, ?, ?, ?)",
-  )
-  .bind(agent_id)
-  .bind(1_000_000_000_i64)
-  .bind(1_000_000_000_i64)
-  .bind(now_ms)
-  .bind(now_ms)
-  .execute(&pool)
-  .await
-  .unwrap();
-
-  sqlx::query(
-    "INSERT OR IGNORE INTO usage_limits \
-     (user_id, max_cost_microdollars_per_month, \
-      current_cost_microdollars_this_month, \
-      created_at, updated_at) \
-     VALUES (?, ?, 0, ?, ?)",
-  )
-  .bind("owner_h2")
-  .bind(10_000_000_000_i64)
-  .bind(now_ms)
-  .bind(now_ms)
-  .execute(&pool)
-  .await
-  .unwrap();
+  // owner_h2 owns the agent; owner_other owns the key
+  seed_user(&pool, "owner_h2", "owner_h2@example.com").await;
+  seed_user(&pool, "owner_other", "other@example.com").await;
+  seed_provider_key(&pool, crypto, other_key_id, "sk-other-user-key", "owner_other").await;
+  seed_agent(&pool, agent_id, "agent_h2", "owner_h2", None).await;
+  seed_agent_budget_and_limits(&pool, agent_id, "owner_h2").await;
 
   let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
 
-  let app = build_handshake_router(state);
   // Explicitly pass other user's key ID
   let body = json!({
     "ic_token": ic_token,
     "provider": "openai",
     "provider_key_id": other_key_id,
   });
-
-  let resp = app
-    .oneshot(
-      Request::builder()
-        .method(Method::POST)
-        .uri("/api/budget/handshake")
-        .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_string(&body).unwrap()))
-        .unwrap(),
-    )
-    .await
-    .unwrap();
+  let resp = perform_handshake(build_handshake_router(state), body).await;
 
   assert_eq!(
     resp.status(),
@@ -497,83 +449,17 @@ async fn test_handshake_no_assigned_key_returns_403() {
   let pool = setup_test_db().await;
   let state = create_test_budget_state(pool.clone()).await;
 
-  let now_ms = chrono::Utc::now().timestamp_millis();
-
-  sqlx::query(
-    "INSERT OR IGNORE INTO users (id, username, password_hash, email, role, is_active, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)",
-  )
-  .bind("owner_h3")
-  .bind("owner_h3")
-  .bind("hash")
-  .bind("owner_h3@example.com")
-  .bind("admin")
-  .bind(1)
-  .bind(now_ms)
-  .execute(&pool)
-  .await
-  .unwrap();
-
-  // Agent with NO provider_key_id
   let agent_id: i64 = 903;
-  sqlx::query(
-    "INSERT INTO agents (id, name, providers, created_at, owner_id) VALUES (?, ?, ?, ?, ?)",
-  )
-  .bind(agent_id)
-  .bind("agent_h3")
-  .bind("[\"openai\"]")
-  .bind(now_ms)
-  .bind("owner_h3")
-  .execute(&pool)
-  .await
-  .unwrap();
 
-  sqlx::query(
-    "INSERT OR IGNORE INTO agent_budgets \
-     (agent_id, total_allocated, total_spent, \
-      budget_remaining, created_at, updated_at) \
-     VALUES (?, ?, 0, ?, ?, ?)",
-  )
-  .bind(agent_id)
-  .bind(1_000_000_000_i64)
-  .bind(1_000_000_000_i64)
-  .bind(now_ms)
-  .bind(now_ms)
-  .execute(&pool)
-  .await
-  .unwrap();
-
-  sqlx::query(
-    "INSERT OR IGNORE INTO usage_limits \
-     (user_id, max_cost_microdollars_per_month, \
-      current_cost_microdollars_this_month, \
-      created_at, updated_at) \
-     VALUES (?, ?, 0, ?, ?)",
-  )
-  .bind("owner_h3")
-  .bind(10_000_000_000_i64)
-  .bind(now_ms)
-  .bind(now_ms)
-  .execute(&pool)
-  .await
-  .unwrap();
+  seed_user(&pool, "owner_h3", "owner_h3@example.com").await;
+  // Agent with NO provider_key_id
+  seed_agent(&pool, agent_id, "agent_h3", "owner_h3", None).await;
+  seed_agent_budget_and_limits(&pool, agent_id, "owner_h3").await;
 
   let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
 
-  let app = build_handshake_router(state);
   let body = json!({ "ic_token": ic_token, "provider": "openai" }); // no provider_key_id
-
-  let resp = app
-    .oneshot(
-      Request::builder()
-        .method(Method::POST)
-        .uri("/api/budget/handshake")
-        .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_string(&body).unwrap()))
-        .unwrap(),
-    )
-    .await
-    .unwrap();
+  let resp = perform_handshake(build_handshake_router(state), body).await;
 
   assert_eq!(
     resp.status(),
@@ -733,31 +619,13 @@ async fn handshake_dev_key_creation_works_with_flag() {
 async fn handshake_toctou_recheck_fails_for_wrong_owner() {
   let pool = setup_test_db().await;
   let state = create_test_budget_state(pool.clone()).await;
-  let now_ms = chrono::Utc::now().timestamp_millis();
 
-  // Create two users
-  for (uid, email) in [
-    ("owner_toctou_a", "toctou_a@example.com"),
-    ("owner_toctou_b", "toctou_b@example.com"),
-  ] {
-    sqlx::query(
-      "INSERT OR IGNORE INTO users (id, username, password_hash, email, role, is_active, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)",
-    )
-    .bind(uid)
-    .bind(uid)
-    .bind("hash")
-    .bind(email)
-    .bind("admin")
-    .bind(1)
-    .bind(now_ms)
-    .execute(&pool)
-    .await
-    .unwrap();
-  }
+  seed_user(&pool, "owner_toctou_a", "toctou_a@example.com").await;
+  seed_user(&pool, "owner_toctou_b", "toctou_b@example.com").await;
 
-  // Create an AI provider key owned by user_a (proper encryption required for decryption path)
+  // Create an AI provider key owned by user_a (auto-assigned ID via AUTOINCREMENT)
   let crypto = state.crypto_service.as_ref().unwrap();
+  let now_ms = chrono::Utc::now().timestamp_millis();
   let encrypted = crypto.encrypt("sk-user-a-toctou-key").unwrap();
   let key_id: i64 = sqlx::query(
     "INSERT INTO ai_provider_keys \
@@ -778,71 +646,17 @@ async fn handshake_toctou_recheck_fails_for_wrong_owner() {
   // Agent is owned by user_b but has user_a's key assigned — the inconsistency
   // that the TOCTOU re-check is designed to catch
   let agent_id: i64 = 9199;
-  sqlx::query(
-    "INSERT INTO agents \
-     (id, name, providers, created_at, owner_id, provider_key_id) \
-     VALUES (?, ?, ?, ?, ?, ?)",
-  )
-  .bind(agent_id)
-  .bind("agent_toctou")
-  .bind("[\"openai\"]")
-  .bind(now_ms)
-  .bind("owner_toctou_b")
-  .bind(key_id)
-  .execute(&pool)
-  .await
-  .unwrap();
-
-  // Budget for agent
-  sqlx::query(
-    "INSERT OR IGNORE INTO agent_budgets \
-     (agent_id, total_allocated, total_spent, budget_remaining, created_at, updated_at) \
-     VALUES (?, ?, 0, ?, ?, ?)",
-  )
-  .bind(agent_id)
-  .bind(1_000_000_000_i64)
-  .bind(1_000_000_000_i64)
-  .bind(now_ms)
-  .bind(now_ms)
-  .execute(&pool)
-  .await
-  .unwrap();
-
-  // Usage limits for user_b (agent owner)
-  sqlx::query(
-    "INSERT OR IGNORE INTO usage_limits \
-     (user_id, max_cost_microdollars_per_month, current_cost_microdollars_this_month, \
-      created_at, updated_at) \
-     VALUES (?, ?, 0, ?, ?)",
-  )
-  .bind("owner_toctou_b")
-  .bind(10_000_000_000_i64)
-  .bind(now_ms)
-  .bind(now_ms)
-  .execute(&pool)
-  .await
-  .unwrap();
+  seed_agent(&pool, agent_id, "agent_toctou", "owner_toctou_b", Some(key_id)).await;
+  seed_agent_budget_and_limits(&pool, agent_id, "owner_toctou_b").await;
 
   let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
 
   // Save a reference to the pool before state is consumed by the router builder
   let db_pool = state.db_pool.clone();
-  let app = build_handshake_router(state);
   // No explicit provider_key_id — the handler will use the agent's assigned key,
   // then the TOCTOU re-check will find that key.user_id (user_a) ≠ owner_for_key (user_b)
   let body = json!({ "ic_token": ic_token, "provider": "openai" });
-
-  let resp = app
-    .oneshot(
-      Request::builder()
-        .method(Method::POST)
-        .uri("/api/budget/handshake")
-        .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_string(&body).unwrap()))
-        .unwrap(),
-    )
-    .await
-    .unwrap();
+  let resp = perform_handshake(build_handshake_router(state), body).await;
 
   assert_eq!(
     resp.status(),
@@ -859,13 +673,12 @@ async fn handshake_toctou_recheck_fails_for_wrong_owner() {
 
   // Verify budget was NOT consumed (reservation should not have been made, or was refunded)
   let initial_budget: i64 = 1_000_000_000;
-  let budget: Option<(i64,)> = sqlx::query_as(
-    "SELECT budget_remaining FROM agent_budgets WHERE agent_id = ?",
-  )
-  .bind(agent_id)
-  .fetch_optional(&db_pool)
-  .await
-  .unwrap();
+  let budget: Option<(i64,)> =
+    sqlx::query_as("SELECT budget_remaining FROM agent_budgets WHERE agent_id = ?")
+      .bind(agent_id)
+      .fetch_optional(&db_pool)
+      .await
+      .unwrap();
   assert_eq!(
     budget.map(|b| b.0),
     Some(initial_budget),

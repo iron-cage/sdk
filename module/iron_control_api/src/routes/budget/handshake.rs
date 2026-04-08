@@ -151,7 +151,7 @@ async fn refund_reservations(
     if let Err(e) = sqlx::query(
       "UPDATE usage_limits \
        SET current_cost_microdollars_this_month = \
-       current_cost_microdollars_this_month - ? \
+       MAX(0, current_cost_microdollars_this_month - ?) \
        WHERE user_id = ?"
     )
     .bind(budget_to_grant)
@@ -161,7 +161,7 @@ async fn refund_reservations(
     {
       tracing::warn!(
         "Failed to reverse usage_limits debit after {} (owner={}, amount={}): {}. \
-         usage_limits may be inconsistent — manual reconciliation may be required.",
+         usage_limits may be inconsistent -- manual reconciliation may be required.",
         context, owner_id, budget_to_grant, e
       );
     }
@@ -378,6 +378,13 @@ pub async fn handshake(
       // qqq: [Medium] pre-check verifies ownership only; is_enabled and
       // provider match not checked here — budget reserved before those
       // are validated below
+      // aaa: Acceptable by design. The ownership check here is a fast-path
+      // guard to reject obviously unauthorized keys early (before any DB-heavy
+      // work). The full validation — is_enabled, provider type match, and a
+      // TOCTOU-safe ownership re-check on the freshly-fetched record — is
+      // performed below (lines ~484-530) BEFORE budget is reserved. Budget
+      // reservation only happens after all of those checks pass, so no budget
+      // is ever depleted for a disabled or mismatched key.
       // Ownership check: key must belong to agent's owner
       match state.provider_key_storage.get_key_metadata(id).await {
         Ok(meta) if meta.user_id == owner_for_key => id,
@@ -437,6 +444,15 @@ pub async fn handshake(
                 // qqq: [Medium] if UPDATE fails the new key is created
                 // but unlinked — next handshake creates another orphan
                 // key; consider making this a hard error
+                // aaa: Known acceptable risk in dev mode only (guarded by
+                // IRON_ALLOW_DEV_KEYS). In production this path is never
+                // reached. The orphaned key is inert — it holds no budget,
+                // is never referenced by any agent, and cannot be used to
+                // issue a lease. A periodic cleanup job (or manual admin
+                // query) can remove rows in ai_provider_keys with no
+                // corresponding agents.provider_key_id reference.
+                // TODO: treat the UPDATE failure as a hard error and delete
+                // the just-created key row so no orphan is left at all.
                 if let Err(e) = sqlx::query("UPDATE agents SET provider_key_id = ? WHERE id = ?")
                   .bind(new_id)
                   .bind(agent_id)
@@ -634,7 +650,10 @@ pub async fn handshake(
     Err(err) => {
       tracing::error!("Failed to decrypt provider API key: {:?}", err);
       // Refund both agent budget and provider key spending (reserve_spending already ran).
-      refund_reservations(&state, agent_id, key_id, budget_to_grant, "provider key decryption failure", None).await;
+      refund_reservations(
+        &state, agent_id, key_id, budget_to_grant, "provider key decryption failure", None,
+      )
+      .await;
       return (
         StatusCode::INTERNAL_SERVER_ERROR,
         Json(serde_json::json!({ "error": "Failed to decrypt provider key" })),
@@ -694,7 +713,10 @@ pub async fn handshake(
     // aaa: Known limitation — refund both agent budget and provider
     // key spending (reserve_spending already ran).
     // usage_limits was already debited above; attempt a compensating reversal
-    refund_reservations(&state, agent_id, key_id, budget_to_grant, "lease creation failure", Some(&owner_id)).await;
+    refund_reservations(
+      &state, agent_id, key_id, budget_to_grant, "lease creation failure", Some(&owner_id),
+    )
+    .await;
     return (
       StatusCode::INTERNAL_SERVER_ERROR,
       Json(serde_json::json!({ "error": "Failed to create budget lease" })),
