@@ -5,6 +5,7 @@ import { toast } from 'vue-sonner'
 
 import { useApi } from '@/composables/useApi'
 import { useConfirm } from '@/composables/useConfirm'
+import { useClipboard } from '@/composables/useClipboard'
 import { formatTimestamp, formatCostUsd } from '@/lib/formatters'
 import {
   getProviderLabel,
@@ -55,6 +56,7 @@ import type { ProviderType } from '@/lib/providers'
 
 const api = useApi()
 const queryClient = useQueryClient()
+const { copyText } = useClipboard()
 
 const showCreateModal = ref(false)
 const showEditModal = ref(false)
@@ -106,6 +108,9 @@ const createMutation = useMutation({
     queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
     toast.success('Provider key created successfully')
   },
+  onError: (err) => {
+    toast.error(err instanceof Error ? err.message : 'Failed to create provider key')
+  },
 })
 
 // Quick Add mutation (separate instance to decouple loading/error state)
@@ -115,6 +120,9 @@ const quickAddMutation = useMutation({
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
     toast.success('Provider key added successfully')
+  },
+  onError: (err) => {
+    toast.error(err instanceof Error ? err.message : 'Failed to add provider key')
   },
 })
 
@@ -306,12 +314,6 @@ function handleQuickAdd() {
   )
 }
 
-function handleCopyText(text: string, label = 'Copied') {
-  navigator.clipboard
-    ?.writeText(text)
-    ?.then(() => toast.success(label))
-    ?.catch(() => toast.error('Copy failed'))
-}
 </script>
 
 <template>
@@ -365,7 +367,7 @@ function handleCopyText(text: string, label = 'Copied') {
             class="text-left max-w-full truncate font-medium text-foreground cursor-pointer"
             :aria-label="`Copy alias: ${key.alias}`"
             :title="key.alias"
-            @click="handleCopyText(key.alias!, 'Copied alias')"
+            @click="copyText(key.alias!, 'Copied alias')"
           >
             {{ key.alias }}
           </button>
@@ -385,7 +387,7 @@ function handleCopyText(text: string, label = 'Copied') {
             class="text-left max-w-full truncate cursor-pointer"
             :aria-label="`Copy API key: ${key.masked_key}`"
             :title="key.masked_key"
-            @click="handleCopyText(key.masked_key, 'Copied key')"
+            @click="copyText(key.masked_key, 'Copied key')"
           >
             {{ key.masked_key }}
           </button>

@@ -6,6 +6,7 @@ import { toast } from 'vue-sonner'
 import { useApi } from '@/composables/useApi'
 import { useAuthStore } from '@/stores/auth'
 import { useConfirm } from '@/composables/useConfirm'
+import { useClipboard } from '@/composables/useClipboard'
 import { formatTimestamp } from '@/lib/formatters'
 
 import { Button } from '@/components/ui/button'
@@ -54,6 +55,7 @@ import type { Agent, IcTokenStatus } from '@/composables/useApi'
 const api = useApi()
 const queryClient = useQueryClient()
 const authStore = useAuthStore()
+const { copyText } = useClipboard()
 
 const showCreateModal = ref(false)
 const showUpdateModal = ref(false)
@@ -422,22 +424,17 @@ watch(showUpdateModal, (open) => {
   if (!open) resetUpdateForm()
 })
 
-function handleCopyText(text: string, label = 'Copied') {
-  navigator.clipboard
-    ?.writeText(text)
-    ?.then(() => toast.success(label))
-    ?.catch(() => toast.error('Copy failed'))
-}
-
 async function handleCopyTokenToClipboard() {
   if (!tokenDialogValue.value) return
-
+  if (!navigator.clipboard) {
+    copyMessage.value = 'Copy not supported'
+    return
+  }
   try {
-    await navigator.clipboard?.writeText(tokenDialogValue.value)
+    await navigator.clipboard.writeText(tokenDialogValue.value)
     copyMessage.value = 'Copied to clipboard'
-  } catch (_err: unknown) {
-    const message = _err instanceof Error ? _err.message : 'Copy failed'
-    copyMessage.value = message
+  } catch (err) {
+    copyMessage.value = err instanceof Error ? err.message : 'Copy failed'
   }
 }
 </script>
@@ -474,7 +471,7 @@ async function handleCopyTokenToClipboard() {
             class="text-left max-w-full truncate text-base font-medium text-foreground cursor-pointer"
             :aria-label="`Copy agent name: ${agent.name}`"
             :title="agent.name"
-            @click="handleCopyText(agent.name, 'Copied name')"
+            @click="copyText(agent.name, 'Copied name')"
           >
             {{ agent.name }}
           </button>
