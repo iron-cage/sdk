@@ -13,7 +13,8 @@ precedence: project_specific
 - **Rule:** An individual guideline within this rulebook, designed to ensure consistency, readability, and maintainability.
 - **SFC:** Single File Component — the `.vue` file format combining `<script>`, `<template>`, and optionally `<style>` in one file.
 - **Composable:** A function that encapsulates and reuses stateful logic using the Vue Composition API.
-- **UI Primitive:** A low-level, unstyled component from Reka UI / Radix Vue, wrapped with project-specific Tailwind styling.
+- **Reka UI:** The accessible, unstyled Vue component library this project uses for all interactive UI primitives. Previously named *Radix Vue*; any earlier references to "Radix Vue" refer to the same library.
+- **UI Primitive:** A low-level, unstyled component from Reka UI, wrapped with project-specific Tailwind styling.
 
 ### Governing Principles
 This rulebook provides a set of guidelines for formatting and structuring frontend code to ensure consistency, readability, and maintainability across the Iron Dashboard project. The foundational principle is that all rules apply universally to all frontend code, regardless of its location.
@@ -22,7 +23,7 @@ This project follows **Prettier** for automatic formatting and **ESLint** (flat 
 
 ### Structure
 Most rules in this document follow a consistent structure for clarity:
-- **Description:** A detailed explanation of the rule's requirements.
+- The rule statement itself, stated as the opening paragraph of each section.
 - **Rationale:** An explanation of why the rule exists and the benefits of following it.
 - **Examples:** `Good` and `Bad` examples illustrating correct and incorrect application of the rule.
 
@@ -69,7 +70,7 @@ Most rules in this document follow a consistent structure for clarity:
 * [CVA for Component Variants](#styling--cva-for-component-variants)
 
 **UI Primitives**
-* [Radix/Reka Base with Tailwind Wrapper](#ui-primitives--radixreka-base-with-tailwind-wrapper)
+* [Reka UI Base with Tailwind Wrapper](#ui-primitives--reka-ui-base-with-tailwind-wrapper)
 * [Icon Components](#ui-primitives--icon-components)
 
 **Routing & Navigation Guards**
@@ -100,7 +101,7 @@ Most rules in this document follow a consistent structure for clarity:
 
 ### Formatting & Whitespace : Prettier as the Single Formatter
 
-**Description:** Prettier is the **sole** authority for code formatting. All formatting decisions — line width, brace placement, trailing commas, quote style, indentation — are delegated to Prettier via the `.prettierrc` configuration file. It is **strictly forbidden** to override Prettier's formatting decisions with manual formatting, ESLint formatting rules, or editor-specific settings.
+Prettier is the **sole** authority for code formatting. All formatting decisions — line width, brace placement, trailing commas, quote style, indentation — are delegated to Prettier via the `.prettierrc` configuration file. It is **strictly forbidden** to override Prettier's formatting decisions with manual formatting, ESLint formatting rules, or editor-specific settings.
 
 The `.prettierrc` at the project root enforces:
 
@@ -127,7 +128,7 @@ Key settings:
 
 ### Component Structure : Mandatory Script Setup with TypeScript
 
-**Description:** All Vue components **must** use the `<script setup lang="ts">` syntax. It is **strictly forbidden** to use the Options API, the non-setup Composition API (`setup()` function), or plain JavaScript in `.vue` files.
+All Vue components **must** use the `<script setup lang="ts">` syntax. It is **strictly forbidden** to use the Options API, the non-setup Composition API (`setup()` function), or plain JavaScript in `.vue` files.
 
 **Rationale:**
 - **Conciseness:** `<script setup>` eliminates boilerplate (no `export default`, no explicit `return`).
@@ -181,7 +182,7 @@ function increment() {
 
 ### Component Structure : SFC Section Order
 
-**Description:** Single File Components **must** order their sections as follows:
+Single File Components **must** order their sections as follows:
 
 1. `<script setup lang="ts">` — **always first**
 2. `<template>` — **always second**
@@ -219,7 +220,7 @@ const message = 'hello'
 
 ### Component Structure : Strict Prop Typing with defineProps
 
-**Description:** All component props **must** be defined using `defineProps<T>()` with a TypeScript interface. It is **strictly forbidden** to use the runtime declaration syntax (`defineProps({ ... })`) or to leave props untyped.
+All component props **must** be defined using `defineProps<T>()` with a TypeScript interface. It is **strictly forbidden** to use the runtime declaration syntax (`defineProps({ ... })`) or to leave props untyped.
 
 When default values are needed, `withDefaults(defineProps<T>(), { ... })` **must** be used.
 
@@ -265,7 +266,7 @@ const props = withDefaults(defineProps<{
 
 ### Component Structure : Typed Emits with defineEmits
 
-**Description:** All component emits **must** be defined using `defineEmits<T>()` with a TypeScript interface specifying event names and their payload types. It is **strictly forbidden** to use the runtime array syntax (`defineEmits(['click'])`) or to leave emits untyped.
+All component emits **must** be defined using `defineEmits<T>()` with a TypeScript interface specifying event names and their payload types. It is **strictly forbidden** to use the runtime array syntax (`defineEmits(['click'])`) or to leave emits untyped.
 
 **Rationale:** Typed emits provide compile-time validation that parent components pass the correct handlers and that child components emit the correct payloads.
 
@@ -292,7 +293,7 @@ const emit = defineEmits<{
 
 ### Component Structure : Loading, Error, and Empty State Pattern
 
-**Description:** All data-driven components **must** handle three states explicitly in the template: loading, error, and empty. These states **must** appear in this exact order using `v-if` / `v-else-if` / `v-else` chains, before the main content.
+All data-driven components **must** handle three states explicitly in the template: loading, error, and empty. These states **must** appear in this exact order using `v-if` / `v-else-if` / `v-else` chains, before the main content.
 
 **Rationale:** Guarantees that every data view has consistent, user-visible feedback for all possible data states, preventing blank screens or confusing behavior.
 
@@ -327,7 +328,7 @@ const emit = defineEmits<{
 
 ### Naming Conventions : File Naming
 
-**Description:** File naming **must** follow these rules based on file type:
+File naming **must** follow these rules based on file type:
 
 | File Type | Convention | Example |
 |-----------|-----------|---------|
@@ -348,7 +349,7 @@ It is **strictly forbidden** to use kebab-case or UPPER_CASE for source files.
 
 ### Naming Conventions : Directory Naming
 
-**Description:** Directories **must** use lowercase for single-word names and kebab-case for multi-word names.
+Directories **must** use lowercase for single-word names and kebab-case for multi-word names.
 
 | Type | Convention | Example |
 |------|-----------|---------|
@@ -363,7 +364,7 @@ It is **strictly forbidden** to use PascalCase, camelCase, or snake_case for dir
 
 ### Naming Conventions : Component Naming
 
-**Description:** Vue component names **must** follow PascalCase. Additionally, the following naming patterns are **mandatory**:
+Vue component names **must** follow PascalCase. Additionally, the following naming patterns are **mandatory**:
 
 | Pattern | Prefix/Suffix | Example |
 |---------|--------------|---------|
@@ -379,7 +380,7 @@ It is **strictly forbidden** to use PascalCase, camelCase, or snake_case for dir
 
 ### Naming Conventions : Composable Naming
 
-**Description:** All composable functions **must** be prefixed with `use` and written in camelCase. The file containing a composable **must** be named identically to the primary exported function.
+All composable functions **must** be prefixed with `use` and written in camelCase. The file containing a composable **must** be named identically to the primary exported function.
 
 **Rationale:** The `use` prefix is the universal Vue convention for composables. It signals that the function uses reactive state and must be called within a setup context.
 
@@ -401,7 +402,7 @@ export function useApi() { /* ... */ }
 
 ### Naming Conventions : Variable and Function Naming
 
-**Description:** Variables and functions **must** use camelCase. The following conventions are **mandatory**:
+Variables and functions **must** use camelCase. The following conventions are **mandatory**:
 
 | Category | Convention | Example |
 |----------|-----------|---------|
@@ -434,7 +435,7 @@ function handleLogout() { /* ... */ }
 
 ### Naming Conventions : Type and Interface Naming
 
-**Description:** All TypeScript types and interfaces **must** use PascalCase. Request and response types **must** use descriptive suffixes:
+All TypeScript types and interfaces **must** use PascalCase. Request and response types **must** use descriptive suffixes:
 
 | Category | Pattern | Example |
 |----------|---------|---------|
@@ -452,7 +453,7 @@ Interfaces and types should not be prefixed with `I` (e.g., `IUser`) or `T` (e.g
 
 ### Naming Conventions : Constant Naming
 
-**Description:** Module-level constants **must** use `UPPER_SNAKE_CASE` when they represent static lookup tables, configuration values, or environment-derived values. Enum-like constant objects follow the same pattern.
+Module-level constants **must** use `UPPER_SNAKE_CASE` when they represent static lookup tables, configuration values, or environment-derived values. Enum-like constant objects follow the same pattern.
 
 **Rationale:** `UPPER_SNAKE_CASE` visually distinguishes immutable module-level data from reactive state and function-scoped variables.
 
@@ -473,7 +474,7 @@ const PROVIDER_LABELS: Record<string, string> = {
 
 ### Imports & Module Organization : Import Order
 
-**Description:** Imports **must** be organized in the following order, with a blank line separating each group:
+Imports **must** be organized in the following order, with a blank line separating each group:
 
 1. **Vue core and external libraries** — `vue`, `vue-router`, `@tanstack/vue-query`, `@vueuse/core`, `vue-sonner`, `pinia`, etc.
 2. **Stores, composables, and utilities** — `@/stores/*`, `@/composables/*`, `@/lib/*`
@@ -510,7 +511,7 @@ import type { User, CreateUserRequest } from '@/composables/useApi'
 
 ### Imports & Module Organization : Path Aliases
 
-**Description:** All imports from within the `src/` directory **must** use the `@/` path alias. Relative imports (`../`, `./`) are **only permitted** within the same immediate directory (e.g., a barrel `index.ts` importing from `./Button.vue` in the same folder).
+All imports from within the `src/` directory **must** use the `@/` path alias. Relative imports (`../`, `./`) are **only permitted** within the same immediate directory (e.g., a barrel `index.ts` importing from `./Button.vue` in the same folder).
 
 The `tsconfig.json` alias:
 
@@ -552,7 +553,7 @@ export { default as Button } from './Button.vue'
 
 ### Imports & Module Organization : Barrel Exports for UI Primitives
 
-**Description:** Every UI primitive directory under `components/ui/` **must** contain an `index.ts` barrel file that re-exports all public components, variant configurations, and types from that directory. Multi-part primitives (e.g., Dialog with DialogContent, DialogHeader, DialogTitle, etc.) **must** export all parts from the single barrel. Consumers **must** import from the barrel, never from individual `.vue` files within the primitive directory.
+Every UI primitive directory under `components/ui/` **must** contain an `index.ts` barrel file that re-exports all public components, variant configurations, and types from that directory. Multi-part primitives (e.g., Dialog with DialogContent, DialogHeader, DialogTitle, etc.) **must** export all parts from the single barrel. Consumers **must** import from the barrel, never from individual `.vue` files within the primitive directory.
 
 **Rationale:** Barrel exports provide a stable public API for UI primitives, allowing internal file restructuring without breaking consumers. Clean destructured imports mirror the component's compositional structure.
 
@@ -620,7 +621,7 @@ export { default as DialogTitle } from './DialogTitle.vue'
 
 ### State Management : Pinia Composition API Stores
 
-**Description:** All Pinia stores **must** use the Composition API syntax (function-based `defineStore`). It is **strictly forbidden** to use the Options API syntax for stores. Stores **must** follow this internal structure:
+All Pinia stores **must** use the Composition API syntax (function-based `defineStore`). It is **strictly forbidden** to use the Options API syntax for stores. Stores **must** follow this internal structure:
 
 1. **Refs** for state
 2. **Computed** for derived state
@@ -687,7 +688,7 @@ export const useAuthStore = defineStore('auth', () => {
 
 ### State Management : TanStack Vue Query for Server State
 
-**Description:** All server-side data fetching **must** use TanStack Vue Query (`useQuery`). It is **strictly forbidden** to use raw `fetch` or `axios` calls in components for data that should be cached, refetched, or shared across components. Raw `fetch` is **only permitted** inside the centralized API composable and inside Pinia store actions that manage authentication (login, refresh, logout).
+All server-side data fetching **must** use TanStack Vue Query (`useQuery`). It is **strictly forbidden** to use raw `fetch` or `axios` calls in components for data that should be cached, refetched, or shared across components. Raw `fetch` is **only permitted** inside the centralized API composable and inside Pinia store actions that manage authentication (login, refresh, logout).
 
 **Query keys must** be arrays that include all reactive dependencies used in the `queryFn`, so that Vue Query refetches automatically when inputs change.
 
@@ -734,7 +735,7 @@ const { data: users, isLoading, error } = useQuery({
 
 ### State Management : Mutation and Cache Invalidation Pattern
 
-**Description:** All write operations (create, update, delete) **must** use `useMutation` from TanStack Vue Query. After a successful mutation, the relevant query caches **must** be invalidated using `queryClient.invalidateQueries()`. User feedback **must** be provided via `vue-sonner` toast notifications in the `onSuccess` and `onError` callbacks.
+All write operations (create, update, delete) **must** use `useMutation` from TanStack Vue Query. After a successful mutation, the relevant query caches **must** be invalidated using `queryClient.invalidateQueries()`. User feedback **must** be provided via `vue-sonner` toast notifications in the `onSuccess` and `onError` callbacks.
 
 **Rationale:** Centralizing mutations through `useMutation` provides consistent loading states, error handling, and cache synchronization. Toast notifications give immediate user feedback.
 
@@ -760,7 +761,7 @@ const createMutation = useMutation({
 
 ### API Layer : Centralized API Composable
 
-**Description:** All backend API calls **must** be defined in the `useApi()` composable (`composables/useApi.ts`). It is **strictly forbidden** for components, stores, or other composables to construct HTTP requests directly. The `useApi()` composable is the single source of truth for:
+All backend API calls **must** be defined in the `useApi()` composable (`composables/useApi.ts`). It is **strictly forbidden** for components, stores, or other composables to construct HTTP requests directly. The `useApi()` composable is the single source of truth for:
 
 1. Base URL configuration
 2. Authorization header injection
@@ -774,7 +775,7 @@ const createMutation = useMutation({
 
 ### API Layer : Type Definitions at the API Boundary
 
-**Description:** All request and response types **must** be defined at the top of the API composable file, before the composable function itself. Types that are consumed by components **must** be exported using `export type` or `export interface` so they are importable alongside the composable.
+All request and response types **must** be defined at the top of the API composable file, before the composable function itself. Types that are consumed by components **must** be exported using `export type` or `export interface` so they are importable alongside the composable.
 
 **Rationale:** Colocating API types with the API layer ensures they stay synchronized with the actual endpoint contracts. Placing them before the composable function makes them importable without circular dependencies.
 
@@ -810,7 +811,7 @@ export function useApi() {
 
 ### API Layer : Error Propagation
 
-**Description:** API errors **must** propagate as `Error` instances with human-readable messages. The API composable **must** parse error response bodies and extract server-provided error messages. Components **must** handle errors through the Vue Query `error` ref or `onError` callback — never with try/catch around query functions.
+API errors **must** propagate as `Error` instances with human-readable messages. The API composable **must** parse error response bodies and extract server-provided error messages. Components **must** handle errors through the Vue Query `error` ref or `onError` callback — never with try/catch around query functions.
 
 **Rationale:** Consistent error objects allow the UI layer to display meaningful messages without knowledge of HTTP response formats.
 
@@ -856,7 +857,7 @@ async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
 
 ### Styling : Tailwind Utility-First
 
-**Description:** All styling **must** use Tailwind CSS utility classes applied directly in templates. It is **strictly forbidden** to create `<style>` blocks in `.vue` files for styling that can be achieved with Tailwind utilities. The **only** permitted use of `<style>` is for third-party library overrides or CSS features that Tailwind cannot express (e.g., complex animations, pseudo-element content).
+All styling **must** use Tailwind CSS utility classes applied directly in templates. It is **strictly forbidden** to create `<style>` blocks in `.vue` files for styling that can be achieved with Tailwind utilities. The **only** permitted use of `<style>` is for third-party library overrides or CSS features that Tailwind cannot express (e.g., complex animations, pseudo-element content).
 
 **Rationale:** Tailwind's utility-first approach colocates styling with markup, eliminates CSS naming debates, and produces smaller CSS bundles through automatic purging.
 
@@ -896,7 +897,7 @@ async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
 
 ### Styling : CSS Variables for Design Tokens
 
-**Description:** All color values, border radii, and other themeable properties **must** be defined as CSS custom properties (variables) in `style.css` and referenced through the Tailwind theme configuration. It is **strictly forbidden** to use hardcoded hex, RGB, or HSL values directly in Tailwind classes or inline styles for any property that participates in theming.
+All color values, border radii, and other themeable properties **must** be defined as CSS custom properties (variables) in `style.css` and referenced through the Tailwind theme configuration. It is **strictly forbidden** to use hardcoded hex, RGB, or HSL values directly in Tailwind classes or inline styles for any property that participates in theming.
 
 Color variables **must** use the HSL format without the `hsl()` wrapper, allowing Tailwind to apply opacity modifiers (e.g., `bg-primary/80`).
 
@@ -918,7 +919,7 @@ Color variables **must** use the HSL format without the `hsl()` wrapper, allowin
 
 ### Styling : Dynamic Class Composition with cn()
 
-**Description:** When a component needs to merge external class props with internal classes, or conditionally apply classes, the `cn()` utility **must** be used. `cn()` wraps `clsx` and `tailwind-merge` to resolve Tailwind class conflicts correctly. It is **strictly forbidden** to use manual string concatenation or template literals for class merging when Tailwind conflicts are possible.
+When a component needs to merge external class props with internal classes, or conditionally apply classes, the `cn()` utility **must** be used. `cn()` wraps `clsx` and `tailwind-merge` to resolve Tailwind class conflicts correctly. It is **strictly forbidden** to use manual string concatenation or template literals for class merging when Tailwind conflicts are possible.
 
 **Rationale:** `tailwind-merge` resolves specificity conflicts (e.g., `p-4` vs `p-2`) that manual concatenation would not, ensuring the last-specified class wins.
 
@@ -956,7 +957,7 @@ const props = defineProps<{
 
 ### Styling : CVA for Component Variants
 
-**Description:** When a component has multiple visual variants (e.g., different sizes, colors, or styles), the `class-variance-authority` (CVA) library **must** be used to define and manage variant classes. CVA configurations **must** be exported from the component's barrel `index.ts` file alongside the component itself.
+When a component has multiple visual variants (e.g., different sizes, colors, or styles), the `class-variance-authority` (CVA) library **must** be used to define and manage variant classes. CVA configurations **must** be exported from the component's barrel `index.ts` file alongside the component itself.
 
 **Rationale:** CVA provides type-safe variant management with auto-complete support, eliminating error-prone ternary chains for class selection.
 
@@ -992,15 +993,15 @@ export type ButtonVariants = VariantProps<typeof buttonVariants>
 
 ---
 
-### UI Primitives : Radix/Reka Base with Tailwind Wrapper
+### UI Primitives : Reka UI Base with Tailwind Wrapper
 
-**Description:** All interactive UI primitives (buttons, dialogs, dropdowns, selects, etc.) **must** be built on top of Reka UI (Radix Vue) unstyled components. Project-specific styling **must** be applied in a thin wrapper component that uses Tailwind utilities.
+All interactive UI primitives (buttons, dialogs, dropdowns, selects, etc.) **must** be built on top of Reka UI unstyled components. Project-specific styling **must** be applied in a thin wrapper component that uses Tailwind utilities.
 
 It is **strictly forbidden** to:
-1. Build interactive primitives from scratch when a Reka UI / Radix Vue component exists
-2. Import Reka UI / Radix Vue components directly in views or page components — always use the project's wrapper
+1. Build interactive primitives from scratch when a Reka UI component exists
+2. Import Reka UI components directly in views or page components — always use the project's wrapper
 
-**Rationale:** Reka UI / Radix Vue provides accessible, keyboard-navigable, WAI-ARIA compliant primitives. Wrapping them with Tailwind styling maintains accessibility guarantees while applying project-specific design tokens.
+**Rationale:** Reka UI provides accessible, keyboard-navigable, WAI-ARIA compliant primitives. Wrapping them with Tailwind styling maintains accessibility guarantees while applying project-specific design tokens.
 
 > Good (Wrapper component)
 
@@ -1043,7 +1044,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 ### UI Primitives : Icon Components
 
-**Description:** All reusable icons **must** be implemented as individual Vue SFC components in the `components/icons/` directory, prefixed with `Icon`. Icons **must** render inline SVG elements and accept standard SVG attributes via prop passthrough.
+All reusable icons **must** be implemented as individual Vue SFC components in the `components/icons/` directory, prefixed with `Icon`. Icons **must** render inline SVG elements and accept standard SVG attributes via prop passthrough.
 
 It is **strictly forbidden** to:
 1. Use icon fonts
@@ -1075,7 +1076,7 @@ For one-off decorative SVGs that are not reused across components, inline `<svg>
 
 ### Routing & Navigation Guards : Lazy-Loaded Route Components
 
-**Description:** All route components except the login page **must** use dynamic imports (`() => import(...)`) for lazy loading. Only the login page — as the entry point for unauthenticated users — **may** be statically imported.
+All route components except the login page **must** use dynamic imports (`() => import(...)`) for lazy loading. Only the login page — as the entry point for unauthenticated users — **may** be statically imported.
 
 **Rationale:** Lazy loading splits each view into its own chunk, reducing the initial bundle size and improving first-load performance.
 
@@ -1105,7 +1106,7 @@ const router = createRouter({
 
 ### Routing & Navigation Guards : Route Meta for Auth and Role Gating
 
-**Description:** Every route **must** declare `requiresAuth` in its `meta` object. Admin-only routes **must** additionally declare `requiresAdmin: true`. Page-level access control **must** be handled by the centralized navigation guard, not by individual view components. However, conditional UI rendering based on role (e.g., `v-if="authStore.isAdmin"` to show/hide a button) is permitted within views — this is presentation logic, not access control.
+Every route **must** declare `requiresAuth` in its `meta` object. Admin-only routes **must** additionally declare `requiresAdmin: true`. Page-level access control **must** be handled by the centralized navigation guard, not by individual view components. However, conditional UI rendering based on role (e.g., `v-if="authStore.isAdmin"` to show/hide a button) is permitted within views — this is presentation logic, not access control.
 
 **Rationale:** Declarative route meta makes access requirements visible at the route definition level and centralizes enforcement in a single guard. Role-based UI visibility within an already-authorized page is a normal presentation concern.
 
@@ -1124,7 +1125,7 @@ const router = createRouter({
 
 ### Routing & Navigation Guards : Centralized Navigation Guard
 
-**Description:** A single `router.beforeEach` guard **must** enforce all authentication and authorization logic. The guard **must** handle three cases:
+A single `router.beforeEach` guard **must** enforce all authentication and authorization logic. The guard **must** handle three cases:
 
 1. **Unauthenticated user accessing a protected route** — redirect to `/login`
 2. **Non-admin user accessing an admin route** — redirect to `/dashboard`
@@ -1157,7 +1158,7 @@ router.beforeEach((to, _from, next) => {
 
 ### Testing : Vitest as the Single Test Runner
 
-**Description:** Vitest is the **sole** test framework for the frontend project. It is **strictly forbidden** to use Jest, Mocha, Jasmine, or any other test runner. The Vitest configuration uses `jsdom` as the DOM environment.
+Vitest is the **sole** test framework for the frontend project. It is **strictly forbidden** to use Jest, Mocha, Jasmine, or any other test runner. The Vitest configuration uses `jsdom` as the DOM environment.
 
 **Rationale:** Vitest is natively integrated with Vite, shares the same transformation pipeline, and supports Vue SFC testing without additional configuration.
 
@@ -1165,7 +1166,7 @@ router.beforeEach((to, _from, next) => {
 
 ### Testing : Colocated Test Files
 
-**Description:** Test files **must** be colocated alongside the source files they test, in the same directory, with the `.test.ts` suffix. This is a deliberate departure from the Rust codestyle rulebook's centralized `tests/` directory rule.
+Test files **must** be colocated alongside the source files they test, in the same directory, with the `.test.ts` suffix. This is a deliberate departure from the Rust codestyle rulebook's centralized `tests/` directory rule.
 
 | Source File | Test File |
 |-------------|-----------|
@@ -1181,7 +1182,7 @@ It is **strictly forbidden** to place test files in a top-level `tests/` or `__t
 
 ### Testing : Test Structure and Conventions
 
-**Description:** Tests **must** follow these conventions:
+Tests **must** follow these conventions:
 
 1. **Describe blocks** group tests by function or behavior
 2. **Nested describe blocks** group tests by scenario (e.g., `describe('login', () => { ... })`)
@@ -1227,7 +1228,7 @@ describe('useAuthStore', () => {
 
 ### Comments & Task Markers : Comment Content
 
-**Description:** Comments **must** primarily explain the "why" or clarify non-obvious aspects of the current code. It is **strictly forbidden** to add comments that merely state what change was made or serve as a historical log. Security-relevant decisions (e.g., storing tokens in localStorage) **must** include a `SECURITY NOTE:` comment explaining the accepted risk and required mitigations.
+Comments **must** primarily explain the "why" or clarify non-obvious aspects of the current code. It is **strictly forbidden** to add comments that merely state what change was made or serve as a historical log. Security-relevant decisions (e.g., storing tokens in localStorage) **must** include a `SECURITY NOTE:` comment explaining the accepted risk and required mitigations.
 
 **Rationale:** Comments that explain intent age well; comments that describe changes become stale immediately.
 
@@ -1252,7 +1253,7 @@ let _refreshPromise: Promise<void> | null = null
 
 ### Comments & Task Markers : Task Marker Compatibility
 
-**Description:** The task marker system defined in the Rust codestyle rulebook (`xxx:`, `qqq:`, `aaa:`, `zzz:`) **must** be used identically in frontend code. All rules from the Rust rulebook regarding task markers — including the prohibition on removing existing task comments and the requirement to annotate addressed tasks with `aaa:` — apply without modification.
+The task marker system defined in the Rust codestyle rulebook (`xxx:`, `qqq:`, `aaa:`, `zzz:`) **must** be used identically in frontend code. All rules from the Rust rulebook regarding task markers — including the prohibition on removing existing task comments and the requirement to annotate addressed tasks with `aaa:` — apply without modification.
 
 **Rationale:** A unified task marker system across the entire codebase (Rust and TypeScript) enables project-wide task tracking with a single grep command.
 
@@ -1260,7 +1261,7 @@ let _refreshPromise: Promise<void> | null = null
 
 ### Project Structure : Canonical Directory Layout
 
-**Description:** The frontend project **must** follow this directory structure. **Any of these directories may be absent** if not needed, but when present, they **must** serve exactly the described purpose.
+The frontend project **must** follow this directory structure. **Any of these directories may be absent** if not needed, but when present, they **must** serve exactly the described purpose.
 
 ```
 src/
@@ -1271,7 +1272,7 @@ src/
 ├── components/                 # Reusable UI components
 │   ├── cards/                  # Card-type display components
 │   ├── icons/                  # SVG icon components (Icon* prefix)
-│   └── ui/                     # Shadcn-style primitives (Radix/Reka wrappers)
+│   └── ui/                     # Shadcn-style primitives (Reka UI wrappers)
 │       ├── button/
 │       │   ├── Button.vue
 │       │   └── index.ts        # Barrel export + CVA config
@@ -1299,7 +1300,6 @@ src/
 │   ├── DashboardView.vue
 │   └── [Feature]View.vue
 │
-├── mock/                       # Mock data for development
 └── assets/                     # Static images and files
 ```
 
@@ -1321,7 +1321,7 @@ src/
 
 ### Security : v-html Prohibition and XSS Prevention
 
-**Description:** It is **strictly forbidden** to use `v-html` in any component. If rendering user-generated or server-provided HTML is unavoidable, the content **must** be sanitized with DOMPurify before binding. All API requests **must** set `Content-Type: application/json` (enforced in the centralized `useApi` composable). Client-side validation is for UX only — the server is always authoritative for access control and data integrity.
+It is **strictly forbidden** to use `v-html` in any component. If rendering user-generated or server-provided HTML is unavoidable, the content **must** be sanitized with DOMPurify before binding. All API requests **must** set `Content-Type: application/json` (enforced in the centralized `useApi` composable). Client-side validation is for UX only — the server is always authoritative for access control and data integrity.
 
 It is **strictly forbidden** to:
 1. Use `v-html` without DOMPurify sanitization
@@ -1334,7 +1334,7 @@ It is **strictly forbidden** to:
 
 ### Security : Global Error Boundary
 
-**Description:** The application **must** register a global error handler via `app.config.errorHandler` to catch unhandled exceptions in the Vue component tree. Additionally, a `window.addEventListener('unhandledrejection', ...)` listener **must** be registered in `main.ts` to catch unhandled promise rejections. Both handlers **must** log the error and display a user-facing toast notification.
+The application **must** register a global error handler via `app.config.errorHandler` to catch unhandled exceptions in the Vue component tree. Additionally, a `window.addEventListener('unhandledrejection', ...)` listener **must** be registered in `main.ts` to catch unhandled promise rejections. Both handlers **must** log the error and display a user-facing toast notification.
 
 **Rationale:** Without a global error boundary, unhandled exceptions silently break the UI. A global handler provides a last line of defense for unexpected errors.
 
@@ -1342,11 +1342,11 @@ It is **strictly forbidden** to:
 
 ### Accessibility : Custom Component Requirements
 
-**Description:** All interactive elements not built on Reka UI primitives **must** meet these accessibility requirements:
+All interactive elements not built on Reka UI primitives **must** meet these accessibility requirements:
 
 1. **Keyboard accessibility:** All interactive elements **must** be reachable and operable via keyboard (`Tab`, `Enter`, `Space`, `Escape` as appropriate)
 2. **ARIA attributes:** Custom interactive components **must** include appropriate ARIA roles and states (`aria-label`, `aria-expanded`, `aria-describedby`, etc.)
 3. **Focus management:** Route transitions **must** not trap or lose focus. After modal close, focus **must** return to the triggering element
 4. **Images:** All `<img>` elements **must** have an `alt` attribute. Decorative images use `alt=""`
 
-**Rationale:** Reka UI / Radix Vue primitives handle accessibility automatically, but custom interactive elements (e.g., clickable text, custom cards) must meet the same standard. Accessibility is a legal requirement in many jurisdictions and improves usability for all users.
+**Rationale:** Reka UI primitives handle accessibility automatically, but custom interactive elements (e.g., clickable text, custom cards) must meet the same standard. Accessibility is a legal requirement in many jurisdictions and improves usability for all users.

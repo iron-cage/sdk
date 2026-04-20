@@ -1,8 +1,8 @@
 import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
-import type { ProviderType } from '@/lib/providers'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+import { useAuthStore } from '@/stores/auth'
+import { API_BASE_URL } from '@/lib/config'
+import type { ProviderType } from '@/lib/providers'
 
 // Prevents concurrent 401 responses from each triggering an independent
 // refresh request (token refresh race condition).

@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
+import { API_BASE_URL } from '@/lib/config'
+
 interface LoginCredentials {
   email: string
   password: string
@@ -30,8 +32,6 @@ function decodeJwtRole(token: string): string | null {
     return null
   }
 }
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref<string | null>(null)

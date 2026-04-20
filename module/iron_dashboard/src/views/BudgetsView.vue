@@ -97,6 +97,14 @@ function handleUpdateBudget() {
   })
 }
 
+function handleCancelBudget() {
+  showBudgetModal.value = false
+  budgetUsd.value = undefined
+  budgetAgentId.value = null
+  budgetAgentName.value = ''
+  budgetError.value = ''
+}
+
 function riskBadgeVariant(risk: string) {
   switch (risk) {
     case 'exhausted':
@@ -293,16 +301,7 @@ function riskBadgeVariant(risk: string) {
         <p v-if="budgetError" class="text-sm text-destructive">{{ budgetError }}</p>
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            @click="
-              showBudgetModal = false
-              budgetUsd = undefined
-              budgetAgentId = null
-              budgetAgentName = ''
-              budgetError = ''
-            "
-          >
+          <Button variant="outline" @click="handleCancelBudget">
             <IconX />
             Cancel
           </Button>

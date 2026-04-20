@@ -25,6 +25,7 @@ export function useConfirm() {
         await action()
       } catch (err) {
         console.error('Confirm action failed:', err)
+        throw err
       }
     }
     showConfirmModal.value = true

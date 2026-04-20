@@ -183,6 +183,7 @@ const suspendMutation = useMutation({
     userToDisable.value = null
     suspendReason.value = ''
     queryClient.invalidateQueries({ queryKey: ['users'] })
+    toast.success('User suspended')
   },
   onError: (err) => {
     toast.error(err instanceof Error ? err.message : 'Failed to suspend user')
@@ -193,6 +194,7 @@ const activateMutation = useMutation({
   mutationFn: (id: string) => api.activateUser(id),
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: ['users'] })
+    toast.success('User activated')
   },
   onError: (err) => {
     toast.error(err instanceof Error ? err.message : 'Failed to activate user')
@@ -228,6 +230,7 @@ const deleteMutation = useMutation({
     showDeleteConfirm.value = false
     userToDelete.value = null
     queryClient.invalidateQueries({ queryKey: ['users'] })
+    toast.success('User deleted')
   },
   onError: (err) => {
     toast.error(err instanceof Error ? err.message : 'Failed to delete user')
@@ -253,6 +256,7 @@ const changeRoleMutation = useMutation({
     showChangeRoleModal.value = false
     userToChangeRole.value = null
     queryClient.invalidateQueries({ queryKey: ['users'] })
+    toast.success('Role updated')
   },
   onError: (err) => {
     toast.error(err instanceof Error ? err.message : 'Failed to change role')
@@ -314,14 +318,28 @@ watch([searchDebounced, roleFilter, isActiveFilter], () => {
   page.value = 1
 })
 
+function resetCreateForm() {
+  username.value = ''
+  password.value = ''
+  email.value = ''
+  role.value = 'developer'
+}
+
+function handleCancelCreate() {
+  showCreateModal.value = false
+  resetCreateForm()
+}
+
+function handleCancelResetPassword() {
+  showResetPasswordModal.value = false
+  userToResetPassword.value = null
+  newPassword.value = ''
+  forcePasswordChange.value = true
+}
+
 // Clear sensitive data when create dialog closes (e.g. via overlay/X)
 watch(showCreateModal, (open) => {
-  if (!open) {
-    username.value = ''
-    password.value = ''
-    email.value = ''
-    role.value = 'developer'
-  }
+  if (!open) resetCreateForm()
 })
 
 watch(showDisableConfirm, (open) => {
@@ -587,13 +605,7 @@ watch(showDisableConfirm, (open) => {
           <Button
             :disabled="createMutation.isPending.value"
             variant="outline"
-            @click="
-              showCreateModal = false
-              username = ''
-              password = ''
-              email = ''
-              role = 'developer'
-            "
+            @click="handleCancelCreate"
           >
             <IconX />
             Cancel
@@ -768,12 +780,7 @@ watch(showDisableConfirm, (open) => {
           <Button
             :disabled="resetPasswordMutation.isPending.value"
             variant="outline"
-            @click="
-              showResetPasswordModal = false
-              userToResetPassword = null
-              newPassword = ''
-              forcePasswordChange = true
-            "
+            @click="handleCancelResetPassword"
           >
             <IconX />
             Cancel

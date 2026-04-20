@@ -1,6 +1,6 @@
 # src/components/ui
 
-Low-level UI primitives (shadcn-vue style) that wrap Reka UI / Radix Vue with Tailwind styling. Each subdirectory exposes its primitives through an `index.ts` barrel — always import from the barrel, never from a `.vue` file directly.
+Low-level UI primitives (shadcn-vue style) that wrap Reka UI with Tailwind styling. Each subdirectory exposes its primitives through an `index.ts` barrel — always import from the barrel, never from a `.vue` file directly.
 
 | Directory | Responsibility |
 |-----------|----------------|

@@ -27,6 +27,15 @@ const emit = defineEmits<{
   'update:open': [value: boolean]
   confirm: []
 }>()
+
+function handleCancel() {
+  emit('update:open', false)
+}
+
+function handleConfirm() {
+  emit('confirm')
+  emit('update:open', false)
+}
 </script>
 
 <template>
@@ -37,14 +46,8 @@ const emit = defineEmits<{
         <DialogDescription>{{ description }}</DialogDescription>
       </DialogHeader>
       <DialogFooter>
-        <Button variant="outline" @click="emit('update:open', false)">Cancel</Button>
-        <Button
-          :variant="variant"
-          @click="
-            emit('confirm')
-            emit('update:open', false)
-          "
-        >
+        <Button variant="outline" @click="handleCancel">Cancel</Button>
+        <Button :variant="variant" @click="handleConfirm">
           {{ confirmLabel }}
         </Button>
       </DialogFooter>

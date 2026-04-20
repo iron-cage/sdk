@@ -54,14 +54,16 @@ describe('useConfirm', () => {
     expect(resolved).toBe(true)
   })
 
-  it('does not propagate errors thrown by action', async () => {
+  it('propagates errors thrown by action so callers can handle them', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const { confirmCallback, openConfirm } = useConfirm()
 
     openConfirm('Test', 'Test', 'OK', async () => {
       throw new Error('Action failed')
     })
 
-    await expect(confirmCallback.value?.()).resolves.toBeUndefined()
+    await expect(confirmCallback.value?.()).rejects.toThrow('Action failed')
+    consoleSpy.mockRestore()
   })
 
   it('logs errors thrown by action', async () => {
@@ -72,7 +74,11 @@ describe('useConfirm', () => {
       throw new Error('oops')
     })
 
-    await confirmCallback.value?.()
+    try {
+      await confirmCallback.value?.()
+    } catch {
+      // swallow — this test verifies the console.error side effect, not the re-throw
+    }
     expect(consoleSpy).toHaveBeenCalledWith('Confirm action failed:', expect.any(Error))
     consoleSpy.mockRestore()
   })

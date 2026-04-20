@@ -145,6 +145,7 @@ const updateMutation = useMutation({
     showEditModal.value = false
     editingKey.value = null
     queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
+    toast.success('Provider key updated')
   },
   onError: (err) => {
     toast.error(err instanceof Error ? err.message : 'Failed to update provider key')
@@ -156,6 +157,7 @@ const deleteMutation = useMutation({
   mutationFn: (id: number) => api.deleteProviderKey(id),
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
+    toast.success('Provider key deleted')
   },
   onError: (err) => {
     toast.error(err instanceof Error ? err.message : 'Failed to delete provider key')
@@ -193,6 +195,17 @@ function handleResetForm() {
   baseUrl.value = ''
   description.value = ''
   isEnabled.value = true
+}
+
+function handleCancelCreate() {
+  showCreateModal.value = false
+  createKeyError.value = ''
+  handleResetForm()
+}
+
+function handleCancelEdit() {
+  showEditModal.value = false
+  editingKey.value = null
 }
 
 function handleCreateKey() {
@@ -614,11 +627,7 @@ function handleQuickAdd() {
           <Button
             :disabled="createMutation.isPending.value"
             variant="outline"
-            @click="
-              showCreateModal = false
-              createKeyError = ''
-              handleResetForm()
-            "
+            @click="handleCancelCreate"
           >
             <IconX />
             Cancel
@@ -692,10 +701,7 @@ function handleQuickAdd() {
           <Button
             :disabled="updateMutation.isPending.value"
             variant="outline"
-            @click="
-              showEditModal = false
-              editingKey = null
-            "
+            @click="handleCancelEdit"
           >
             <IconX />
             Cancel

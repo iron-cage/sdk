@@ -225,6 +225,7 @@ const deleteMutation = useMutation({
   mutationFn: (id: number) => api.deleteAgent(id),
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: ['agents'] })
+    toast.success('Agent deleted')
   },
   onError: (err) => {
     toast.error(err instanceof Error ? err.message : 'Failed to delete agent')
@@ -373,6 +374,7 @@ const revokeIcTokenMutation = useMutation({
       has_ic_token: false,
       created_at: null,
     })
+    toast.success('IC token revoked')
   },
   onError: (err) => {
     toast.error(err instanceof Error ? err.message : 'Failed to revoke IC token')
@@ -410,14 +412,43 @@ function handleRevokeIcToken(agent: Agent) {
   )
 }
 
+function resetCreateForm() {
+  name.value = ''
+  selectedProviderKeyIds.value = []
+  addingProviderKeyId.value = ''
+  initialBudgetUsd.value = undefined
+  selectedOwnerId.value = ''
+}
+
+function resetTokenDialogState() {
+  tokenDialogValue.value = ''
+  tokenDialogAgentName.value = ''
+  tokenDialogWarning.value = ''
+  copyMessage.value = ''
+}
+
+function handleCancelCreate() {
+  showCreateModal.value = false
+  resetCreateForm()
+}
+
+function handleCancelUpdate() {
+  showUpdateModal.value = false
+  resetUpdateForm()
+}
+
+function handleCloseTokenDialog() {
+  showTokenDialog.value = false
+  resetTokenDialogState()
+}
+
+function handleTokenDialogOpenChange(open: boolean) {
+  showTokenDialog.value = open
+  if (!open) resetTokenDialogState()
+}
+
 watch(showCreateModal, (open) => {
-  if (!open) {
-    name.value = ''
-    selectedProviderKeyIds.value = []
-    addingProviderKeyId.value = ''
-    initialBudgetUsd.value = undefined
-    selectedOwnerId.value = ''
-  }
+  if (!open) resetCreateForm()
 })
 
 watch(showUpdateModal, (open) => {
@@ -702,16 +733,9 @@ async function handleCopyTokenToClipboard() {
 
         <DialogFooter>
           <Button
-            @click="
-              showCreateModal = false
-              name = ''
-              selectedProviderKeyIds = []
-              addingProviderKeyId = ''
-              initialBudgetUsd = undefined
-              selectedOwnerId = ''
-            "
             :disabled="createMutation.isPending.value"
             variant="outline"
+            @click="handleCancelCreate"
           >
             <IconX />
             Cancel
@@ -813,13 +837,7 @@ async function handleCopyTokenToClipboard() {
           <Button
             :disabled="updateMutation.isPending.value"
             variant="outline"
-            @click="
-              showUpdateModal = false
-              name = ''
-              selectedProviderKeyIds = []
-              addingProviderKeyId = ''
-              selectedOwnerId = ''
-            "
+            @click="handleCancelUpdate"
           >
             <IconX />
             Cancel
@@ -835,17 +853,7 @@ async function handleCopyTokenToClipboard() {
     <!-- IC Token Display Modal -->
     <Dialog
       :open="showTokenDialog"
-      @update:open="
-        (open) => {
-          showTokenDialog = open
-          if (!open) {
-            tokenDialogValue = ''
-            tokenDialogAgentName = ''
-            tokenDialogWarning = ''
-            copyMessage = ''
-          }
-        }
-      "
+      @update:open="handleTokenDialogOpenChange"
     >
       <DialogContent class="sm:max-w-lg">
         <DialogHeader>
@@ -874,16 +882,7 @@ async function handleCopyTokenToClipboard() {
         </div>
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            @click="
-              showTokenDialog = false
-              tokenDialogValue = ''
-              tokenDialogAgentName = ''
-              tokenDialogWarning = ''
-              copyMessage = ''
-            "
-          >
+          <Button variant="outline" @click="handleCloseTokenDialog">
             <IconX />
             Close
           </Button>

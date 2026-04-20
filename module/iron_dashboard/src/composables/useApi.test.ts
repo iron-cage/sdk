@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
+import { createRouter, createMemoryHistory, type Router } from 'vue-router'
+import { defineComponent, h } from 'vue'
+import { mount, flushPromises, type VueWrapper } from '@vue/test-utils'
 
-// Mock vue-router before any import that uses it
-const mockReplace = vi.fn()
-vi.mock('vue-router', () => ({
-  useRouter: () => ({ replace: mockReplace }),
-}))
+import { useApi } from './useApi'
+import { useAuthStore } from '../stores/auth'
 
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
@@ -18,23 +18,76 @@ function makeJwt(payload: object): string {
   return `header.${seg}.sig`
 }
 
-describe('useApi — _logoutPromise deduplication', () => {
-  beforeEach(() => {
+function createTestRouter(): Router {
+  return createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/', redirect: '/dashboard' },
+      { path: '/login', name: 'login', component: { template: '<div />' } },
+      { path: '/dashboard', name: 'dashboard', component: { template: '<div />' } },
+    ],
+  })
+}
+
+function mountApi(router: Router): { api: ReturnType<typeof useApi>; wrapper: VueWrapper } {
+  let api: ReturnType<typeof useApi> | undefined
+  const Harness = defineComponent({
+    setup() {
+      api = useApi()
+      return () => h('div')
+    },
+  })
+  const wrapper = mount(Harness, { global: { plugins: [router] } })
+  return { api: api!, wrapper }
+}
+
+function okJson<T>(body: T) {
+  const text = JSON.stringify(body)
+  return {
+    ok: true,
+    status: 200,
+    json: async () => body,
+    text: async () => text,
+  }
+}
+
+function unauthorized() {
+  return {
+    ok: false,
+    status: 401,
+    json: async () => ({ error: 'Unauthorized' }),
+    text: async () => '',
+  }
+}
+
+function noContent() {
+  return {
+    ok: true,
+    status: 204,
+    json: async () => ({}),
+    text: async () => '',
+  }
+}
+
+describe('useApi — 401 handling and logout deduplication', () => {
+  let router: Router
+  let wrapper: VueWrapper | undefined
+
+  beforeEach(async () => {
     setActivePinia(createPinia())
     localStorage.clear()
     mockFetch.mockReset()
-    mockReplace.mockReset()
+    router = createTestRouter()
+    await router.push('/dashboard')
+    await router.isReady()
   })
 
   afterEach(() => {
-    vi.restoreAllMocks()
+    wrapper?.unmount()
+    wrapper = undefined
   })
 
-  /**
-   * Helper: set up an authenticated store with a refresh token so the
-   * 401-handling code paths are exercised.
-   */
-  function setupAuthenticatedStore() {
+  function setupAuthenticatedSession() {
     const jwt = makeJwt({ role: 'admin' })
     localStorage.setItem('access_token', jwt)
     localStorage.setItem('refresh_token', 'rt_valid')
@@ -42,116 +95,109 @@ describe('useApi — _logoutPromise deduplication', () => {
     localStorage.setItem('user_id', 'u1')
   }
 
-  it('concurrent 401s after failed refresh trigger authStore.logout exactly once', async () => {
-    setupAuthenticatedStore()
-
-    // We need to dynamically import so the store is created after pinia is set up
-    const { useAuthStore } = await import('../stores/auth')
+  it('concurrent 401s after failed refresh clear the session and redirect to /login once', async () => {
+    setupAuthenticatedSession()
+    const mounted = mountApi(router)
+    wrapper = mounted.wrapper
+    const api = mounted.api
     const authStore = useAuthStore()
 
-    const logoutSpy = vi.spyOn(authStore, 'logout')
-
-    // Mock the refresh call to fail
-    const refreshMock = vi
-      .spyOn(authStore, 'refresh')
-      .mockRejectedValue(new Error('Token refresh failed'))
-
-    const { useApi } = await import('./useApi')
-    const api = useApi()
-
-    // Both initial requests return 401
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 401,
-      json: async () => ({ error: 'Unauthorized' }),
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.includes('/api/v1/auth/refresh')) return unauthorized()
+      if (url.includes('/api/v1/auth/logout')) return noContent()
+      return unauthorized()
     })
 
-    // Fire two concurrent requests that will both get 401
     const results = await Promise.allSettled([api.getAgents(), api.getProviderKeys()])
+    await flushPromises()
 
-    // Both should reject with 'Session expired'
     expect(results[0].status).toBe('rejected')
     expect(results[1].status).toBe('rejected')
     if (results[0].status === 'rejected') {
-      expect(results[0].reason.message).toBe('Session expired')
+      expect((results[0].reason as Error).message).toBe('Session expired')
     }
     if (results[1].status === 'rejected') {
-      expect(results[1].reason.message).toBe('Session expired')
+      expect((results[1].reason as Error).message).toBe('Session expired')
     }
 
-    // Logout should be called exactly once despite two concurrent 401s
-    expect(logoutSpy).toHaveBeenCalledTimes(1)
-    expect(mockReplace).toHaveBeenCalledWith('/login')
+    // The refresh endpoint is hit exactly once despite two concurrent 401s —
+    // this verifies _refreshPromise deduplication.
+    const refreshCalls = mockFetch.mock.calls.filter((c) =>
+      String(c[0]).includes('/api/v1/auth/refresh')
+    )
+    expect(refreshCalls.length).toBe(1)
 
-    refreshMock.mockRestore()
-    logoutSpy.mockRestore()
+    expect(authStore.isAuthenticated).toBe(false)
+    expect(authStore.accessToken).toBeNull()
+    expect(authStore.refreshToken).toBeNull()
+    expect(router.currentRoute.value.path).toBe('/login')
   })
 
-  it('401 after successful refresh retries and triggers logout on second 401', async () => {
-    setupAuthenticatedStore()
-
-    const { useAuthStore } = await import('../stores/auth')
+  it('successful refresh retries the original request and clears the session on second 401', async () => {
+    setupAuthenticatedSession()
+    const mounted = mountApi(router)
+    wrapper = mounted.wrapper
+    const api = mounted.api
     const authStore = useAuthStore()
-
-    const logoutSpy = vi.spyOn(authStore, 'logout')
-
-    // Refresh succeeds
     const newJwt = makeJwt({ role: 'admin' })
-    const refreshMock = vi.spyOn(authStore, 'refresh').mockImplementation(async () => {
-      authStore.$patch({ accessToken: newJwt })
+
+    let businessHits = 0
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.includes('/api/v1/auth/refresh')) {
+        return okJson({
+          user_token: newJwt,
+          refresh_token: 'rt_valid_2',
+          token_type: 'Bearer',
+          expires_in: 3600,
+          user: { id: 'u1', email: 'a@b.c', role: 'admin', name: 'testuser' },
+        })
+      }
+      if (url.includes('/api/v1/auth/logout')) return noContent()
+      businessHits++
+      return unauthorized()
     })
 
-    const { useApi } = await import('./useApi')
-    const api = useApi()
+    const err = await api.getAgents().catch((e: Error) => e)
+    await flushPromises()
 
-    // First fetch returns 401, retry after refresh also returns 401
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 401,
-      json: async () => ({ error: 'Unauthorized' }),
-    })
+    expect(err).toBeInstanceOf(Error)
+    expect((err as Error).message).toBe('Session expired')
 
-    const result = await api.getAgents().catch((e: Error) => e)
+    // Original call + one retry after refresh
+    expect(businessHits).toBe(2)
 
-    expect(result).toBeInstanceOf(Error)
-    expect((result as Error).message).toBe('Session expired')
-    expect(logoutSpy).toHaveBeenCalledTimes(1)
-
-    refreshMock.mockRestore()
-    logoutSpy.mockRestore()
+    expect(authStore.isAuthenticated).toBe(false)
+    expect(router.currentRoute.value.path).toBe('/login')
   })
 
-  it('401 without refresh token triggers logout (catch path 3)', async () => {
-    // Set up store WITHOUT refresh token
+  it('401 without a refresh token clears the session and redirects to /login', async () => {
+    // Authenticate without a refresh token
     const jwt = makeJwt({ role: 'admin' })
     localStorage.setItem('access_token', jwt)
     localStorage.setItem('username', 'testuser')
     localStorage.setItem('user_id', 'u1')
 
-    const { useAuthStore } = await import('../stores/auth')
+    const mounted = mountApi(router)
+    wrapper = mounted.wrapper
+    const api = mounted.api
     const authStore = useAuthStore()
 
-    const logoutSpy = vi.spyOn(authStore, 'logout')
+    mockFetch.mockImplementation(async () => unauthorized())
 
-    const { useApi } = await import('./useApi')
-    const api = useApi()
-
-    // Request returns 401, no refresh token available
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 401,
-      json: async () => ({ error: 'Unauthorized' }),
-    })
-
-    // Fire two concurrent requests
     const results = await Promise.allSettled([api.getAgents(), api.getProviderKeys()])
+    await flushPromises()
 
     expect(results[0].status).toBe('rejected')
     expect(results[1].status).toBe('rejected')
 
-    // Logout should be called exactly once
-    expect(logoutSpy).toHaveBeenCalledTimes(1)
+    // Without a refresh token, no refresh attempt is made
+    const refreshCalls = mockFetch.mock.calls.filter((c) =>
+      String(c[0]).includes('/api/v1/auth/refresh')
+    )
+    expect(refreshCalls.length).toBe(0)
 
-    logoutSpy.mockRestore()
+    expect(authStore.isAuthenticated).toBe(false)
+    expect(authStore.accessToken).toBeNull()
+    expect(router.currentRoute.value.path).toBe('/login')
   })
 })
