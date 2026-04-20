@@ -13,7 +13,7 @@ export function useConfirm() {
     description: string,
     label: string,
     action: () => void | Promise<void>,
-    variant: 'default' | 'destructive' = 'default',
+    variant: 'default' | 'destructive' = 'default'
   ) {
     confirmTitle.value = title
     confirmDescription.value = description
@@ -25,6 +25,7 @@ export function useConfirm() {
         await action()
       } catch (err) {
         console.error('Confirm action failed:', err)
+        throw err
       }
     }
     showConfirmModal.value = true

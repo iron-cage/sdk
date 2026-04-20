@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { detectProviderFromKey, generateProviderAlias, getProviderKeyPlaceholder } from './providers'
+import {
+  detectProviderFromKey,
+  generateProviderAlias,
+  getProviderKeyPlaceholder,
+} from './providers'
 
 describe('detectProviderFromKey', () => {
   it('returns null for an empty string', () => {
@@ -65,11 +69,9 @@ describe('generateProviderAlias', () => {
   })
 
   it('returns "Anthropic 1" when no existing Anthropic keys', () => {
-    expect(
-      generateProviderAlias('anthropic', [
-        { provider: 'openai', alias: 'OpenAI 1' },
-      ]),
-    ).toBe('Anthropic 1')
+    expect(generateProviderAlias('anthropic', [{ provider: 'openai', alias: 'OpenAI 1' }])).toBe(
+      'Anthropic 1'
+    )
   })
 
   it('increments past the highest existing numbered alias', () => {
@@ -77,16 +79,14 @@ describe('generateProviderAlias', () => {
       generateProviderAlias('openai', [
         { provider: 'openai', alias: 'OpenAI 1' },
         { provider: 'openai', alias: 'OpenAI 3' },
-      ]),
+      ])
     ).toBe('OpenAI 4')
   })
 
   it('ignores aliases from other providers', () => {
-    expect(
-      generateProviderAlias('openai', [
-        { provider: 'anthropic', alias: 'Anthropic 5' },
-      ]),
-    ).toBe('OpenAI 1')
+    expect(generateProviderAlias('openai', [{ provider: 'anthropic', alias: 'Anthropic 5' }])).toBe(
+      'OpenAI 1'
+    )
   })
 
   it('ignores keys without an alias', () => {
@@ -94,16 +94,14 @@ describe('generateProviderAlias', () => {
       generateProviderAlias('gemini', [
         { provider: 'gemini' },
         { provider: 'gemini', alias: 'Gemini 2' },
-      ]),
+      ])
     ).toBe('Gemini 3')
   })
 
   it('ignores non-numbered aliases', () => {
-    expect(
-      generateProviderAlias('xai', [
-        { provider: 'xai', alias: 'My custom key' },
-      ]),
-    ).toBe('xAI 1')
+    expect(generateProviderAlias('xai', [{ provider: 'xai', alias: 'My custom key' }])).toBe(
+      'xAI 1'
+    )
   })
 })
 

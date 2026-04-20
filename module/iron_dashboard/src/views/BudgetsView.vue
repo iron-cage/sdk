@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
-import { useApi, type BudgetStatus } from '../composables/useApi'
-import { useAuthStore } from '../stores/auth'
+import { toast } from 'vue-sonner'
+
+import { useApi } from '@/composables/useApi'
+import { useAuthStore } from '@/stores/auth'
+import { cn } from '@/lib/utils'
+
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -15,21 +19,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { toast } from 'vue-sonner'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import PageLayout from '@/components/PageLayout.vue'
+import DataTable from '@/components/DataTable.vue'
+import PercentBar from '@/components/PercentBar.vue'
 import IconX from '@/components/icons/IconX.vue'
 import IconCheck from '@/components/icons/IconCheck.vue'
 import IconDotsHorizontal from '@/components/icons/IconDotsHorizontal.vue'
 import IconEdit from '@/components/icons/IconEdit.vue'
 import IconRefresh from '@/components/icons/IconRefresh.vue'
-import PageLayout from '@/components/PageLayout.vue'
-import DataTable from '@/components/DataTable.vue'
-import PercentBar from '@/components/PercentBar.vue'
+
+import type { BudgetStatus } from '@/composables/useApi'
 
 const api = useApi()
 const authStore = useAuthStore()
@@ -42,12 +47,17 @@ const budgetUsd = ref<number | undefined>(undefined)
 const budgetError = ref('')
 
 // Fetch agent budget status
-const { data: budgetStatus, isLoading: isBudgetLoading, error: budgetQueryError, refetch: refetchBudget } = useQuery({
+const {
+  data: budgetStatus,
+  isLoading: isBudgetLoading,
+  error: budgetQueryError,
+  refetch: refetchBudget,
+} = useQuery({
   queryKey: ['budget-status'],
   queryFn: () => api.getBudgetStatus(),
 })
 
-function openBudgetModal(row: BudgetStatus) {
+function handleOpenBudgetModal(row: BudgetStatus) {
   budgetAgentId.value = row.agent_id
   budgetAgentName.value = row.agent_name
   budgetUsd.value = Number(row.budget.toFixed(2))
@@ -65,6 +75,7 @@ const updateBudgetMutation = useMutation({
     budgetUsd.value = undefined
     budgetError.value = ''
     queryClient.invalidateQueries({ queryKey: ['budget-status'] })
+    toast.success('Budget updated successfully')
   },
   onError: (err) => {
     toast.error(err instanceof Error ? err.message : 'Failed to update budget')
@@ -86,21 +97,32 @@ function handleUpdateBudget() {
   })
 }
 
+function handleCancelBudget() {
+  showBudgetModal.value = false
+  budgetUsd.value = undefined
+  budgetAgentId.value = null
+  budgetAgentName.value = ''
+  budgetError.value = ''
+}
+
 function riskBadgeVariant(risk: string) {
   switch (risk) {
     case 'exhausted':
-    case 'critical': return 'bg-destructive'
+    case 'critical':
+      return 'bg-destructive'
     case 'high':
-    case 'medium':   return 'bg-warning'
-    case 'low':      return 'bg-success'
-    default:         return 'bg-muted'
+    case 'medium':
+      return 'bg-warning'
+    case 'low':
+      return 'bg-success'
+    default:
+      return 'bg-muted'
   }
 }
 </script>
 
 <template>
   <PageLayout title="Agent Budgets">
-
     <template #actions>
       <Button variant="outline" @click="refetchBudget">
         <IconRefresh />
@@ -109,14 +131,17 @@ function riskBadgeVariant(risk: string) {
     </template>
 
     <!-- Budget summary bar -->
-    <div v-if="budgetStatus?.summary" class="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-border bg-muted/30">
+    <div
+      v-if="budgetStatus?.summary"
+      class="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-border bg-muted/30"
+    >
       <span class="text-sm font-medium text-foreground mr-1">
         {{ budgetStatus.summary.total_agents }} agents
       </span>
       <div class="h-4 w-px bg-border mx-1" />
       <span
         v-if="budgetStatus.summary.exhausted"
-        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-destructive  text-xs font-medium"
+        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-destructive text-xs font-medium"
       >
         <span class="h-1.5 w-1.5 rounded-full bg-destructive" />
         {{ budgetStatus.summary.exhausted }} exhausted
@@ -179,7 +204,10 @@ function riskBadgeVariant(risk: string) {
         <p class="text-muted-foreground">No agent budget data available.</p>
       </template>
       <tr v-for="row in budgetStatus?.data" :key="row.agent_id">
-        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground max-w-[300px] truncate" :title="row.agent_name">
+        <td
+          class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-medium text-foreground max-w-[300px] truncate"
+          :title="row.agent_name"
+        >
           {{ row.agent_name }}
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap">
@@ -197,12 +225,16 @@ function riskBadgeVariant(risk: string) {
         <td class="px-3 sm:px-6 py-2 text-base text-foreground">
           <div class="flex items-center gap-2 min-w-[100px]">
             <PercentBar :percentage="row.percent_used" class="max-w-[100px] max-sm:hidden" />
-            <span class="shrink-0 text-muted-foreground text-xs max-sm:text-foreground">{{ row.percent_used.toFixed(1) }}%</span>
+            <span class="shrink-0 text-muted-foreground text-xs max-sm:text-foreground"
+              >{{ row.percent_used.toFixed(1) }}%</span
+            >
           </div>
         </td>
-        <td class="px-3 sm:px-6 py-2 whitespace-nowrap ">
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap">
           <span class="capitalize text-sm flex gap-2 items-center">
-            <span :class="`rounded-full h-2 w-2 inline-block ${riskBadgeVariant(row.risk_level)}`"></span>
+            <span
+              :class="cn('rounded-full h-2 w-2 inline-block', riskBadgeVariant(row.risk_level))"
+            ></span>
             {{ row.risk_level }}
           </span>
         </td>
@@ -215,7 +247,7 @@ function riskBadgeVariant(risk: string) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" class="max-w-[220px]">
-              <DropdownMenuItem @click="openBudgetModal(row)">
+              <DropdownMenuItem @click="handleOpenBudgetModal(row)">
                 <IconEdit />
                 Update Budget
               </DropdownMenuItem>
@@ -228,16 +260,26 @@ function riskBadgeVariant(risk: string) {
     <!-- Update Agent Budget Modal -->
     <Dialog
       :open="showBudgetModal"
-      @update:open="(open) => { showBudgetModal = open; if (!open) { budgetUsd = undefined; budgetAgentId = null; budgetAgentName = ''; budgetError = '' } }"
+      @update:open="
+        (open) => {
+          showBudgetModal = open
+          if (!open) {
+            budgetUsd = undefined
+            budgetAgentId = null
+            budgetAgentName = ''
+            budgetError = ''
+          }
+        }
+      "
     >
       <DialogContent class="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Update Agent Budget</DialogTitle>
           <DialogDescription>
-            Set the total allocated budget for {{ budgetAgentName }} (in USD). Remaining will be recalculated automatically.
+            Set the total allocated budget for {{ budgetAgentName }} (in USD). Remaining will be
+            recalculated automatically.
           </DialogDescription>
         </DialogHeader>
-
 
         <div class="space-y-4">
           <div class="space-y-1.5">
@@ -259,7 +301,7 @@ function riskBadgeVariant(risk: string) {
         <p v-if="budgetError" class="text-sm text-destructive">{{ budgetError }}</p>
 
         <DialogFooter>
-          <Button variant="outline" @click="showBudgetModal = false; budgetUsd = undefined; budgetAgentId = null; budgetAgentName = ''; budgetError = ''">
+          <Button variant="outline" @click="handleCancelBudget">
             <IconX />
             Cancel
           </Button>

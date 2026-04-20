@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAuthStore } from '../stores/auth'
-import LoginView from '../views/LoginView.vue'
+import { useAuthStore } from '@/stores/auth'
+import LoginView from '@/views/LoginView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -18,25 +18,25 @@ const router = createRouter({
     {
       path: '/dashboard',
       name: 'dashboard',
-      component: () => import('../views/DashboardView.vue'),
+      component: () => import('@/views/DashboardView.vue'),
       meta: { requiresAuth: true },
     },
     {
       path: '/agents',
       name: 'agents',
-      component: () => import('../views/AgentsView.vue'),
+      component: () => import('@/views/AgentsView.vue'),
       meta: { requiresAuth: true },
     },
     {
       path: '/usage',
       name: 'usage',
-      component: () => import('../views/UsageView.vue'),
+      component: () => import('@/views/UsageView.vue'),
       meta: { requiresAuth: true },
     },
     {
       path: '/budgets',
       name: 'budgets',
-      component: () => import('../views/BudgetsView.vue'),
+      component: () => import('@/views/BudgetsView.vue'),
       meta: { requiresAuth: true },
     },
     {
@@ -47,13 +47,13 @@ const router = createRouter({
     {
       path: '/providers',
       name: 'providers',
-      component: () => import('../views/ProvidersView.vue'),
+      component: () => import('@/views/ProvidersView.vue'),
       meta: { requiresAuth: true, requiresAdmin: true },
     },
     {
       path: '/users',
       name: 'users',
-      component: () => import('../views/UsersView.vue'),
+      component: () => import('@/views/UsersView.vue'),
       meta: { requiresAuth: true, requiresAdmin: true },
     },
     {

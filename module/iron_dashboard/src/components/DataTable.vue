@@ -23,7 +23,7 @@ const wrapperId = useId()
 const clampedRatio = computed(() => Math.min(1, Math.max(0, scrollRatio.value)))
 const showScrollbar = computed(() => clampedRatio.value < 0.9999)
 const thumbWidthPct = computed(() => clampedRatio.value * 100)
-const thumbLeftPct  = computed(() => thumbPos.value * (100 - thumbWidthPct.value))
+const thumbLeftPct = computed(() => thumbPos.value * (100 - thumbWidthPct.value))
 
 function updateScroll() {
   const el = wrapperRef.value
@@ -59,7 +59,10 @@ function onThumbPointerMove(e: PointerEvent) {
   const el = wrapperRef.value
   const availableTrack = computeAvailableTrack()
   if (availableTrack === 0) return
-  const newPos = Math.max(0, Math.min(1, dragStartThumbPos + (e.clientX - dragStartX) / availableTrack))
+  const newPos = Math.max(
+    0,
+    Math.min(1, dragStartThumbPos + (e.clientX - dragStartX) / availableTrack)
+  )
   el.scrollLeft = newPos * (el.scrollWidth - el.clientWidth)
 }
 
@@ -78,7 +81,9 @@ function onTrackClick(e: MouseEvent) {
   const thumbW = rect.width * clampedRatio.value
   const available = computeAvailableTrack()
   if (available < 1) return
-  el.scrollLeft = Math.max(0, Math.min(1, (e.clientX - rect.left - thumbW / 2) / available)) * (el.scrollWidth - el.clientWidth)
+  el.scrollLeft =
+    Math.max(0, Math.min(1, (e.clientX - rect.left - thumbW / 2) / available)) *
+    (el.scrollWidth - el.clientWidth)
 }
 
 function scrollByKey(dir: -1 | 1) {
@@ -105,20 +110,24 @@ watch(showScrollbar, (nowVisible) => {
   if (!nowVisible) onThumbPointerUp()
 })
 
-watch(wrapperRef, (el, oldEl) => {
-  if (oldEl) {
-    oldEl.removeEventListener('scroll', updateScroll)
-  }
-  ro?.disconnect()
+watch(
+  wrapperRef,
+  (el, oldEl) => {
+    if (oldEl) {
+      oldEl.removeEventListener('scroll', updateScroll)
+    }
+    ro?.disconnect()
 
-  if (!el) return
-  el.addEventListener('scroll', updateScroll, { passive: true })
-  updateScroll()
-  ro = new ResizeObserver(updateScroll)
-  ro.observe(el)
-  const tableEl = el.querySelector('table')
-  if (tableEl) ro.observe(tableEl)
-}, { flush: 'post' })
+    if (!el) return
+    el.addEventListener('scroll', updateScroll, { passive: true })
+    updateScroll()
+    ro = new ResizeObserver(updateScroll)
+    ro.observe(el)
+    const tableEl = el.querySelector('table')
+    if (tableEl) ro.observe(tableEl)
+  },
+  { flush: 'post' }
+)
 
 onUnmounted(() => {
   wrapperRef.value?.removeEventListener('scroll', updateScroll)
@@ -138,9 +147,7 @@ onUnmounted(() => {
     <!-- Error -->
     <div v-else-if="error" class="p-4">
       <p class="text-destructive">{{ error.message }}</p>
-      <Button v-if="onRetry" variant="outline" class="mt-4" @click="onRetry">
-        Retry
-      </Button>
+      <Button v-if="onRetry" variant="outline" class="mt-4" @click="onRetry"> Retry </Button>
     </div>
 
     <!-- Empty -->

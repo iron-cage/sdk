@@ -9,21 +9,33 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
-withDefaults(defineProps<{
-  open: boolean
-  title: string
-  description: string
-  confirmLabel?: string
-  variant?: 'default' | 'destructive'
-}>(), {
-  confirmLabel: 'Confirm',
-  variant: 'default',
-})
+withDefaults(
+  defineProps<{
+    open: boolean
+    title: string
+    description: string
+    confirmLabel?: string
+    variant?: 'default' | 'destructive'
+  }>(),
+  {
+    confirmLabel: 'Confirm',
+    variant: 'default',
+  }
+)
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
-  'confirm': []
+  confirm: []
 }>()
+
+function handleCancel() {
+  emit('update:open', false)
+}
+
+function handleConfirm() {
+  emit('confirm')
+  emit('update:open', false)
+}
 </script>
 
 <template>
@@ -34,8 +46,8 @@ const emit = defineEmits<{
         <DialogDescription>{{ description }}</DialogDescription>
       </DialogHeader>
       <DialogFooter>
-        <Button variant="outline" @click="emit('update:open', false)">Cancel</Button>
-        <Button :variant="variant" @click="emit('confirm'); emit('update:open', false)">
+        <Button variant="outline" @click="handleCancel">Cancel</Button>
+        <Button :variant="variant" @click="handleConfirm">
           {{ confirmLabel }}
         </Button>
       </DialogFooter>

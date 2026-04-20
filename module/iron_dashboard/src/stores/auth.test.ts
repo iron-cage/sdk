@@ -6,7 +6,10 @@ const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
 function makeJwt(payload: object): string {
-  const seg = btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  const seg = btoa(JSON.stringify(payload))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
   return `header.${seg}.sig`
 }
 
@@ -32,7 +35,7 @@ describe('useAuthStore', () => {
 
     it('derives role from JWT payload, ignoring localStorage role key', () => {
       localStorage.setItem('access_token', makeJwt({ role: 'developer' }))
-      localStorage.setItem('role', 'admin')  // legacy key should be ignored
+      localStorage.setItem('role', 'admin') // legacy key should be ignored
 
       const store = useAuthStore()
       expect(store.role).toBe('developer')
@@ -114,8 +117,9 @@ describe('useAuthStore', () => {
       })
 
       const store = useAuthStore()
-      await expect(store.login({ email: 'bad@test.com', password: 'wrong' }))
-        .rejects.toThrow('Invalid credentials')
+      await expect(store.login({ email: 'bad@test.com', password: 'wrong' })).rejects.toThrow(
+        'Invalid credentials'
+      )
       expect(store.isAuthenticated).toBe(false)
     })
 
@@ -123,12 +127,15 @@ describe('useAuthStore', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
-        json: async () => { throw new Error('not json') },
+        json: async () => {
+          throw new Error('not json')
+        },
       })
 
       const store = useAuthStore()
-      await expect(store.login({ email: 'x@test.com', password: 'y' }))
-        .rejects.toThrow('Login failed')
+      await expect(store.login({ email: 'x@test.com', password: 'y' })).rejects.toThrow(
+        'Login failed'
+      )
     })
   })
 

@@ -1,11 +1,23 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
-import { useApi, type ProviderKey } from '../composables/useApi'
-import type { ProviderType } from '@/lib/providers'
+import { toast } from 'vue-sonner'
+
+import { useApi } from '@/composables/useApi'
+import { useConfirm } from '@/composables/useConfirm'
+import { useClipboard } from '@/composables/useClipboard'
+import { formatTimestamp, formatCostUsd } from '@/lib/formatters'
+import {
+  getProviderLabel,
+  getProviderKeyPlaceholder,
+  detectProviderFromKey,
+  generateProviderAlias,
+} from '@/lib/providers'
+
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import {
   Dialog,
   DialogContent,
@@ -21,7 +33,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { toast } from 'vue-sonner'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,9 +40,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { formatTimestamp, formatCostUsd } from '@/lib/formatters'
-import { getProviderLabel, getProviderKeyPlaceholder, detectProviderFromKey, generateProviderAlias } from '@/lib/providers'
-import { useConfirm } from '@/composables/useConfirm'
+import PageLayout from '@/components/PageLayout.vue'
+import DataTable from '@/components/DataTable.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import ProviderBadge from '@/components/ProviderBadge.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
 import IconX from '@/components/icons/IconX.vue'
@@ -39,13 +50,13 @@ import IconCheck from '@/components/icons/IconCheck.vue'
 import IconDotsHorizontal from '@/components/icons/IconDotsHorizontal.vue'
 import IconTrash from '@/components/icons/IconTrash.vue'
 import IconEdit from '@/components/icons/IconEdit.vue'
-import PageLayout from '@/components/PageLayout.vue'
-import DataTable from '@/components/DataTable.vue'
-import ConfirmDialog from '@/components/ConfirmDialog.vue'
-import Switch from '@/components/ui/switch/Switch.vue'
+
+import type { ProviderKey } from '@/composables/useApi'
+import type { ProviderType } from '@/lib/providers'
 
 const api = useApi()
 const queryClient = useQueryClient()
+const { copyText } = useClipboard()
 
 const showCreateModal = ref(false)
 const showEditModal = ref(false)
@@ -53,7 +64,15 @@ const showQuickAddModal = ref(false)
 const quickAddKey = ref('')
 const quickAddError = ref('')
 const toggleLoadingId = ref<number | null>(null)
-const { showConfirmModal, confirmTitle, confirmDescription, confirmLabel, confirmVariant, confirmCallback, openConfirm } = useConfirm()
+const {
+  showConfirmModal,
+  confirmTitle,
+  confirmDescription,
+  confirmLabel,
+  confirmVariant,
+  confirmCallback,
+  openConfirm,
+} = useConfirm()
 const editingKey = ref<ProviderKey | null>(null)
 
 // Form fields
@@ -66,17 +85,31 @@ const isEnabled = ref(true)
 const createKeyError = ref('')
 
 // Fetch provider keys
-const { data: providerKeys, isLoading, error, refetch } = useQuery({
+const {
+  data: providerKeys,
+  isLoading,
+  error,
+  refetch,
+} = useQuery({
   queryKey: ['providerKeys'],
   queryFn: () => api.getProviderKeys(),
 })
 
 // Create provider key mutation (standard form)
 const createMutation = useMutation({
-  mutationFn: (data: { provider: ProviderType; api_key: string; alias?: string; base_url?: string; description?: string }) =>
-    api.createProviderKey(data),
+  mutationFn: (data: {
+    provider: ProviderType
+    api_key: string
+    alias?: string
+    base_url?: string
+    description?: string
+  }) => api.createProviderKey(data),
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
+    toast.success('Provider key created successfully')
+  },
+  onError: (err) => {
+    toast.error(err instanceof Error ? err.message : 'Failed to create provider key')
   },
 })
 
@@ -86,17 +119,33 @@ const quickAddMutation = useMutation({
     api.createProviderKey(data),
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
+    toast.success('Provider key added successfully')
+  },
+  onError: (err) => {
+    toast.error(err instanceof Error ? err.message : 'Failed to add provider key')
   },
 })
 
 // Update provider key mutation
 const updateMutation = useMutation({
-  mutationFn: (data: { id: number; alias?: string; base_url?: string; description?: string; is_enabled?: boolean }) =>
-    api.updateProviderKey(data.id, { alias: data.alias, base_url: data.base_url, description: data.description, is_enabled: data.is_enabled }),
+  mutationFn: (data: {
+    id: number
+    alias?: string
+    base_url?: string
+    description?: string
+    is_enabled?: boolean
+  }) =>
+    api.updateProviderKey(data.id, {
+      alias: data.alias,
+      base_url: data.base_url,
+      description: data.description,
+      is_enabled: data.is_enabled,
+    }),
   onSuccess: () => {
     showEditModal.value = false
     editingKey.value = null
     queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
+    toast.success('Provider key updated')
   },
   onError: (err) => {
     toast.error(err instanceof Error ? err.message : 'Failed to update provider key')
@@ -108,6 +157,7 @@ const deleteMutation = useMutation({
   mutationFn: (id: number) => api.deleteProviderKey(id),
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
+    toast.success('Provider key deleted')
   },
   onError: (err) => {
     toast.error(err instanceof Error ? err.message : 'Failed to delete provider key')
@@ -122,8 +172,8 @@ const toggleMutation = useMutation({
     toggleLoadingId.value = data.id
     await queryClient.cancelQueries({ queryKey: ['providerKeys'] })
     const previous = queryClient.getQueryData<ProviderKey[]>(['providerKeys'])
-    queryClient.setQueryData<ProviderKey[]>(['providerKeys'], old =>
-      old?.map(k => k.id === data.id ? { ...k, is_enabled: data.is_enabled } : k)
+    queryClient.setQueryData<ProviderKey[]>(['providerKeys'], (old) =>
+      old?.map((k) => (k.id === data.id ? { ...k, is_enabled: data.is_enabled } : k))
     )
     return { previous }
   },
@@ -138,15 +188,24 @@ const toggleMutation = useMutation({
   },
 })
 
-
-
-function resetForm() {
+function handleResetForm() {
   provider.value = 'openai'
   apiKey.value = ''
   alias.value = ''
   baseUrl.value = ''
   description.value = ''
   isEnabled.value = true
+}
+
+function handleCancelCreate() {
+  showCreateModal.value = false
+  createKeyError.value = ''
+  handleResetForm()
+}
+
+function handleCancelEdit() {
+  showEditModal.value = false
+  editingKey.value = null
 }
 
 function handleCreateKey() {
@@ -165,15 +224,19 @@ function handleCreateKey() {
       description: description.value || undefined,
     },
     {
-      onSuccess: () => { showCreateModal.value = false; createKeyError.value = ''; resetForm() },
+      onSuccess: () => {
+        showCreateModal.value = false
+        createKeyError.value = ''
+        handleResetForm()
+      },
       onError: (err) => {
         createKeyError.value = err instanceof Error ? err.message : 'Failed to create provider key'
       },
-    },
+    }
   )
 }
 
-function openEditModal(key: ProviderKey) {
+function handleOpenEditModal(key: ProviderKey) {
   editingKey.value = key
   alias.value = key.alias || ''
   baseUrl.value = key.base_url || ''
@@ -199,7 +262,7 @@ function handleDeleteKey(key: ProviderKey) {
     `Delete the ${getProviderLabel(key.provider)} key? This action cannot be undone.`,
     'Delete',
     () => deleteMutation.mutate(key.id),
-    'destructive',
+    'destructive'
   )
 }
 
@@ -208,11 +271,17 @@ function handleToggleEnabled(key: ProviderKey) {
 }
 
 watch(showCreateModal, (open) => {
-  if (!open) { resetForm(); createKeyError.value = '' }
+  if (!open) {
+    handleResetForm()
+    createKeyError.value = ''
+  }
 })
 
 watch(showQuickAddModal, (open) => {
-  if (!open) { quickAddKey.value = ''; quickAddError.value = '' }
+  if (!open) {
+    quickAddKey.value = ''
+    quickAddError.value = ''
+  }
 })
 
 const detectedProvider = computed(() => detectProviderFromKey(quickAddKey.value))
@@ -223,7 +292,7 @@ const previewAlias = computed(() =>
     : ''
 )
 
-function closeQuickAdd() {
+function handleCloseQuickAdd() {
   showQuickAddModal.value = false
 }
 
@@ -243,13 +312,18 @@ function handleQuickAdd() {
     return
   }
   quickAddMutation.mutate(
-    { provider: detectedProvider.value, api_key: quickAddKey.value.trim(), alias: previewAlias.value },
     {
-      onSuccess: () => closeQuickAdd(),
-      onError: (err) => {
-        quickAddError.value = err instanceof Error ? err.message : 'Failed to add key — please try again'
-      },
+      provider: detectedProvider.value,
+      api_key: quickAddKey.value.trim(),
+      alias: previewAlias.value,
     },
+    {
+      onSuccess: () => handleCloseQuickAdd(),
+      onError: (err) => {
+        quickAddError.value =
+          err instanceof Error ? err.message : 'Failed to add key — please try again'
+      },
+    }
   )
 }
 
@@ -287,7 +361,9 @@ function handleQuickAdd() {
     >
       <template #empty>
         <p class="text-muted-foreground mb-2">No AI provider keys configured</p>
-        <p class="text-base text-muted-foreground mb-4">Add API keys for OpenAI, Anthropic, Gemini, or xAI to get started.</p>
+        <p class="text-base text-muted-foreground mb-4">
+          Add API keys for OpenAI, Anthropic, Gemini, or xAI to get started.
+        </p>
         <Button @click="showCreateModal = true"><IconPlus />Add First Provider Key</Button>
       </template>
 
@@ -295,26 +371,39 @@ function handleQuickAdd() {
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap">
           <ProviderBadge :provider="key.provider" />
         </td>
-        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground max-w-[240px] truncate">
+        <td
+          class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground max-w-[240px] truncate"
+        >
           <button
             v-if="key.alias"
             type="button"
             class="text-left max-w-full truncate font-medium text-foreground cursor-pointer"
             :aria-label="`Copy alias: ${key.alias}`"
             :title="key.alias"
-            @click="navigator.clipboard?.writeText(key.alias!)?.then(() => toast.success('Copied alias'))?.catch(() => toast.error('Copy failed'))"
-          >{{ key.alias }}</button>
+            @click="copyText(key.alias!, 'Copied alias')"
+          >
+            {{ key.alias }}
+          </button>
           <span v-else>-</span>
         </td>
-        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground max-w-[320px] truncate" :title="key.description || '-'">{{ key.description || '-' }}</td>
-        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-mono text-muted-foreground max-w-[160px] truncate">
+        <td
+          class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground max-w-[320px] truncate"
+          :title="key.description || '-'"
+        >
+          {{ key.description || '-' }}
+        </td>
+        <td
+          class="px-3 sm:px-6 py-2 whitespace-nowrap text-base font-mono text-muted-foreground max-w-[160px] truncate"
+        >
           <button
             type="button"
             class="text-left max-w-full truncate cursor-pointer"
             :aria-label="`Copy API key: ${key.masked_key}`"
             :title="key.masked_key"
-            @click="navigator.clipboard?.writeText(key.masked_key)?.then(() => toast.success('Copied key'))?.catch(() => toast.error('Copy failed'))"
-          >{{ key.masked_key }}</button>
+            @click="copyText(key.masked_key, 'Copied key')"
+          >
+            {{ key.masked_key }}
+          </button>
         </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-foreground">
           {{ formatCostUsd(key.total_spend_usd, 2) }}
@@ -331,7 +420,9 @@ function handleQuickAdd() {
             {{ key.is_enabled ? 'Enabled' : 'Disabled' }}
           </Button>
         </td>
-        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">{{ formatTimestamp(key.created_at) }}</td>
+        <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-base text-muted-foreground">
+          {{ formatTimestamp(key.created_at) }}
+        </td>
         <td class="px-3 sm:px-6 py-2 whitespace-nowrap text-right text-base font-medium">
           <DropdownMenu>
             <DropdownMenuTrigger as-child>
@@ -341,12 +432,19 @@ function handleQuickAdd() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" class="max-w-[220px]">
-              <DropdownMenuItem :disabled="updateMutation.isPending.value" @click="openEditModal(key)">
+              <DropdownMenuItem
+                :disabled="updateMutation.isPending.value"
+                @click="handleOpenEditModal(key)"
+              >
                 <IconEdit />
                 Edit
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem :disabled="deleteMutation.isPending.value" class="text-destructive" @click="handleDeleteKey(key)">
+              <DropdownMenuItem
+                :disabled="deleteMutation.isPending.value"
+                class="text-destructive"
+                @click="handleDeleteKey(key)"
+              >
                 <IconTrash />
                 Delete
               </DropdownMenuItem>
@@ -362,7 +460,8 @@ function handleQuickAdd() {
         <DialogHeader>
           <DialogTitle>Quick Add Provider Key</DialogTitle>
           <DialogDescription>
-            Paste your API key — the provider will be detected automatically and the key will be saved with a generated name.
+            Paste your API key — the provider will be detected automatically and the key will be
+            saved with a generated name.
           </DialogDescription>
         </DialogHeader>
 
@@ -380,31 +479,52 @@ function handleQuickAdd() {
               @keyup.enter="handleQuickAdd"
             />
             <div id="quick-add-hint" aria-live="polite" class="min-h-[1.25rem]">
-              <p v-if="detectedProvider" class="text-xs text-muted-foreground flex items-center gap-1.5">
+              <p
+                v-if="detectedProvider"
+                class="text-xs text-muted-foreground flex items-center gap-1.5"
+              >
                 <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-success" />
-                Detected: <span class="font-medium text-foreground">{{ getProviderLabel(detectedProvider) }}</span>
-                · will be saved as <span class="font-medium text-foreground">{{ previewAlias }}</span>
+                Detected:
+                <span class="font-medium text-foreground">{{
+                  getProviderLabel(detectedProvider)
+                }}</span>
+                · will be saved as
+                <span class="font-medium text-foreground">{{ previewAlias }}</span>
               </p>
               <p v-else-if="quickAddKey" class="text-xs text-muted-foreground">
-                Provider not recognised — check the key or use "Add Provider Key" to select manually.
+                Provider not recognised — check the key or use "Add Provider Key" to select
+                manually.
               </p>
             </div>
           </div>
         </div>
 
-        <p v-if="quickAddError" role="alert" aria-live="assertive" aria-atomic="true" class="text-sm text-destructive">{{ quickAddError }}</p>
+        <p
+          v-if="quickAddError"
+          role="alert"
+          aria-live="assertive"
+          aria-atomic="true"
+          class="text-sm text-destructive"
+        >
+          {{ quickAddError }}
+        </p>
 
         <DialogFooter>
           <Button
             variant="outline"
             :disabled="quickAddMutation.isPending.value"
-            @click="closeQuickAdd"
+            @click="handleCloseQuickAdd"
           >
             <IconX />
             Cancel
           </Button>
           <Button
-            :disabled="quickAddMutation.isPending.value || !detectedProvider || quickAddKey.trim().length < 10 || !providerKeys"
+            :disabled="
+              quickAddMutation.isPending.value ||
+              !detectedProvider ||
+              quickAddKey.trim().length < 10 ||
+              !providerKeys
+            "
             @click="handleQuickAdd"
           >
             <IconCheck />
@@ -420,7 +540,8 @@ function handleQuickAdd() {
         <DialogHeader>
           <DialogTitle>Add Provider Key</DialogTitle>
           <DialogDescription>
-            Add an API key for OpenAI, Anthropic, Gemini, or xAI. The key will be encrypted and stored securely.
+            Add an API key for OpenAI, Anthropic, Gemini, or xAI. The key will be encrypted and
+            stored securely.
           </DialogDescription>
         </DialogHeader>
 
@@ -492,21 +613,26 @@ function handleQuickAdd() {
           </div>
         </div>
 
-        <p v-if="createKeyError" role="alert" aria-live="assertive" aria-atomic="true" class="text-sm text-destructive">{{ createKeyError }}</p>
+        <p
+          v-if="createKeyError"
+          role="alert"
+          aria-live="assertive"
+          aria-atomic="true"
+          class="text-sm text-destructive"
+        >
+          {{ createKeyError }}
+        </p>
 
         <DialogFooter>
           <Button
             :disabled="createMutation.isPending.value"
             variant="outline"
-            @click="showCreateModal = false; createKeyError = ''; resetForm()"
+            @click="handleCancelCreate"
           >
             <IconX />
             Cancel
           </Button>
-          <Button
-            :disabled="createMutation.isPending.value"
-            @click="handleCreateKey"
-          >
+          <Button :disabled="createMutation.isPending.value" @click="handleCreateKey">
             <IconPlus />
             {{ createMutation.isPending.value ? 'Adding...' : 'Add Key' }}
           </Button>
@@ -520,7 +646,8 @@ function handleQuickAdd() {
         <DialogHeader>
           <DialogTitle>Edit Provider Key</DialogTitle>
           <DialogDescription>
-            Update the description or base URL. The API key cannot be changed - delete and create a new key instead.
+            Update the description or base URL. The API key cannot be changed - delete and create a
+            new key instead.
           </DialogDescription>
         </DialogHeader>
 
@@ -574,15 +701,12 @@ function handleQuickAdd() {
           <Button
             :disabled="updateMutation.isPending.value"
             variant="outline"
-            @click="showEditModal = false; editingKey = null"
+            @click="handleCancelEdit"
           >
             <IconX />
             Cancel
           </Button>
-          <Button
-            :disabled="updateMutation.isPending.value"
-            @click="handleUpdateKey"
-          >
+          <Button :disabled="updateMutation.isPending.value" @click="handleUpdateKey">
             <IconCheck />
             {{ updateMutation.isPending.value ? 'Updating...' : 'Update Key' }}
           </Button>

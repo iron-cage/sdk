@@ -1,3 +1,5 @@
+import { cn } from '@/lib/utils'
+
 const PROVIDER_LABELS: Record<string, string> = {
   openai: 'OpenAI',
   anthropic: 'Anthropic',
@@ -8,8 +10,8 @@ const PROVIDER_LABELS: Record<string, string> = {
 const PROVIDER_BADGE_COLORS: Record<string, string> = {
   openai: 'bg-success/80',
   anthropic: 'bg-accent/80',
-  gemini: 'bg-blue-500/80',
-  xai: 'bg-purple-500/80',
+  gemini: 'bg-chart-1/80',
+  xai: 'bg-chart-4/80',
 }
 
 const PROVIDER_KEY_PLACEHOLDERS: Record<string, string> = {
@@ -24,9 +26,11 @@ export function getProviderLabel(provider: string): string {
 }
 
 export function getProviderBadgeClass(provider: string): string {
-  const bg = PROVIDER_BADGE_COLORS[provider] ?? 'bg-muted/80'
-  const text = PROVIDER_BADGE_COLORS[provider] ? 'text-white' : 'text-foreground'
-  return `${bg} ${text} text-xs font-medium px-2 py-0.5 rounded-full`
+  return cn(
+    'text-xs font-medium px-2 py-0.5 rounded-full',
+    PROVIDER_BADGE_COLORS[provider] ?? 'bg-muted/80',
+    PROVIDER_BADGE_COLORS[provider] ? 'text-primary-foreground' : 'text-foreground'
+  )
 }
 
 export function getProviderKeyPlaceholder(provider: string): string {
@@ -46,7 +50,7 @@ export function detectProviderFromKey(key: string): ProviderType | null {
 
 export function generateProviderAlias(
   provider: ProviderType,
-  existingKeys: Array<{ provider: string; alias?: string }>,
+  existingKeys: Array<{ provider: string; alias?: string }>
 ): string {
   const label = getProviderLabel(provider)
   const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -55,7 +59,7 @@ export function generateProviderAlias(
   for (const k of existingKeys) {
     if (k.provider !== provider) continue
     const m = k.alias?.match(re)
-    if (m) max = Math.max(max, parseInt(m[1], 10))
+    if (m) max = Math.max(max, parseInt(m[1]!, 10))
   }
   return `${label} ${max + 1}`
 }
