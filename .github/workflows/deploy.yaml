@@ -132,14 +132,18 @@ jobs:
       continue-on-error: true
       env:
         GCHAT_WEBHOOK_URL: ${{ secrets.GCHAT_WEBHOOK_URL }}
+        GH_REPOSITORY: ${{ github.repository }}
+        GH_REF_NAME: ${{ github.ref_name }}
+        GH_SERVER_URL: ${{ github.server_url }}
+        GH_RUN_ID: ${{ github.run_id }}
       run: |
         echo "::add-mask::${GCHAT_WEBHOOK_URL}"
         if [ -z "${GCHAT_WEBHOOK_URL}" ]; then exit 0; fi
         jq -n \
-          --arg repo "${{ github.repository }}" \
-          --arg branch "${{ github.ref_name }}" \
+          --arg repo "${GH_REPOSITORY}" \
+          --arg branch "${GH_REF_NAME}" \
           --arg mode "${DEPLOYMENT_MODE}" \
-          --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+          --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
           '{"text": ("❌ *Deploy failed*\n*Repo:* " + $repo + "\n*Branch:* " + $branch + "\n*Mode:* " + $mode + "\n*Run:* " + $run_url)}' \
         | curl -s --fail -X POST "${GCHAT_WEBHOOK_URL}" \
             -H 'Content-Type: application/json' \

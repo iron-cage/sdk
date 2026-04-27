@@ -4,13 +4,14 @@ CI/CD pipeline for Iron Cage SDK. All workflows run on self-hosted runners confi
 
 ## Directory Structure
 
-```
-.github/workflows/
-├── deploy.yaml                        # Production deploy (push to master / manual)
-├── deploy-check.yml                   # Pre-merge deploy validation (PRs to master)
-├── iron_token_manager_validation.yml  # iron_token_manager module tests & schema checks
-└── readme.md
-```
+### Responsibility Table
+
+| File | Responsibility |
+|------|----------------|
+| `deploy.yaml` | Deploy to Hetzner on push to master or manual trigger |
+| `deploy-check.yml` | Validate deploy infrastructure on PRs to master |
+| `iron_token_manager_validation.yml` | Run iron_token_manager tests and schema checks |
+| `readme.md` | Document workflow directory structure and usage |
 
 ## Workflows
 
