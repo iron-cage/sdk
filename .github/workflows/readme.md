@@ -1,10 +1,10 @@
 # GitHub Actions Workflows
 
-CI/CD pipeline for Iron Cage SDK. All workflows run on self-hosted runners configured via repository variables.
+CI/CD pipeline for Iron Runtime. All workflows run on self-hosted runners configured via repository variables.
 
 ### Scope
 
-**Responsibilities:** Define and maintain all CI/CD automation for the Iron Cage SDK.
+**Responsibilities:** Define and maintain all CI/CD automation for the Iron Runtime.
 
 **In Scope:** Workflow definitions for deployment, pre-merge validation, and module-specific checks.
 
@@ -19,7 +19,6 @@ CI/CD pipeline for Iron Cage SDK. All workflows run on self-hosted runners confi
 | `deploy.yaml` | Deploy to Hetzner on push to master or manual trigger |
 | `deploy-check.yml` | Validate deploy infrastructure on PRs to master |
 | `iron_token_manager_validation.yml` | Run iron_token_manager tests and schema checks |
-| `readme.md` | Document workflow directory structure and usage |
 
 ### Workflows
 
@@ -41,9 +40,9 @@ Builds, pushes and deploys the application to a Hetzner server via GCP infrastru
 5. Notify Google Chat on failure via `jq` + `curl --fail` (skipped silently if `GCHAT_WEBHOOK_URL` is not set); `continue-on-error: true`
 6. Shred all secret files with `shred -vfz -n 3` (runs even on failure)
 
-**Required secrets:** `SECRET_GCP_CREDENTIALS`, `SECRET_RSA_PRIVATE_KEY`, `SECRET_RSA_PUBLIC_KEY`, `TF_VAR_PROJECT_ID`, `GOOGLE_APPLICATION_REGION`, `SECRET_STATE_ARCHIVE_KEY`, `HOST_SERVER_NAME`, `HOST_SERVER_IP`, `SECRET_HETZNER_CLOUD_TOKEN`, `DATABASE_URL`, `JWT_SECRET`, `IC_TOKEN_SECRET`, `IP_TOKEN_KEY`, `IRON_SECRETS_MASTER_KEY`, `ALLOWED_ORIGINS`, `SERVER_PORT`, `IRON_DEPLOYMENT_MODE`, `ENABLE_DEMO_SEED`, `GCHAT_WEBHOOK_URL` (optional)
+**Required secrets:** `SECRET_GCP_CREDENTIALS`, `SECRET_RSA_PRIVATE_KEY`, `SECRET_RSA_PUBLIC_KEY`, `TF_VAR_PROJECT_ID`, `GOOGLE_APPLICATION_REGION`, `SECRET_STATE_ARCHIVE_KEY`, `HOST_SERVER_NAME`, `HOST_SERVER_IP`, `SECRET_HETZNER_CLOUD_TOKEN`, `DATABASE_URL`, `JWT_SECRET`, `IC_TOKEN_SECRET`, `IP_TOKEN_KEY`, `IRON_SECRETS_MASTER_KEY`, `ALLOWED_ORIGINS`, `GCHAT_WEBHOOK_URL` (optional)
 
-**Required vars:** `GH_RUNNER_DEPLOY`, `DEPLOYMENT_MODE`, `PROJECT_NAME`, `PROJECT_DOMAIN`, `PROJECT_CERT_EMAIL`, `HOST_SERVER_IMAGE`, `HOST_SERVER_LOCATION`, `HOST_SERVER_TYPE`, `ALLOWED_SSH_IPS`, `RUST_LOG`
+**Required vars:** `GH_RUNNER_DEPLOY`, `DEPLOYMENT_MODE`, `PROJECT_NAME`, `PROJECT_DOMAIN`, `PROJECT_CERT_EMAIL`, `HOST_SERVER_IMAGE`, `HOST_SERVER_LOCATION`, `HOST_SERVER_TYPE`, `ALLOWED_SSH_IPS`, `RUST_LOG`, `SERVER_PORT`, `IRON_DEPLOYMENT_MODE`, `ENABLE_DEMO_SEED`
 
 **Runner requirements (`GH_RUNNER_DEPLOY`):** `jq`, `curl`, `shred` (GNU coreutils), `base64`, `make`, `docker`
 

@@ -70,9 +70,9 @@ jobs:
         IP_TOKEN_KEY: ${{ secrets.IP_TOKEN_KEY }}
         IRON_SECRETS_MASTER_KEY: ${{ secrets.IRON_SECRETS_MASTER_KEY }}
         ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS }}
-        SERVER_PORT: ${{ secrets.SERVER_PORT }}
-        IRON_DEPLOYMENT_MODE: ${{ secrets.IRON_DEPLOYMENT_MODE }}
-        ENABLE_DEMO_SEED: ${{ secrets.ENABLE_DEMO_SEED }}
+        SERVER_PORT: ${{ vars.SERVER_PORT }}
+        IRON_DEPLOYMENT_MODE: ${{ vars.IRON_DEPLOYMENT_MODE }}
+        ENABLE_DEMO_SEED: ${{ vars.ENABLE_DEMO_SEED }}
         PROJECT_NAME: ${{ vars.PROJECT_NAME }}
         PROJECT_DOMAIN: ${{ vars.PROJECT_DOMAIN }}
         PROJECT_CERT_EMAIL: ${{ vars.PROJECT_CERT_EMAIL }}
@@ -94,9 +94,11 @@ jobs:
         echo "::add-mask::${IP_TOKEN_KEY}"
         echo "::add-mask::${IRON_SECRETS_MASTER_KEY}"
         echo "::add-mask::${ALLOWED_ORIGINS}"
-        echo "::add-mask::${SERVER_PORT}"
-        echo "::add-mask::${IRON_DEPLOYMENT_MODE}"
-        echo "::add-mask::${ENABLE_DEMO_SEED}"
+        # Secret values written below must NOT contain a literal double-quote (") character.
+        # Each value is wrapped in double quotes (VAR="<value>") so that the generated
+        # -secret.sh is valid shell and can be parsed by Make's include directive.
+        # An embedded " breaks the quoting and causes a silent parse failure at deploy time.
+        # If a secret must contain a double-quote, re-generate it without that character.
         install -m 600 /dev/null .secret/-secret.sh
         printf 'GOOGLE_APPLICATION_CREDENTIALS=".secret/-service_account.json"\n' >> .secret/-secret.sh
         printf 'GOOGLE_APPLICATION_PROJECT_ID="%s"\n' "${GOOGLE_APPLICATION_PROJECT_ID}" >> .secret/-secret.sh
@@ -139,8 +141,8 @@ jobs:
         GH_SERVER_URL: ${{ github.server_url }}
         GH_RUN_ID: ${{ github.run_id }}
       run: |
-        echo "::add-mask::${GCHAT_WEBHOOK_URL}"
         if [ -z "${GCHAT_WEBHOOK_URL}" ]; then exit 0; fi
+        echo "::add-mask::${GCHAT_WEBHOOK_URL}"
         command -v jq > /dev/null || { echo "ERROR: jq not found on runner — install jq to enable webhook notifications"; exit 1; }
         jq -n \
           --arg repo "${GH_REPOSITORY}" \

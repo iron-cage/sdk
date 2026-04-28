@@ -48,8 +48,8 @@ PROJECT_CERT_EMAIL="example@email.com"
 HOST_SERVER_LOCATION="hel1"
 ## Server image
 HOST_SERVER_IMAGE="ubuntu-24.04"
-## Server type
-HOST_SERVER_TYPE="cx33"
+## Server type: cx23 (2 vCPU / 4 GB) | cx33 (4 vCPU / 8 GB) | cx43 (8 vCPU / 16 GB)
+HOST_SERVER_TYPE="cx23"
 ## Semicolon-separated list of allowed SSH IP/CIDR ranges
 ALLOWED_SSH_IPS="0.0.0.0/0;::/0"
 
