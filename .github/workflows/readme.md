@@ -12,7 +12,7 @@ CI/CD pipeline for Iron Runtime. All workflows run on self-hosted runners config
 
 ### Directory Structure
 
-#### Responsibility Table
+### Responsibility Table
 
 | File | Responsibility |
 |------|----------------|
@@ -22,7 +22,7 @@ CI/CD pipeline for Iron Runtime. All workflows run on self-hosted runners config
 
 ### Workflows
 
-#### `deploy.yaml` — Deploy CI
+### `deploy.yaml` — Deploy CI
 
 Builds, pushes and deploys the application to a Hetzner server via GCP infrastructure.
 
@@ -35,9 +35,9 @@ Builds, pushes and deploys the application to a Hetzner server via GCP infrastru
 **Steps:**
 1. Decode GCP service account credentials from base64 secret into `.secret/-service_account.json`
 2. Write SSH key pair to `.secret/-iron_sdk` / `.secret/-iron_sdk.pub`
-3. Assemble `.secret/-secret.sh` with all runtime variables using `printf` (safe for special characters)
+3. Assemble `.secret/-secret.sh` with all runtime variables using `printf` (values must not contain `"` — see deploy.yaml comment)
 4. `make deploy` — build image, push to GAR, deploy to server
-5. Notify Google Chat on failure via `jq` + `curl --fail` (skipped silently if `GCHAT_WEBHOOK_URL` is not set); `continue-on-error: true`
+5. Notify Google Chat on failure or cancellation via `jq` + `curl --fail` (skipped silently if `GCHAT_WEBHOOK_URL` is not set); message reads "Deploy cancelled" vs "Deploy failed" based on `job.status`; `continue-on-error: true`
 6. Shred all secret files with `shred -vfz -n 3` (runs even on failure)
 
 **Required secrets:** `SECRET_GCP_CREDENTIALS`, `SECRET_RSA_PRIVATE_KEY`, `SECRET_RSA_PUBLIC_KEY`, `TF_VAR_PROJECT_ID`, `GOOGLE_APPLICATION_REGION`, `SECRET_STATE_ARCHIVE_KEY`, `HOST_SERVER_NAME`, `HOST_SERVER_IP`, `SECRET_HETZNER_CLOUD_TOKEN`, `DATABASE_URL`, `JWT_SECRET`, `IC_TOKEN_SECRET`, `IP_TOKEN_KEY`, `IRON_SECRETS_MASTER_KEY`, `ALLOWED_ORIGINS`, `GCHAT_WEBHOOK_URL` (optional)
@@ -48,7 +48,7 @@ Builds, pushes and deploys the application to a Hetzner server via GCP infrastru
 
 ---
 
-#### `deploy-check.yml` — Deployment CI
+### `deploy-check.yml` — Deployment CI
 
 Validates deploy infrastructure on every PR targeting `master`. Does not deploy anything.
 
@@ -62,7 +62,7 @@ Validates deploy infrastructure on every PR targeting `master`. Does not deploy 
 
 ---
 
-#### `iron_token_manager_validation.yml` — Iron Token Manager Validation
+### `iron_token_manager_validation.yml` — Iron Token Manager Validation
 
 Validates the `module/iron_token_manager` crate on changes to that module.
 

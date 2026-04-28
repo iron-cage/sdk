@@ -131,7 +131,7 @@ jobs:
     - name: 'Build the image, push and deploy'
       run: 'make deploy'
 
-    - name: Notify Google Chat on failure
+    - name: Notify Google Chat on failure or cancellation
       if: failure() || cancelled()
       continue-on-error: true
       env:
@@ -140,6 +140,7 @@ jobs:
         GH_REF_NAME: ${{ github.ref_name }}
         GH_SERVER_URL: ${{ github.server_url }}
         GH_RUN_ID: ${{ github.run_id }}
+        GH_JOB_STATUS: ${{ job.status }}
       run: |
         if [ -z "${GCHAT_WEBHOOK_URL}" ]; then exit 0; fi
         echo "::add-mask::${GCHAT_WEBHOOK_URL}"
@@ -149,7 +150,8 @@ jobs:
           --arg branch "${GH_REF_NAME}" \
           --arg mode "${DEPLOYMENT_MODE}" \
           --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
-          '{"text": ("❌ *Deploy failed*\n*Repo:* " + $repo + "\n*Branch:* " + $branch + "\n*Mode:* " + $mode + "\n*Run:* " + $run_url)}' \
+          --arg status "${GH_JOB_STATUS}" \
+          '{"text": ((if $status == "cancelled" then "⚠️ *Deploy cancelled*" else "❌ *Deploy failed*" end) + "\n*Repo:* " + $repo + "\n*Branch:* " + $branch + "\n*Mode:* " + $mode + "\n*Run:* " + $run_url)}' \
         | curl -s --fail -X POST "${GCHAT_WEBHOOK_URL}" \
             -H 'Content-Type: application/json' \
             -d @-
