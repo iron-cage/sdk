@@ -14,9 +14,9 @@ GOOGLE_ENCRYPTION_KEY="<generated-encryption-key>"
 
 
 # SSH KEYS
-## Generate with: ssh-keygen -t ed25519 -f .secret/-iron_site -C "deploy_key"
-SSH_PRIVATE_KEY_PATH=".secret/-iron_site"
-SSH_PUBLIC_KEY_PATH=".secret/-iron_site.pub"
+## Generate with: ssh-keygen -t ed25519 -f .secret/-iron_sdk -C "deploy_key"
+SSH_PRIVATE_KEY_PATH=".secret/-iron_sdk"
+SSH_PUBLIC_KEY_PATH=".secret/-iron_sdk.pub"
 
 # HOST SERVER
 ## Set after server is created, or use existing server

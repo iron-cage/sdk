@@ -40,6 +40,8 @@ jobs:
           exit 1
         fi
         chmod 600 .secret/-service_account.json
+        echo "::add-mask::$(jq -r '.private_key_id' .secret/-service_account.json)"
+        echo "::add-mask::$(jq -r '.client_email' .secret/-service_account.json)"
 
     - name: Create key files
       env:
@@ -128,7 +130,7 @@ jobs:
       run: 'make deploy'
 
     - name: Notify Google Chat on failure
-      if: failure()
+      if: failure() || cancelled()
       continue-on-error: true
       env:
         GCHAT_WEBHOOK_URL: ${{ secrets.GCHAT_WEBHOOK_URL }}
@@ -139,6 +141,7 @@ jobs:
       run: |
         echo "::add-mask::${GCHAT_WEBHOOK_URL}"
         if [ -z "${GCHAT_WEBHOOK_URL}" ]; then exit 0; fi
+        command -v jq > /dev/null || { echo "ERROR: jq not found on runner — install jq to enable webhook notifications"; exit 1; }
         jq -n \
           --arg repo "${GH_REPOSITORY}" \
           --arg branch "${GH_REF_NAME}" \

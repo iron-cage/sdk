@@ -2,9 +2,17 @@
 
 CI/CD pipeline for Iron Cage SDK. All workflows run on self-hosted runners configured via repository variables.
 
-## Directory Structure
+### Scope
 
-### Responsibility Table
+**Responsibilities:** Define and maintain all CI/CD automation for the Iron Cage SDK.
+
+**In Scope:** Workflow definitions for deployment, pre-merge validation, and module-specific checks.
+
+**Out of Scope:** Deployment scripts (`deploy/`), Makefiles, Terraform configuration, and manual release procedures.
+
+### Directory Structure
+
+#### Responsibility Table
 
 | File | Responsibility |
 |------|----------------|
@@ -13,9 +21,9 @@ CI/CD pipeline for Iron Cage SDK. All workflows run on self-hosted runners confi
 | `iron_token_manager_validation.yml` | Run iron_token_manager tests and schema checks |
 | `readme.md` | Document workflow directory structure and usage |
 
-## Workflows
+### Workflows
 
-### `deploy.yaml` — Deploy CI
+#### `deploy.yaml` — Deploy CI
 
 Builds, pushes and deploys the application to a Hetzner server via GCP infrastructure.
 
@@ -37,9 +45,11 @@ Builds, pushes and deploys the application to a Hetzner server via GCP infrastru
 
 **Required vars:** `GH_RUNNER_DEPLOY`, `DEPLOYMENT_MODE`, `PROJECT_NAME`, `PROJECT_DOMAIN`, `PROJECT_CERT_EMAIL`, `HOST_SERVER_IMAGE`, `HOST_SERVER_LOCATION`, `HOST_SERVER_TYPE`, `ALLOWED_SSH_IPS`, `RUST_LOG`
 
+**Runner requirements (`GH_RUNNER_DEPLOY`):** `jq`, `curl`, `shred` (GNU coreutils), `base64`, `make`, `docker`
+
 ---
 
-### `deploy-check.yml` — Deployment CI
+#### `deploy-check.yml` — Deployment CI
 
 Validates deploy infrastructure on every PR targeting `master`. Does not deploy anything.
 
@@ -53,7 +63,7 @@ Validates deploy infrastructure on every PR targeting `master`. Does not deploy 
 
 ---
 
-### `iron_token_manager_validation.yml` — Iron Token Manager Validation
+#### `iron_token_manager_validation.yml` — Iron Token Manager Validation
 
 Validates the `module/iron_token_manager` crate on changes to that module.
 
