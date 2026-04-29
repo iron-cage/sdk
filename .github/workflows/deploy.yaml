@@ -24,6 +24,8 @@ jobs:
         && 'dev'
         || inputs.environment
       }}
+    env:
+      DEPLOYMENT_MODE: ${{ vars.DEPLOYMENT_MODE }}
     steps:
     - uses: actions/checkout@v4
 
@@ -32,83 +34,127 @@ jobs:
         GCP_CREDS_B64: ${{ secrets.SECRET_GCP_CREDENTIALS }}
       run: |
         echo "::add-mask::${GCP_CREDS_B64}"
-        printf '%s' "${GCP_CREDS_B64}" | base64 --decode > "./.secret/gcp_creds.json"
-        if [ ! -s "./.secret/gcp_creds.json" ]; then
+        printf '%s' "${GCP_CREDS_B64}" | base64 --decode > .secret/-service_account.json
+        if [ ! -s .secret/-service_account.json ]; then
           echo "ERROR: Failed to decode service account credentials"
           exit 1
         fi
-        chmod 600 "./.secret/gcp_creds.json"
+        chmod 600 .secret/-service_account.json
+        echo "::add-mask::$(jq -r '.private_key_id' .secret/-service_account.json)"
+        echo "::add-mask::$(jq -r '.client_email' .secret/-service_account.json)"
 
     - name: Create key files
       env:
         SSH_PRIVATE_KEY: ${{ secrets.SECRET_RSA_PRIVATE_KEY }}
         SSH_PUBLIC_KEY: ${{ secrets.SECRET_RSA_PUBLIC_KEY }}
       run: |
-        install -m 600 /dev/null "./.secret/ssh_key"
-        printf '%s\n' "${SSH_PRIVATE_KEY}" > "./.secret/ssh_key"
+        echo "::add-mask::${SSH_PRIVATE_KEY}"
+        echo "::add-mask::${SSH_PUBLIC_KEY}"
+        install -m 600 /dev/null .secret/-iron_sdk
+        printf '%s\n' "${SSH_PRIVATE_KEY}" > .secret/-iron_sdk
 
-        install -m 644 /dev/null "./.secret/ssh_key.pub"
-        printf '%s\n' "${SSH_PUBLIC_KEY}" > "./.secret/ssh_key.pub"
+        install -m 644 /dev/null .secret/-iron_sdk.pub
+        printf '%s\n' "${SSH_PUBLIC_KEY}" > .secret/-iron_sdk.pub
 
     - name: Create secret.sh file
       env:
-        GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_SE_CREDS_PATH }}
         GOOGLE_APPLICATION_PROJECT_ID: ${{ secrets.TF_VAR_PROJECT_ID }}
         GOOGLE_APPLICATION_REGION: ${{ secrets.GOOGLE_APPLICATION_REGION }}
         GOOGLE_ENCRYPTION_KEY: ${{ secrets.SECRET_STATE_ARCHIVE_KEY }}
-        SSH_PRIVATE_KEY_PATH: ${{ secrets.SECRET_RSA_PRIVATE_KEY_PATH }}
-        SSH_PUBLIC_KEY_PATH: ${{ secrets.SECRET_RSA_PUBLIC_KEY_PATH }}
         HOST_SERVER_NAME: ${{ secrets.HOST_SERVER_NAME }}
         HOST_SERVER_IP: ${{ secrets.HOST_SERVER_IP }}
         HETZNER_CLOUD_TOKEN: ${{ secrets.SECRET_HETZNER_CLOUD_TOKEN }}
-        DEPLOYMENT_MODE: ${{ vars.DEPLOYMENT_MODE }}
-        PROJECT_NAME: ${{ vars.PROJECT_NAME }}
-        PROJECT_DOMAIN: ${{ vars.PROJECT_DOMAIN }}
-        PROJECT_CERT_EMAIL: ${{ vars.PROJECT_CERT_EMAIL }}
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
         JWT_SECRET: ${{ secrets.JWT_SECRET }}
         IC_TOKEN_SECRET: ${{ secrets.IC_TOKEN_SECRET }}
         IP_TOKEN_KEY: ${{ secrets.IP_TOKEN_KEY }}
         IRON_SECRETS_MASTER_KEY: ${{ secrets.IRON_SECRETS_MASTER_KEY }}
         ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS }}
-        SERVER_PORT: ${{ secrets.SERVER_PORT }}
-        IRON_DEPLOYMENT_MODE: ${{ secrets.IRON_DEPLOYMENT_MODE }}
-        ENABLE_DEMO_SEED: ${{ secrets.ENABLE_DEMO_SEED }}
+        SERVER_PORT: ${{ vars.SERVER_PORT }}
+        IRON_DEPLOYMENT_MODE: ${{ vars.IRON_DEPLOYMENT_MODE }}
+        ENABLE_DEMO_SEED: ${{ vars.ENABLE_DEMO_SEED }}
+        PROJECT_NAME: ${{ vars.PROJECT_NAME }}
+        PROJECT_DOMAIN: ${{ vars.PROJECT_DOMAIN }}
+        PROJECT_CERT_EMAIL: ${{ vars.PROJECT_CERT_EMAIL }}
+        HOST_SERVER_IMAGE: ${{ vars.HOST_SERVER_IMAGE }}
+        HOST_SERVER_LOCATION: ${{ vars.HOST_SERVER_LOCATION }}
+        HOST_SERVER_TYPE: ${{ vars.HOST_SERVER_TYPE }}
+        ALLOWED_SSH_IPS: ${{ vars.ALLOWED_SSH_IPS }}
         RUST_LOG: ${{ vars.RUST_LOG }}
       run: |
+        echo "::add-mask::${GOOGLE_APPLICATION_PROJECT_ID}"
+        echo "::add-mask::${GOOGLE_APPLICATION_REGION}"
+        echo "::add-mask::${GOOGLE_ENCRYPTION_KEY}"
+        echo "::add-mask::${HOST_SERVER_NAME}"
+        echo "::add-mask::${HOST_SERVER_IP}"
+        echo "::add-mask::${HETZNER_CLOUD_TOKEN}"
+        echo "::add-mask::${DATABASE_URL}"
+        echo "::add-mask::${JWT_SECRET}"
+        echo "::add-mask::${IC_TOKEN_SECRET}"
+        echo "::add-mask::${IP_TOKEN_KEY}"
+        echo "::add-mask::${IRON_SECRETS_MASTER_KEY}"
+        echo "::add-mask::${ALLOWED_ORIGINS}"
+        # Secret values written below must NOT contain a literal double-quote (") character.
+        # Each value is wrapped in double quotes (VAR="<value>") so that the generated
+        # -secret.sh is valid shell and can be parsed by Make's include directive.
+        # An embedded " breaks the quoting and causes a silent parse failure at deploy time.
+        # If a secret must contain a double-quote, re-generate it without that character.
         install -m 600 /dev/null .secret/-secret.sh
-        cat > .secret/-secret.sh <<EOF
-        GOOGLE_APPLICATION_CREDENTIALS=./.secret/gcp_creds.json
-        GOOGLE_APPLICATION_PROJECT_ID=${GOOGLE_APPLICATION_PROJECT_ID}
-        GOOGLE_APPLICATION_REGION=${GOOGLE_APPLICATION_REGION}
-        GOOGLE_ENCRYPTION_KEY=${GOOGLE_ENCRYPTION_KEY}
-        SSH_PRIVATE_KEY_PATH=./.secret/ssh_key
-        SSH_PUBLIC_KEY_PATH=./.secret/ssh_key.pub
-        HOST_SERVER_NAME=${HOST_SERVER_NAME}
-        HOST_SERVER_IP=${HOST_SERVER_IP}
-        HETZNER_CLOUD_TOKEN=${HETZNER_CLOUD_TOKEN}
-        DEPLOYMENT_MODE=${DEPLOYMENT_MODE}
-        PROJECT_NAME=${PROJECT_NAME}
-        PROJECT_DOMAIN=${PROJECT_DOMAIN}
-        PROJECT_CERT_EMAIL=${PROJECT_CERT_EMAIL}
-        DATABASE_URL=${DATABASE_URL}
-        JWT_SECRET=${JWT_SECRET}
-        IC_TOKEN_SECRET=${IC_TOKEN_SECRET}
-        IP_TOKEN_KEY=${IP_TOKEN_KEY}
-        IRON_SECRETS_MASTER_KEY=${IRON_SECRETS_MASTER_KEY}
-        ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
-        SERVER_PORT=${SERVER_PORT}
-        IRON_DEPLOYMENT_MODE=${IRON_DEPLOYMENT_MODE}
-        ENABLE_DEMO_SEED=${ENABLE_DEMO_SEED}
-        RUST_LOG=${RUST_LOG}
-        EOF
+        printf 'GOOGLE_APPLICATION_CREDENTIALS=".secret/-service_account.json"\n' >> .secret/-secret.sh
+        printf 'GOOGLE_APPLICATION_PROJECT_ID="%s"\n' "${GOOGLE_APPLICATION_PROJECT_ID}" >> .secret/-secret.sh
+        printf 'GOOGLE_APPLICATION_REGION="%s"\n' "${GOOGLE_APPLICATION_REGION}" >> .secret/-secret.sh
+        printf 'GOOGLE_ENCRYPTION_KEY="%s"\n' "${GOOGLE_ENCRYPTION_KEY}" >> .secret/-secret.sh
+        printf 'SSH_PRIVATE_KEY_PATH=".secret/-iron_sdk"\n' >> .secret/-secret.sh
+        printf 'SSH_PUBLIC_KEY_PATH=".secret/-iron_sdk.pub"\n' >> .secret/-secret.sh
+        printf 'HOST_SERVER_NAME="%s"\n' "${HOST_SERVER_NAME}" >> .secret/-secret.sh
+        printf 'HOST_SERVER_IP="%s"\n' "${HOST_SERVER_IP}" >> .secret/-secret.sh
+        printf 'HETZNER_CLOUD_TOKEN="%s"\n' "${HETZNER_CLOUD_TOKEN}" >> .secret/-secret.sh
+        printf 'DEPLOYMENT_MODE="%s"\n' "${DEPLOYMENT_MODE}" >> .secret/-secret.sh
+        printf 'PROJECT_NAME="%s"\n' "${PROJECT_NAME}" >> .secret/-secret.sh
+        printf 'PROJECT_DOMAIN="%s"\n' "${PROJECT_DOMAIN}" >> .secret/-secret.sh
+        printf 'PROJECT_CERT_EMAIL="%s"\n' "${PROJECT_CERT_EMAIL}" >> .secret/-secret.sh
+        printf 'HOST_SERVER_IMAGE="%s"\n' "${HOST_SERVER_IMAGE}" >> .secret/-secret.sh
+        printf 'HOST_SERVER_LOCATION="%s"\n' "${HOST_SERVER_LOCATION}" >> .secret/-secret.sh
+        printf 'HOST_SERVER_TYPE="%s"\n' "${HOST_SERVER_TYPE}" >> .secret/-secret.sh
+        printf 'ALLOWED_SSH_IPS="%s"\n' "${ALLOWED_SSH_IPS}" >> .secret/-secret.sh
+        printf 'DATABASE_URL="%s"\n' "${DATABASE_URL}" >> .secret/-secret.sh
+        printf 'JWT_SECRET="%s"\n' "${JWT_SECRET}" >> .secret/-secret.sh
+        printf 'IC_TOKEN_SECRET="%s"\n' "${IC_TOKEN_SECRET}" >> .secret/-secret.sh
+        printf 'IP_TOKEN_KEY="%s"\n' "${IP_TOKEN_KEY}" >> .secret/-secret.sh
+        printf 'IRON_SECRETS_MASTER_KEY="%s"\n' "${IRON_SECRETS_MASTER_KEY}" >> .secret/-secret.sh
+        printf 'ALLOWED_ORIGINS="%s"\n' "${ALLOWED_ORIGINS}" >> .secret/-secret.sh
+        printf 'SERVER_PORT="%s"\n' "${SERVER_PORT}" >> .secret/-secret.sh
+        printf 'IRON_DEPLOYMENT_MODE="%s"\n' "${IRON_DEPLOYMENT_MODE}" >> .secret/-secret.sh
+        printf 'ENABLE_DEMO_SEED="%s"\n' "${ENABLE_DEMO_SEED}" >> .secret/-secret.sh
+        printf 'RUST_LOG="%s"\n' "${RUST_LOG}" >> .secret/-secret.sh
 
-    - name: 'Build the image, push and deploy' 
+    - name: 'Build the image, push and deploy'
       run: 'make deploy'
 
-    # - name: 'Verify deployment health'
-    #   run: |
-    #     timeout 60 bash -c 'until curl -f "https://${{ vars.PROJECT_DOMAIN }}/login"; do sleep 5; done'
+    - name: Notify Google Chat on failure or cancellation
+      if: failure() || cancelled()
+      continue-on-error: true
+      env:
+        GCHAT_WEBHOOK_URL: ${{ secrets.GCHAT_WEBHOOK_URL }}
+        GH_REPOSITORY: ${{ github.repository }}
+        GH_REF_NAME: ${{ github.ref_name }}
+        GH_SERVER_URL: ${{ github.server_url }}
+        GH_RUN_ID: ${{ github.run_id }}
+        GH_JOB_STATUS: ${{ job.status }}
+      run: |
+        if [ -z "${GCHAT_WEBHOOK_URL}" ]; then exit 0; fi
+        echo "::add-mask::${GCHAT_WEBHOOK_URL}"
+        command -v jq > /dev/null || { echo "ERROR: jq not found on runner — install jq to enable webhook notifications"; exit 1; }
+        jq -n \
+          --arg repo "${GH_REPOSITORY}" \
+          --arg branch "${GH_REF_NAME}" \
+          --arg mode "${DEPLOYMENT_MODE}" \
+          --arg run_url "${GH_SERVER_URL}/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}" \
+          --arg status "${GH_JOB_STATUS}" \
+          '{"text": ((if $status == "cancelled" then "⚠️ *Deploy cancelled*" else "❌ *Deploy failed*" end) + "\n*Repo:* " + $repo + "\n*Branch:* " + $branch + "\n*Mode:* " + $mode + "\n*Run:* " + $run_url)}' \
+        | curl -s --fail -X POST "${GCHAT_WEBHOOK_URL}" \
+            -H 'Content-Type: application/json' \
+            -d @-
 
     - name: Cleanup secrets
       if: always()
@@ -116,12 +162,12 @@ jobs:
         if [ -f .secret/-secret.sh ]; then
           shred -vfz -n 3 .secret/-secret.sh
         fi
-        if [ -f "./.secret/gcp_creds.json" ]; then
-          shred -vfz -n 3 "./.secret/gcp_creds.json"
+        if [ -f ".secret/-service_account.json" ]; then
+          shred -vfz -n 3 ".secret/-service_account.json"
         fi
-        if [ -f "./.secret/ssh_key" ]; then
-          shred -vfz -n 3 "./.secret/ssh_key"
+        if [ -f ".secret/-iron_sdk" ]; then
+          shred -vfz -n 3 ".secret/-iron_sdk"
         fi
-        if [ -f "./.secret/ssh_key.pub" ]; then
-          shred -vfz -n 3 "./.secret/ssh_key.pub"
+        if [ -f ".secret/-iron_sdk.pub" ]; then
+          shred -vfz -n 3 ".secret/-iron_sdk.pub"
         fi
