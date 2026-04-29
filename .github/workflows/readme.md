@@ -10,8 +10,6 @@ CI/CD pipeline for Iron Runtime. All workflows run on self-hosted runners config
 
 **Out of Scope:** Deployment scripts (`deploy/`), Makefiles, Terraform configuration, and manual release procedures.
 
-### Directory Structure
-
 ### Responsibility Table
 
 | File | Responsibility |
