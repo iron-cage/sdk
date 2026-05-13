@@ -1,18 +1,18 @@
 <!-- task_system_metadata
 type: root
 version: 1.0
-highest_id: 28
+highest_id: 33
 last_allocation:
-  id: 28
+  id: 33
   crate: workspace
-  timestamp: 2026-03-20T00:00:00Z
+  timestamp: 2026-05-13T00:00:00Z
 -->
 
 # Master Task Index - Workspace
 
-**Last Updated**: 2026-03-20
+**Last Updated**: 2026-05-13
 **Purpose**: Comprehensive task tracking for this workspace task folder
-**Total Tasks**: 27 tasks
+**Total Tasks**: 32 tasks
 
 ---
 
@@ -27,12 +27,12 @@ last_allocation:
 ## Global ID Registry
 
 <!-- registry_data
-highest_id: 28
+highest_id: 33
 -->
 
 **Current State:**
-- **Highest Allocated ID**: 28
-- **Active Tasks**: 27
+- **Highest Allocated ID**: 33
+- **Active Tasks**: 32
 - **Completed Tasks**: 0
 - **Backlog Tasks**: 0
 - **Task Systems**: 1 (root workspace task system)
@@ -40,7 +40,7 @@ highest_id: 28
 **ID Allocation Policy:**
 - All task IDs are allocated from this registry
 - IDs must be globally unique within this workspace task system
-- Next available ID: 29
+- Next available ID: 34
 
 ---
 
@@ -57,26 +57,31 @@ highest_id: 28
 | 5 | [016](016_expand_pii_detection_patterns.md) | 2160 | 9 | 6 | 10 | 4 | 🔄 (Planned) | Expand PII detection patterns | Add SSN, credit card, E.164 phone, IP address, and AWS key detection patterns |
 | 6 | [002](002_support_multiple_provider_keys_per_provider.md) | 2016 | 8 | 7 | 9 | 4 | 🔄 (Planned) | Support multiple keys per provider | Remove single-key behavior and enforce owner-scoped key selection |
 | 7 | [012](012_unify_error_handling_strategy.md) | 1960 | 7 | 7 | 10 | 4 | 🔄 (Planned) | Unify error handling strategy | Converge formatters and config to Result-based error handling, eliminating silent defaults |
-| 8 | [004](004_per_ic_key_limits.md) | 1728 | 8 | 6 | 9 | 4 | 🔄 (Planned) | Add dedicated limits per IC key | Introduce independent IC-key limit controls per agent |
-| 9 | [003](003_provider_key_spending_and_limits.md) | 1620 | 9 | 5 | 9 | 4 | 🔄 (Planned) | Add spending and limits per provider key | Introduce key-level budget accounting and enforcement |
-| 10 | [007](007_migrate_to_api_llm_bindings.md) | 1620 | 9 | 5 | 9 | 4 | 🔄 (Planned) | Migrate to `api_llm` bindings | Establish binding layer, migrate all providers, remove legacy direct-HTTP code |
-| 11 | [015](015_budget_lease_auto_refresh_worker.md) | 1536 | 8 | 6 | 8 | 4 | 🔄 (Planned) | Budget lease auto-refresh worker | Add background tokio task for threshold-based budget lease auto-refresh |
-| 12 | [017](017_complete_python_sdk_async_bridge.md) | 1500 | 10 | 3 | 10 | 5 | 🔄 (Planned) | Complete Python SDK async bridge | Complete pyo3-async-runtimes bridge and implement start_agent() for Python SDK |
-| 13 | [019](019_e2e_rusticon_demo_script.md) | 1500 | 10 | 3 | 10 | 5 | 🔄 (Planned) | End-to-end Rusticon demo script | Create reproducible end-to-end demo validating all Rusticon promises |
-| 14 | [018](018_pypi_distribution_pipeline.md) | 1080 | 8 | 5 | 9 | 3 | 🔄 (Planned) | PyPI distribution pipeline | Build maturin-based PyPI package and distribution pipeline |
-| 15 | [005](005_add_gemini_provider.md) | 1008 | 7 | 6 | 8 | 3 | 🔄 (Planned) | Add Gemini inference provider | End-to-end Gemini support in control, runtime, and analytics |
-| 16 | [006](006_add_xai_provider.md) | 1008 | 7 | 6 | 8 | 3 | 🔄 (Planned) | Add xAI inference provider | End-to-end xAI support in control, runtime, and analytics |
-| 17 | [013](013_increase_test_coverage_zero_modules.md) | 900 | 6 | 5 | 10 | 3 | 🔄 (Planned) | Increase test coverage for untested modules | Add tests for untested public functions in provider_adapter.rs and trace_storage.rs |
-| 18 | [022](022_provider_failover.md) | 864 | 8 | 4 | 9 | 3 | 🔄 (Planned) | Provider failover | Implement automatic provider failover with health-based routing |
-| 19 | [020](020_postgresql_audit_backend.md) | 840 | 7 | 5 | 8 | 3 | 🔄 (Planned) | PostgreSQL audit backend | Add PostgreSQL AuditBackend implementation for multi-user deployments |
-| 20 | [011](011_upgrade_rust_2024_edition.md) | 840 | 5 | 7 | 8 | 3 | 🔄 (Planned) | Upgrade to Rust 2024 edition | Update workspace edition from 2021 to 2024 and fix any breaking changes |
-| 21 | [023](023_hardening.md) | 810 | 9 | 3 | 10 | 3 | 🔄 (Planned) | Hardening | Add property tests, fuzz testing, and load testing for hardening |
-| 22 | [021](021_token_revocation_vault_backend.md) | 768 | 8 | 4 | 8 | 3 | 🔄 (Planned) | Token revocation and vault backend | Add dedicated token revocation action and integrate vault backend for key storage |
-| 23 | [024](024_api_surface_polish.md) | 700 | 7 | 5 | 10 | 2 | 🔄 (Planned) | API surface polish | Stabilize public API surface with consistent naming and versioning |
-| 24 | [026](026_documentation_and_examples.md) | 700 | 7 | 5 | 10 | 2 | 🔄 (Planned) | Documentation and examples | Write user-facing documentation, API reference, and integration examples |
-| 25 | [025](025_ci_cd_pipeline.md) | 576 | 8 | 4 | 9 | 2 | 🔄 (Planned) | CI/CD pipeline | Set up GitHub Actions CI/CD with automated testing, linting, and release workflows |
-| 26 | [027](027_dashboard_integration.md) | 504 | 7 | 4 | 9 | 2 | 🔄 (Planned) | Dashboard integration | Connect Control Panel dashboard to backend API endpoints |
-| 27 | [008](008_deploy_iron_cage_internal.md) | 360 | 10 | 4 | 9 | 1 | 🔄 (Planned) | Deploy Iron Cage as internal centralized token control platform | Centralized IP key sharing, IC token distribution, RBAC, and secure internal deployment |
+| 8 | [029](029_freeform_workspace_setup.md) | 1800 | 9 | 5 | 10 | 4 | 🔄 (Planned) | FreeForm component infrastructure | Shared `FreeFormDialog` + `DetectedConfirmation` + toggle primitive and LLM-backed parse adapter; foundation for 030–033 |
+| 9 | [004](004_per_ic_key_limits.md) | 1728 | 8 | 6 | 9 | 4 | 🔄 (Planned) | Add dedicated limits per IC key | Introduce independent IC-key limit controls per agent |
+| 10 | [003](003_provider_key_spending_and_limits.md) | 1620 | 9 | 5 | 9 | 4 | 🔄 (Planned) | Add spending and limits per provider key | Introduce key-level budget accounting and enforcement |
+| 11 | [007](007_migrate_to_api_llm_bindings.md) | 1620 | 9 | 5 | 9 | 4 | 🔄 (Planned) | Migrate to `api_llm` bindings | Establish binding layer, migrate all providers, remove legacy direct-HTTP code |
+| 12 | [032](032_freeform_providers_and_policy.md) | 1620 | 9 | 5 | 9 | 4 | 🔄 (Planned) | FreeForm: Providers + Usage Policy + `/use-cases` page | Structured paste-block grammar, transactional apply, idempotency, CLI parity, and `/use-cases` showcase |
+| 13 | [015](015_budget_lease_auto_refresh_worker.md) | 1536 | 8 | 6 | 8 | 4 | 🔄 (Planned) | Budget lease auto-refresh worker | Add background tokio task for threshold-based budget lease auto-refresh |
+| 14 | [017](017_complete_python_sdk_async_bridge.md) | 1500 | 10 | 3 | 10 | 5 | 🔄 (Planned) | Complete Python SDK async bridge | Complete pyo3-async-runtimes bridge and implement start_agent() for Python SDK |
+| 15 | [019](019_e2e_rusticon_demo_script.md) | 1500 | 10 | 3 | 10 | 5 | 🔄 (Planned) | End-to-end Rusticon demo script | Create reproducible end-to-end demo validating all Rusticon promises |
+| 16 | [030](030_freeform_registration.md) | 1470 | 7 | 7 | 10 | 3 | 🔄 (Planned) | FreeForm: Registration twin | LLM-inferred first/last/birthday from one-sentence paste; classic-form prefill with AI-disclosure subtitle |
+| 17 | [031](031_freeform_team_setup.md) | 1470 | 7 | 7 | 10 | 3 | 🔄 (Planned) | FreeForm: Team Setup twin | LLM-inferred company name/domain/account-type from free description; constrained to existing enum |
+| 18 | [033](033_invite_link_and_member_access.md) | 1296 | 8 | 6 | 9 | 3 | 🔄 (Planned) | Magic invite link + Member Model Access | Policy-snapshot invite links with seat decrement; member-side IC token panel + Request gated models |
+| 19 | [018](018_pypi_distribution_pipeline.md) | 1080 | 8 | 5 | 9 | 3 | 🔄 (Planned) | PyPI distribution pipeline | Build maturin-based PyPI package and distribution pipeline |
+| 20 | [005](005_add_gemini_provider.md) | 1008 | 7 | 6 | 8 | 3 | 🔄 (Planned) | Add Gemini inference provider | End-to-end Gemini support in control, runtime, and analytics |
+| 21 | [006](006_add_xai_provider.md) | 1008 | 7 | 6 | 8 | 3 | 🔄 (Planned) | Add xAI inference provider | End-to-end xAI support in control, runtime, and analytics |
+| 22 | [013](013_increase_test_coverage_zero_modules.md) | 900 | 6 | 5 | 10 | 3 | 🔄 (Planned) | Increase test coverage for untested modules | Add tests for untested public functions in provider_adapter.rs and trace_storage.rs |
+| 23 | [022](022_provider_failover.md) | 864 | 8 | 4 | 9 | 3 | 🔄 (Planned) | Provider failover | Implement automatic provider failover with health-based routing |
+| 24 | [020](020_postgresql_audit_backend.md) | 840 | 7 | 5 | 8 | 3 | 🔄 (Planned) | PostgreSQL audit backend | Add PostgreSQL AuditBackend implementation for multi-user deployments |
+| 25 | [011](011_upgrade_rust_2024_edition.md) | 840 | 5 | 7 | 8 | 3 | 🔄 (Planned) | Upgrade to Rust 2024 edition | Update workspace edition from 2021 to 2024 and fix any breaking changes |
+| 26 | [023](023_hardening.md) | 810 | 9 | 3 | 10 | 3 | 🔄 (Planned) | Hardening | Add property tests, fuzz testing, and load testing for hardening |
+| 27 | [021](021_token_revocation_vault_backend.md) | 768 | 8 | 4 | 8 | 3 | 🔄 (Planned) | Token revocation and vault backend | Add dedicated token revocation action and integrate vault backend for key storage |
+| 28 | [024](024_api_surface_polish.md) | 700 | 7 | 5 | 10 | 2 | 🔄 (Planned) | API surface polish | Stabilize public API surface with consistent naming and versioning |
+| 29 | [026](026_documentation_and_examples.md) | 700 | 7 | 5 | 10 | 2 | 🔄 (Planned) | Documentation and examples | Write user-facing documentation, API reference, and integration examples |
+| 30 | [025](025_ci_cd_pipeline.md) | 576 | 8 | 4 | 9 | 2 | 🔄 (Planned) | CI/CD pipeline | Set up GitHub Actions CI/CD with automated testing, linting, and release workflows |
+| 31 | [027](027_dashboard_integration.md) | 504 | 7 | 4 | 9 | 2 | 🔄 (Planned) | Dashboard integration | Connect Control Panel dashboard to backend API endpoints |
+| 32 | [008](008_deploy_iron_cage_internal.md) | 360 | 10 | 4 | 9 | 1 | 🔄 (Planned) | Deploy Iron Cage as internal centralized token control platform | Centralized IP key sharing, IC token distribution, RBAC, and secure internal deployment |
 
 ---
 
@@ -86,10 +91,10 @@ highest_id: 28
 
 | Status | Count | Percentage | Location |
 |--------|-------|------------|----------|
-| 🔄 Planned | 27 | 100.0% | `task/` |
+| 🔄 Planned | 32 | 100.0% | `task/` |
 | ✅ Completed | 0 | 0.0% | `task/completed/` |
 | 📥 Backlog | 0 | 0.0% | `task/backlog/` |
-| **TOTAL** | **27** | **100%** | |
+| **TOTAL** | **32** | **100%** | |
 
 ### Tasks by Domain
 
@@ -104,7 +109,8 @@ highest_id: 28
 | Code Quality & Hardening | 5 | 5 | 0 | 0 |
 | Compliance & Safety | 3 | 3 | 0 | 0 |
 | SDK, Integration & Documentation | 6 | 6 | 0 | 0 |
-| **TOTAL** | **27** | **27** | **0** | **0** |
+| FreeForm Onboarding | 5 | 5 | 0 | 0 |
+| **TOTAL** | **32** | **32** | **0** | **0** |
 
 ---
 
@@ -177,6 +183,13 @@ Tasks are organized in this workspace as:
 - Task 026 (documentation and examples)
 - Task 027 (dashboard integration)
 
+**FreeForm Onboarding (Zero-to-Protected-in-60s)**
+- Task 029 (FreeForm component infrastructure — `FreeFormDialog`, `DetectedConfirmation`, toggle, parse adapter)
+- Task 030 (Registration FreeForm twin)
+- Task 031 (Team Setup FreeForm twin)
+- Task 032 (Providers + Usage Policy FreeForm + `/use-cases` page)
+- Task 033 (Magic invite link + Member Model Access)
+
 ---
 
 ## Documentation
@@ -187,6 +200,17 @@ Tasks are organized in this workspace as:
 ---
 
 ## Recent Changes
+
+**2026-05-13**:
+- ✅ Split task 029 into the full FreeForm Onboarding pillar (Rusticon "Zero to protected in 60 seconds")
+  - Task 029 rewritten as **FreeForm component infrastructure** (V=9, E=5, S=10, P=4, Adv=1800)
+  - Task 030 added — **Registration FreeForm twin** (V=7, E=7, S=10, P=3, Adv=1470)
+  - Task 031 added — **Team Setup FreeForm twin** (V=7, E=7, S=10, P=3, Adv=1470)
+  - Task 032 added — **Providers + Usage Policy FreeForm + `/use-cases`** (V=9, E=5, S=9, P=4, Adv=1620)
+  - Task 033 added — **Magic invite link + Member Model Access** (V=8, E=6, S=9, P=3, Adv=1296)
+- ✅ Updated global registry to highest ID `033` and next available ID `034`
+- ✅ Added "FreeForm Onboarding" domain to the by-domain breakdown and navigation
+- ✅ Re-sorted index across all 32 tasks by advisability
 
 **2026-03-20**:
 - ✅ Registered tasks 009-028 (Architecture Review & Roadmap - 3-stage plan)
