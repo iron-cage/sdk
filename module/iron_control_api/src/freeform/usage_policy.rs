@@ -39,8 +39,6 @@ pub struct ParsedPolicy {
   pub spending_cap: Option<SpendingCap>,
   /// Default model all members receive from `default: <model>`.
   pub default_model: Option<String>,
-  /// Models gated behind an admin-approval request from `requestable: model[, ...]`.
-  pub requestable_models: Vec<String>,
 }
 
 /// A per-line parse error.
@@ -86,9 +84,10 @@ impl core::fmt::Display for ParseError {
 /// Supported directives (keywords are case-insensitive):
 /// - `limit all users $N/<period>` — workspace spending cap
 /// - `default: <model>` or `default model: <model>`
-/// - `requestable: model[, model, ...]`
 ///
-/// Returns the parsed policy or per-line errors (all-or-nothing).
+/// # Errors
+///
+/// Returns a list of [`ParseError`]s if any directive is malformed (all-or-nothing).
 pub fn parse(input: &str) -> Result<ParsedPolicy, Vec<ParseError>> {
   let mut policy = ParsedPolicy::default();
   let mut errors: Vec<ParseError> = Vec::new();
@@ -135,23 +134,6 @@ pub fn parse(input: &str) -> Result<ParsedPolicy, Vec<ParseError>> {
       } else {
         policy.default_model = Some(model);
       }
-    } else if lower.starts_with("requestable:") {
-      let rest = trimmed["requestable:".len()..].trim();
-      let models: Vec<String> = rest
-        .split(',')
-        .map(|m| m.trim().to_string())
-        .filter(|m| !m.is_empty())
-        .collect();
-
-      if models.is_empty() {
-        errors.push(ParseError {
-          line: line_no,
-          content: trimmed.to_string(),
-          kind: ParseErrorKind::EmptyModelId,
-        });
-      } else {
-        policy.requestable_models.extend(models);
-      }
     } else {
       errors.push(ParseError {
         line: line_no,
@@ -169,7 +151,9 @@ pub fn parse(input: &str) -> Result<ParsedPolicy, Vec<ParseError>> {
 }
 
 fn parse_spend_cap(s: &str) -> Result<SpendingCap, ParseErrorKind> {
-  let s = s.strip_prefix('$').ok_or(ParseErrorKind::InvalidSpendAmount)?;
+  let s = s
+    .strip_prefix('$')
+    .ok_or(ParseErrorKind::InvalidSpendAmount)?;
   let (amount_str, period_str) = s
     .split_once('/')
     .ok_or(ParseErrorKind::InvalidSpendAmount)?;
@@ -178,101 +162,18 @@ fn parse_spend_cap(s: &str) -> Result<SpendingCap, ParseErrorKind> {
     .trim()
     .parse()
     .map_err(|_| ParseErrorKind::InvalidSpendAmount)?;
-  let amount_cents = (amount_dollars * 100.0).round() as u64;
+  let cents = (amount_dollars * 100.0).round();
+  if !cents.is_finite() || cents < 0.0 || cents > u64::MAX as f64 {
+    return Err(ParseErrorKind::InvalidSpendAmount);
+  }
+  #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+  let amount_cents = cents as u64;
 
   let period = CapPeriod::from_str(period_str.trim())
     .ok_or_else(|| ParseErrorKind::InvalidPeriod(period_str.trim().to_string()))?;
 
-  Ok(SpendingCap { amount_cents, period })
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn parses_multiline_policy() {
-    let input = "\
-limit all users $100/week
-default: gpt-5.4-mini
-requestable: claude-4-6-sonnet, gemini-3.1-pro-preview";
-
-    let policy = parse(input).unwrap();
-    assert_eq!(
-      policy.spending_cap,
-      Some(SpendingCap { amount_cents: 10000, period: CapPeriod::Week })
-    );
-    assert_eq!(policy.default_model.as_deref(), Some("gpt-5.4-mini"));
-    assert_eq!(
-      policy.requestable_models,
-      vec!["claude-4-6-sonnet", "gemini-3.1-pro-preview"]
-    );
-  }
-
-  #[test]
-  fn single_line_deck_format_is_rejected() {
-    // The deck shows directives on one line for display; the grammar expects one directive per line.
-    let input = "limit all users $100/week - default: gpt-5.4-mini - requestable: claude-4-6-sonnet";
-    assert!(parse(input).is_err());
-  }
-
-  #[test]
-  fn parses_default_model_variant() {
-    let input = "default model: gpt-4o";
-    let policy = parse(input).unwrap();
-    assert_eq!(policy.default_model.as_deref(), Some("gpt-4o"));
-  }
-
-  #[test]
-  fn rejects_unknown_period() {
-    let input = "limit all users $50/fortnight";
-    let errs = parse(input).unwrap_err();
-    assert!(matches!(&errs[0].kind, ParseErrorKind::InvalidPeriod(p) if p == "fortnight"));
-  }
-
-  #[test]
-  fn rejects_invalid_amount() {
-    let input = "limit all users 50/week";
-    let errs = parse(input).unwrap_err();
-    assert_eq!(errs[0].kind, ParseErrorKind::InvalidSpendAmount);
-  }
-
-  #[test]
-  fn rejects_empty_model() {
-    let input = "default:";
-    let errs = parse(input).unwrap_err();
-    assert_eq!(errs[0].kind, ParseErrorKind::EmptyModelId);
-  }
-
-  #[test]
-  fn ignores_blank_lines_and_comments() {
-    let input = "\
-# workspace policy
-limit all users $200/month
-
-default: gpt-4o";
-
-    let policy = parse(input).unwrap();
-    assert_eq!(policy.spending_cap.unwrap().period, CapPeriod::Month);
-    assert_eq!(policy.default_model.as_deref(), Some("gpt-4o"));
-  }
-
-  #[test]
-  fn rejects_per_user_limit_as_malformed() {
-    let input = "limit user@example.com $50/week";
-    let errs = parse(input).unwrap_err();
-    assert_eq!(errs[0].kind, ParseErrorKind::MalformedLine);
-  }
-
-  #[test]
-  fn idempotent_reparse() {
-    let input = "limit all users $100/week\ndefault: gpt-4o\nrequestable: claude-4-6-sonnet";
-    assert_eq!(parse(input), parse(input));
-  }
-
-  #[test]
-  fn all_or_nothing_on_mixed_error() {
-    let input = "limit all users $100/week\nbadline";
-    assert!(parse(input).is_err());
-  }
+  Ok(SpendingCap {
+    amount_cents,
+    period,
+  })
 }

@@ -208,7 +208,7 @@ pub mod ic_token;
 pub mod rate_limiter;
 
 #[cfg(feature = "enabled")]
-/// Deterministic paste parsers for FreeForm onboarding surfaces.
+/// Deterministic paste parsers for `FreeForm` onboarding surfaces.
 pub mod freeform;
 
 #[cfg(feature = "enabled")]
