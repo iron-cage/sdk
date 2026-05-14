@@ -27,7 +27,7 @@ use crate::{
   rbac::{Permission, PermissionChecker, Role},
 };
 
-/// BCrypt cost for new member passwords (matches UserService::BCRYPT_COST).
+/// `BCrypt` cost for new member passwords (matches `UserService::BCRYPT_COST`).
 const BCRYPT_COST: u32 = 12;
 
 /// State for invite endpoints.
@@ -201,6 +201,17 @@ pub async fn post_invite_generate(
   ))
 }
 
+/// DB row returned by the invite-preview query.
+#[derive(sqlx::FromRow)]
+struct InviteLinkRow {
+  name: String,
+  domain: String,
+  default_model: Option<String>,
+  seats_total: i64,
+  seats_used: i64,
+  expires_at: Option<i64>,
+}
+
 /// GET /api/v1/invites/:token
 ///
 /// Return a workspace preview for an invite link. Public - no authentication required.
@@ -214,7 +225,7 @@ pub async fn get_invite_preview(
 ) -> ApiResult<impl IntoResponse> {
   let token_hash = hash_token(&token);
 
-  let row: Option<(String, String, Option<String>, i64, i64, Option<i64>)> = sqlx::query_as(
+  let row: Option<InviteLinkRow> = sqlx::query_as(
     r"
       SELECT w.name, w.domain,
              wp.default_model,
@@ -230,16 +241,15 @@ pub async fn get_invite_preview(
   .await
   .map_err(|_| ApiError::Internal("Failed to query invite".into()))?;
 
-  let (workspace_name, domain, default_model, seats_total, seats_used, expires_at) =
-    row.ok_or_else(|| ApiError::NotFound("Invite not found".into()))?;
+  let row = row.ok_or_else(|| ApiError::NotFound("Invite not found".into()))?;
 
-  if let Some(exp) = expires_at {
+  if let Some(exp) = row.expires_at {
     if now_ms() > exp {
       return Err(ApiError::BadRequest("Invite link has expired".into()));
     }
   }
 
-  let seats_remaining = seats_total - seats_used;
+  let seats_remaining = row.seats_total - row.seats_used;
   if seats_remaining <= 0 {
     return Err(ApiError::BadRequest("Invite link is full".into()));
   }
@@ -247,9 +257,9 @@ pub async fn get_invite_preview(
   Ok((
     StatusCode::OK,
     Json(InvitePreviewResponse {
-      workspace_name,
-      domain,
-      default_model,
+      workspace_name: row.name,
+      domain: row.domain,
+      default_model: row.default_model,
       seats_remaining,
     }),
   ))
