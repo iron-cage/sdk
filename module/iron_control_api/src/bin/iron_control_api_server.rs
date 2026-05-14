@@ -71,8 +71,8 @@ use iron_control_api::{
   rbac::PermissionChecker,
   routes::{
     self, analytics::AnalyticsState, auth::AuthState, budget::BudgetState, freeform::FreeformState,
-    ic_token::IcTokenState, keys::KeysState, limits::LimitsState, providers::ProvidersState,
-    tokens::TokenState, usage::UsageState, users::UserManagementState,
+    ic_token::IcTokenState, invites::InviteState, keys::KeysState, limits::LimitsState,
+    providers::ProvidersState, tokens::TokenState, usage::UsageState, users::UserManagementState,
   },
   token_auth::ApiTokenState,
 };
@@ -217,6 +217,7 @@ struct AppState {
   keys: KeysState,
   users: UserManagementState,
   freeform: FreeformState,
+  invites: InviteState,
   agents: SqlitePool,
   budget: BudgetState,
   analytics: AnalyticsState,
@@ -283,6 +284,13 @@ impl FromRef<AppState> for UserManagementState {
 impl FromRef<AppState> for FreeformState {
   fn from_ref(state: &AppState) -> Self {
     state.freeform.clone()
+  }
+}
+
+/// Enable invite routes to access `InviteState` from combined `AppState`
+impl FromRef<AppState> for InviteState {
+  fn from_ref(state: &AppState) -> Self {
+    state.invites.clone()
   }
 }
 
@@ -612,6 +620,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
     crypto: Some(crypto_service_for_freeform),
   };
 
+  // Initialize invite link state
+  let invite_state = InviteState {
+    pool: agents_pool.clone(),
+    jwt_secret: auth_state.jwt_secret.clone(),
+  };
+
   // Seed database with test data if empty (development convenience)
   let user_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
     .fetch_one(&agents_pool)
@@ -654,6 +668,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     keys: keys_state,
     users: user_management_state,
     freeform: freeform_state,
+    invites: invite_state,
     agents: agents_pool,
     budget: budget_state,
     analytics: analytics_state,
@@ -791,6 +806,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
     .route(
       "/api/v1/workspace/budget",
       post(routes::workspace::post_workspace_budget),
+    )
+    // Invite link endpoints
+    .route(
+      "/api/v1/invites/generate",
+      post(routes::invites::post_invite_generate),
+    )
+    .route(
+      "/api/v1/invites/{token}",
+      get(routes::invites::get_invite_preview),
+    )
+    .route(
+      "/api/v1/invites/{token}/accept",
+      post(routes::invites::post_invite_accept),
+    )
+    .route(
+      "/api/v1/invites/{token}/approve",
+      post(routes::invites::post_invite_approve),
     )
     // Key fetch endpoint (API token authentication)
     .route("/api/v1/keys", get(routes::keys::get_key))

@@ -10,6 +10,7 @@ pub mod budget;
 pub mod freeform;
 pub mod health;
 pub mod ic_token;
+pub mod invites;
 pub mod keys;
 pub mod limits;
 pub mod providers;
