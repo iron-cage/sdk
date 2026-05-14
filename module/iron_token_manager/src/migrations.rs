@@ -85,6 +85,9 @@ static MIGRATIONS: &[(&str, &str)] = &[
   migration!("028_add_spending_used_non_negative_guard"),
   migration!("029_add_spending_constraints"),
   migration!("030_add_agent_token_index"),
+  migration!("031_add_workspaces_and_policy"),
+  migration!("032_add_invite_links"),
+  migration!("033_add_invite_seats"),
 ];
 
 /// Applies all migrations to the database pool.
