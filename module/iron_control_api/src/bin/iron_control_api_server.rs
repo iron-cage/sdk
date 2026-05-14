@@ -70,9 +70,9 @@ use iron_control_api::{
   ic_token::{IcTokenManager, IcTokenRateLimiter},
   rbac::PermissionChecker,
   routes::{
-    self, analytics::AnalyticsState, auth::AuthState, budget::BudgetState, ic_token::IcTokenState,
-    keys::KeysState, limits::LimitsState, providers::ProvidersState, tokens::TokenState,
-    usage::UsageState, users::UserManagementState,
+    self, analytics::AnalyticsState, auth::AuthState, budget::BudgetState, freeform::FreeformState,
+    ic_token::IcTokenState, keys::KeysState, limits::LimitsState, providers::ProvidersState,
+    tokens::TokenState, usage::UsageState, users::UserManagementState,
   },
   token_auth::ApiTokenState,
 };
@@ -216,6 +216,7 @@ struct AppState {
   providers: ProvidersState,
   keys: KeysState,
   users: UserManagementState,
+  freeform: FreeformState,
   agents: SqlitePool,
   budget: BudgetState,
   analytics: AnalyticsState,
@@ -275,6 +276,13 @@ impl FromRef<AppState> for KeysState {
 impl FromRef<AppState> for UserManagementState {
   fn from_ref(state: &AppState) -> Self {
     state.users.clone()
+  }
+}
+
+/// Enable freeform routes to access `FreeformState` from combined `AppState`
+impl FromRef<AppState> for FreeformState {
+  fn from_ref(state: &AppState) -> Self {
+    state.freeform.clone()
   }
 }
 
@@ -447,7 +455,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
       // agent_1 during handshake — a development convenience that must never
       // be active in production as it bypasses the key-assignment requirement
       // and could expose unguarded API key paths.
-      if env::var("IRON_ALLOW_DEV_KEYS").ok().filter(|v| v != "0" && v != "false" && !v.is_empty()).is_some() {
+      if env::var("IRON_ALLOW_DEV_KEYS")
+        .ok()
+        .filter(|v| v != "0" && v != "false" && !v.is_empty())
+        .is_some()
+      {
         tracing::error!(
           "[CRITICAL] CRITICAL: IRON_ALLOW_DEV_KEYS is set in a production environment"
         );
@@ -550,6 +562,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
   // Clone crypto_service for BudgetState (Feature 014: Agent Provider Key)
   let crypto_service_for_budget = crypto_service.clone();
+  // Clone crypto_service for FreeformState (provider key encryption during onboarding)
+  let crypto_service_for_freeform = crypto_service.clone();
 
   let keys_state = KeysState {
     token_storage: token_state.storage.clone(),
@@ -589,6 +603,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
   let ic_token_state = IcTokenState {
     pool: agents_pool.clone(),
     ic_token_manager: ic_token_manager.clone(),
+  };
+
+  // Initialize FreeForm onboarding state
+  let freeform_state = FreeformState {
+    pool: agents_pool.clone(),
+    provider_storage: providers_state.storage.clone(),
+    crypto: Some(crypto_service_for_freeform),
   };
 
   // Seed database with test data if empty (development convenience)
@@ -632,6 +653,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     providers: providers_state,
     keys: keys_state,
     users: user_management_state,
+    freeform: freeform_state,
     agents: agents_pool,
     budget: budget_state,
     analytics: analytics_state,
@@ -755,6 +777,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
     .route(
       "/api/v1/projects/{project_id}/provider",
       delete(routes::providers::unassign_provider_from_project),
+    )
+    // FreeForm onboarding endpoints (Admin)
+    .route(
+      "/api/v1/freeform/company",
+      post(routes::freeform::post_company),
+    )
+    .route(
+      "/api/v1/freeform/providers",
+      post(routes::freeform::post_providers),
     )
     // Key fetch endpoint (API token authentication)
     .route("/api/v1/keys", get(routes::keys::get_key))

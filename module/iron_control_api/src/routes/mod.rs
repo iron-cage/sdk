@@ -7,6 +7,7 @@ pub mod agents;
 pub mod analytics;
 pub mod auth;
 pub mod budget;
+pub mod freeform;
 pub mod health;
 pub mod ic_token;
 pub mod keys;
