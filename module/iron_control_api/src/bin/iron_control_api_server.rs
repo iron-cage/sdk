@@ -787,6 +787,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
       "/api/v1/freeform/providers",
       post(routes::freeform::post_providers),
     )
+    // Workspace management endpoints (Admin)
+    .route(
+      "/api/v1/workspace/budget",
+      post(routes::workspace::post_workspace_budget),
+    )
     // Key fetch endpoint (API token authentication)
     .route("/api/v1/keys", get(routes::keys::get_key))
     // Agent management endpoints

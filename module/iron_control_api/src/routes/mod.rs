@@ -17,3 +17,4 @@ pub mod tokens;
 pub mod usage;
 pub mod users;
 pub mod version;
+pub mod workspace;
