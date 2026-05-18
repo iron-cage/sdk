@@ -807,6 +807,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
       "/api/v1/workspace/budget",
       post(routes::workspace::post_workspace_budget),
     )
+    .route(
+      "/api/v1/me/workspace",
+      get(routes::workspace::get_me_workspace),
+    )
     // Invite link endpoints
     .route(
       "/api/v1/invites/generate",

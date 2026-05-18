@@ -1,7 +1,8 @@
 //! Workspace management API endpoints
 //!
 //! Endpoints:
-//! - POST `/api/v1/workspace/budget` — upsert workspace spending policy (Admin)
+//! - POST `/api/v1/workspace/budget` - upsert workspace spending policy (Admin)
+//! - GET  `/api/v1/me/workspace` - read the current user's workspace info
 
 use core::str::FromStr;
 
@@ -154,6 +155,76 @@ pub async fn post_workspace_budget(
       workspace_id,
       amount_cents,
       period: period_str,
+    }),
+  ))
+}
+
+/// Response from `GET /api/v1/me/workspace`.
+#[derive(Debug, Serialize)]
+pub struct MeWorkspaceResponse {
+  /// Workspace the authenticated user belongs to.
+  pub workspace_id: i64,
+  /// Display name of the workspace.
+  pub workspace_name: String,
+  /// Company domain (e.g. `acme.com`).
+  pub domain: String,
+  /// Default model used by the workspace, if configured.
+  pub default_model: Option<String>,
+  /// Workspace budget ceiling in US cents, if configured.
+  pub budget_amount_cents: Option<i64>,
+  /// Workspace billing period (`day`, `week`, `month`), if configured.
+  pub budget_period: Option<String>,
+}
+
+/// DB row returned by the `/me/workspace` query.
+#[derive(sqlx::FromRow)]
+struct MeWorkspaceRow {
+  id: i64,
+  name: String,
+  domain: String,
+  default_model: Option<String>,
+  budget_amount_cents: Option<i64>,
+  budget_period: Option<String>,
+}
+
+/// `GET /api/v1/me/workspace`
+///
+/// Return the current user's workspace info: name, domain, and policy summary.
+/// Any authenticated user (Admin or Member) may call this.
+///
+/// # Errors
+///
+/// Returns `ApiError` if no workspace exists or the database query fails.
+pub async fn get_me_workspace(
+  State(pool): State<SqlitePool>,
+  AuthenticatedUser(_claims): AuthenticatedUser,
+) -> ApiResult<impl IntoResponse> {
+  let row: Option<MeWorkspaceRow> = sqlx::query_as(
+    r"
+      SELECT w.id, w.name, w.domain,
+             wp.default_model,
+             wp.budget_amount_cents,
+             wp.budget_period
+      FROM workspaces w
+      LEFT JOIN workspace_policy wp ON wp.workspace_id = w.id
+      WHERE w.id = 1
+    ",
+  )
+  .fetch_optional(&pool)
+  .await
+  .map_err(|_| ApiError::Internal("Failed to query workspace".into()))?;
+
+  let row = row.ok_or_else(|| ApiError::NotFound("Workspace not configured".into()))?;
+
+  Ok((
+    StatusCode::OK,
+    Json(MeWorkspaceResponse {
+      workspace_id: row.id,
+      workspace_name: row.name,
+      domain: row.domain,
+      default_model: row.default_model,
+      budget_amount_cents: row.budget_amount_cents,
+      budget_period: row.budget_period,
     }),
   ))
 }
