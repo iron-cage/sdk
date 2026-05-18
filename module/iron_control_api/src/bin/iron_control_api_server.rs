@@ -813,6 +813,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
       post(routes::invites::post_invite_generate),
     )
     .route(
+      "/api/v1/invites/pending",
+      get(routes::invites::get_pending_invites),
+    )
+    .route(
+      "/api/v1/invites/seats/{seat_id}/approve",
+      post(routes::invites::post_invite_seat_approve),
+    )
+    .route(
       "/api/v1/invites/{token}",
       get(routes::invites::get_invite_preview),
     )
