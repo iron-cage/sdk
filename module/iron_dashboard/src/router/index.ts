@@ -69,6 +69,12 @@ const router = createRouter({
       component: () => import('../views/ProvidersPage.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/setup/budget',
+      name: 'setup-budget',
+      component: () => import('../views/BudgetPage.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 
