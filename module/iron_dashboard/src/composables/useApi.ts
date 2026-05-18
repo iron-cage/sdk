@@ -158,6 +158,10 @@ interface RejectBudgetRequestResponse {
   rejected_at: number
 }
 
+export interface ApiFetchError extends Error {
+  status?: number
+}
+
 export function useApi() {
   const authStore = useAuthStore()
 
@@ -180,7 +184,9 @@ export function useApi() {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Request failed' }))
-      throw new Error(error.error || `HTTP ${response.status}`)
+      const err = new Error(error.error || `HTTP ${response.status}`) as ApiFetchError
+      err.status = response.status
+      throw err
     }
 
     // Handle empty responses (204 No Content, or empty body)

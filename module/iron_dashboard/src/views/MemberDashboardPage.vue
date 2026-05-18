@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { Check, Copy } from 'lucide-vue-next'
-import { useApi, type MeWorkspaceResponse, type CreateTokenResponse } from '@/composables/useApi'
+import {
+  useApi,
+  type MeWorkspaceResponse,
+  type CreateTokenResponse,
+  type ApiFetchError,
+} from '@/composables/useApi'
 import { useAuthStore } from '@/stores/auth'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -15,6 +20,7 @@ const gatewayUrl = computed(() => import.meta.env.VITE_GATEWAY_URL || window.loc
 
 const workspaceLoading = ref(true)
 const workspaceError = ref<string | null>(null)
+const workspaceMissing = ref(false)
 const workspace = ref<MeWorkspaceResponse | null>(null)
 
 const generating = ref(false)
@@ -28,7 +34,11 @@ onMounted(async () => {
   try {
     workspace.value = await api.getMeWorkspace()
   } catch (e) {
-    workspaceError.value = e instanceof Error ? e.message : String(e)
+    if ((e as ApiFetchError).status === 404) {
+      workspaceMissing.value = true
+    } else {
+      workspaceError.value = e instanceof Error ? e.message : String(e)
+    }
   } finally {
     workspaceLoading.value = false
   }
@@ -75,122 +85,137 @@ async function copyText(value: string, flag: 'gateway' | 'token') {
 
 <template>
   <div class="mx-auto max-w-2xl space-y-6 py-10">
-    <div class="space-y-1">
-      <h1 class="text-2xl font-semibold">
-        Welcome
-        <span v-if="workspace">to {{ workspace.workspace_name }}</span>
-      </h1>
-      <p class="text-sm text-muted-foreground">Your access details for the Iron Cage gateway.</p>
-    </div>
-
-    <Alert
-      v-if="workspaceError"
-      variant="destructive"
-    >
-      <AlertDescription>{{ workspaceError }}</AlertDescription>
-    </Alert>
-
-    <Card>
+    <Card v-if="workspaceMissing">
       <CardHeader>
-        <CardTitle>Gateway URL</CardTitle>
-        <CardDescription> Point your SDK or HTTP client to this base URL. </CardDescription>
+        <CardTitle>Workspace setup in progress</CardTitle>
+        <CardDescription> Your admin is still configuring this workspace. </CardDescription>
       </CardHeader>
-      <CardContent class="space-y-3">
-        <div class="rounded-md border bg-muted/30 p-3 font-mono text-sm break-all">
-          {{ gatewayUrl }}
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          @click="copyText(gatewayUrl, 'gateway')"
-        >
-          <component
-            :is="copiedGateway ? Check : Copy"
-            class="size-4"
-          />
-          {{ copiedGateway ? 'Copied' : 'Copy URL' }}
-        </Button>
+      <CardContent>
+        <p class="text-sm text-muted-foreground">
+          Please check back in a few minutes. If this persists, contact your admin to confirm the
+          workspace setup has been completed.
+        </p>
       </CardContent>
     </Card>
 
-    <Card>
-      <CardHeader>
-        <CardTitle>IC Token</CardTitle>
-        <CardDescription>
-          Use this token as the bearer credential for gateway requests. Shown once - copy it now.
-        </CardDescription>
-      </CardHeader>
-      <CardContent class="space-y-3">
-        <div
-          v-if="!icToken"
-          class="space-y-3"
-        >
-          <p class="text-sm text-muted-foreground">
-            No token yet. Generate one to start using the gateway.
-          </p>
-          <Alert
-            v-if="generateError"
-            variant="destructive"
-          >
-            <AlertDescription>{{ generateError }}</AlertDescription>
-          </Alert>
-          <Button
-            :disabled="generating"
-            @click="generateIcToken"
-          >
-            {{ generating ? 'Generating...' : 'Generate Token' }}
-          </Button>
-        </div>
+    <template v-else>
+      <div class="space-y-1">
+        <h1 class="text-2xl font-semibold">
+          Welcome
+          <span v-if="workspace">to {{ workspace.workspace_name }}</span>
+        </h1>
+        <p class="text-sm text-muted-foreground">Your access details for the Iron Cage gateway.</p>
+      </div>
 
-        <div
-          v-else
-          class="space-y-3"
-        >
+      <Alert
+        v-if="workspaceError"
+        variant="destructive"
+      >
+        <AlertDescription>{{ workspaceError }}</AlertDescription>
+      </Alert>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Gateway URL</CardTitle>
+          <CardDescription> Point your SDK or HTTP client to this base URL. </CardDescription>
+        </CardHeader>
+        <CardContent class="space-y-3">
           <div class="rounded-md border bg-muted/30 p-3 font-mono text-sm break-all">
-            {{ icToken.token }}
+            {{ gatewayUrl }}
           </div>
           <Button
             variant="outline"
             size="sm"
-            @click="copyText(icToken.token, 'token')"
+            @click="copyText(gatewayUrl, 'gateway')"
           >
             <component
-              :is="copiedToken ? Check : Copy"
+              :is="copiedGateway ? Check : Copy"
               class="size-4"
             />
-            {{ copiedToken ? 'Copied' : 'Copy Token' }}
+            {{ copiedGateway ? 'Copied' : 'Copy URL' }}
           </Button>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
 
-    <Card>
-      <CardHeader>
-        <CardTitle>Default Model</CardTitle>
-        <CardDescription>
-          The model that gateway requests resolve to when none is specified.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div
-          v-if="workspaceLoading"
-          class="text-sm text-muted-foreground"
-        >
-          Loading...
-        </div>
-        <Badge
-          v-else-if="workspace?.default_model"
-          variant="secondary"
-        >
-          {{ workspace.default_model }}
-        </Badge>
-        <p
-          v-else
-          class="text-sm text-muted-foreground"
-        >
-          Not configured. Ask your admin to set a default model.
-        </p>
-      </CardContent>
-    </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>IC Token</CardTitle>
+          <CardDescription>
+            Use this token as the bearer credential for gateway requests. Shown once - copy it now.
+          </CardDescription>
+        </CardHeader>
+        <CardContent class="space-y-3">
+          <div
+            v-if="!icToken"
+            class="space-y-3"
+          >
+            <p class="text-sm text-muted-foreground">
+              No token yet. Generate one to start using the gateway.
+            </p>
+            <Alert
+              v-if="generateError"
+              variant="destructive"
+            >
+              <AlertDescription>{{ generateError }}</AlertDescription>
+            </Alert>
+            <Button
+              :disabled="generating"
+              @click="generateIcToken"
+            >
+              {{ generating ? 'Generating...' : 'Generate Token' }}
+            </Button>
+          </div>
+
+          <div
+            v-else
+            class="space-y-3"
+          >
+            <div class="rounded-md border bg-muted/30 p-3 font-mono text-sm break-all">
+              {{ icToken.token }}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              @click="copyText(icToken.token, 'token')"
+            >
+              <component
+                :is="copiedToken ? Check : Copy"
+                class="size-4"
+              />
+              {{ copiedToken ? 'Copied' : 'Copy Token' }}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Default Model</CardTitle>
+          <CardDescription>
+            The model that gateway requests resolve to when none is specified.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div
+            v-if="workspaceLoading"
+            class="text-sm text-muted-foreground"
+          >
+            Loading...
+          </div>
+          <Badge
+            v-else-if="workspace?.default_model"
+            variant="secondary"
+          >
+            {{ workspace.default_model }}
+          </Badge>
+          <p
+            v-else
+            class="text-sm text-muted-foreground"
+          >
+            Not configured. Ask your admin to set a default model.
+          </p>
+        </CardContent>
+      </Card>
+    </template>
   </div>
 </template>
