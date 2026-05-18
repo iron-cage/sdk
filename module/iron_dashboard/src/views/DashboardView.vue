@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { useQuery, useQueryClient } from '@tanstack/vue-query'
+import { ref } from 'vue'
+import { useQuery } from '@tanstack/vue-query'
+import { Sparkles } from 'lucide-vue-next'
 import { useApi } from '../composables/useApi'
 import { useAuthStore } from '@/stores/auth'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import AutoSetupWizard from '@/components/freeform/AutoSetupWizard.vue'
 
 const api = useApi()
 const authStore = useAuthStore()
-const queryClient = useQueryClient()
 
 // Fetch spending analytics
 const { data: spending, isLoading: spendingLoading } = useQuery({
@@ -30,35 +31,7 @@ const { data: agents, isLoading: agentsLoading } = useQuery({
 
 const isLoading = spendingLoading || requestsLoading || agentsLoading
 
-// Auto-setup wizard: open automatically for admins on an unconfigured workspace.
 const wizardOpen = ref(false)
-const wizardDismissed = ref(false)
-
-const { data: workspace } = useQuery({
-  queryKey: ['me-workspace'],
-  queryFn: () => api.getMeWorkspace(),
-  enabled: authStore.isAdmin,
-})
-
-// "Unconfigured" = default seed row from migration 034 with no policy set yet.
-const isWorkspaceUnconfigured = (w: { domain: string; default_model: string | null }) =>
-  w.domain === 'example.com' || w.default_model === null
-
-watch(workspace, (w) => {
-  if (!w || wizardDismissed.value) return
-  if (isWorkspaceUnconfigured(w)) {
-    wizardOpen.value = true
-  }
-})
-
-function onWizardOpenUpdate(value: boolean) {
-  wizardOpen.value = value
-  if (!value) wizardDismissed.value = true
-}
-
-function onWizardComplete() {
-  queryClient.invalidateQueries({ queryKey: ['me-workspace'] })
-}
 
 function formatCurrency(usd: number): string {
   return `$${usd.toFixed(3)}`
@@ -67,13 +40,18 @@ function formatCurrency(usd: number): string {
 
 <template>
   <div>
-    <AutoSetupWizard
-      :open="wizardOpen"
-      @update:open="onWizardOpenUpdate"
-      @complete="onWizardComplete"
-    />
+    <AutoSetupWizard v-model:open="wizardOpen" />
 
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">Dashboard</h1>
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
+      <Button
+        v-if="authStore.isAdmin"
+        @click="wizardOpen = true"
+      >
+        <Sparkles class="size-4" />
+        Setup Wizard
+      </Button>
+    </div>
 
     <!-- Loading state -->
     <div

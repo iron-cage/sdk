@@ -55,6 +55,9 @@ pub struct BudgetRequest {
   pub amount_cents: Option<i64>,
   /// Billing period: `"day"`, `"week"`, or `"month"`. Used when `text` is absent.
   pub period: Option<String>,
+  /// Optional default model for the workspace. When omitted, the existing
+  /// value (if any) is preserved.
+  pub default_model: Option<String>,
 }
 
 /// Response from `POST /api/v1/workspace/budget`.
@@ -66,6 +69,8 @@ pub struct WorkspaceBudgetResponse {
   pub amount_cents: i64,
   /// Effective billing period.
   pub period: String,
+  /// Effective default model after the upsert (may be `None` if never set).
+  pub default_model: Option<String>,
 }
 
 /// POST /api/v1/workspace/budget
@@ -84,7 +89,7 @@ pub async fn post_workspace_budget(
 ) -> ApiResult<impl IntoResponse> {
   check_permission(&claims.role, Permission::ManageUsers)?;
 
-  let (amount_cents, period_str) = if let Some(ref raw) = body.text {
+  let (amount_cents, period_str, default_model) = if let Some(ref raw) = body.text {
     let policy = usage_policy::parse(raw).map_err(|errors| {
       let msg = errors
         .iter()
@@ -105,7 +110,11 @@ pub async fn post_workspace_budget(
       .try_into()
       .map_err(|_| ApiError::BadRequest("Budget amount too large".into()))?;
 
-    (cents, period_to_str(&cap.period).to_string())
+    (
+      cents,
+      period_to_str(&cap.period).to_string(),
+      policy.default_model,
+    )
   } else {
     let amount = body.amount_cents.ok_or_else(|| {
       ApiError::BadRequest("Either 'text' or 'amount_cents' + 'period' required".into())
@@ -129,22 +138,27 @@ pub async fn post_workspace_budget(
       ));
     }
 
-    (amount, valid_period)
+    (amount, valid_period, body.default_model.clone())
   };
 
-  let workspace_id: i64 = sqlx::query_scalar(
+  // COALESCE on default_model preserves the existing value when this request
+  // does not specify one (e.g. admin edits only the budget amount).
+  let row: (i64, Option<String>) = sqlx::query_as(
     r"
-      INSERT INTO workspace_policy (workspace_id, budget_amount_cents, budget_period, updated_at)
-      VALUES (1, ?, ?, strftime('%s', 'now') * 1000)
+      INSERT INTO workspace_policy
+        (workspace_id, budget_amount_cents, budget_period, default_model, updated_at)
+      VALUES (1, ?, ?, ?, strftime('%s', 'now') * 1000)
       ON CONFLICT(workspace_id) DO UPDATE SET
         budget_amount_cents = excluded.budget_amount_cents,
         budget_period       = excluded.budget_period,
+        default_model       = COALESCE(excluded.default_model, workspace_policy.default_model),
         updated_at          = excluded.updated_at
-      RETURNING workspace_id
+      RETURNING workspace_id, default_model
     ",
   )
   .bind(amount_cents)
   .bind(&period_str)
+  .bind(&default_model)
   .fetch_one(&pool)
   .await
   .map_err(|_| ApiError::Internal("Failed to upsert workspace policy".into()))?;
@@ -152,9 +166,10 @@ pub async fn post_workspace_budget(
   Ok((
     StatusCode::OK,
     Json(WorkspaceBudgetResponse {
-      workspace_id,
+      workspace_id: row.0,
       amount_cents,
       period: period_str,
+      default_model: row.1,
     }),
   ))
 }
