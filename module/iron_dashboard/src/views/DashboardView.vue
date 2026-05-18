@@ -1,9 +1,14 @@
 <script setup lang="ts">
-import { useQuery } from '@tanstack/vue-query'
+import { ref, watch } from 'vue'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useApi } from '../composables/useApi'
+import { useAuthStore } from '@/stores/auth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import AutoSetupWizard from '@/components/freeform/AutoSetupWizard.vue'
 
 const api = useApi()
+const authStore = useAuthStore()
+const queryClient = useQueryClient()
 
 // Fetch spending analytics
 const { data: spending, isLoading: spendingLoading } = useQuery({
@@ -25,6 +30,36 @@ const { data: agents, isLoading: agentsLoading } = useQuery({
 
 const isLoading = spendingLoading || requestsLoading || agentsLoading
 
+// Auto-setup wizard: open automatically for admins on an unconfigured workspace.
+const wizardOpen = ref(false)
+const wizardDismissed = ref(false)
+
+const { data: workspace } = useQuery({
+  queryKey: ['me-workspace'],
+  queryFn: () => api.getMeWorkspace(),
+  enabled: authStore.isAdmin,
+})
+
+// "Unconfigured" = default seed row from migration 034 with no policy set yet.
+const isWorkspaceUnconfigured = (w: { domain: string; default_model: string | null }) =>
+  w.domain === 'example.com' || w.default_model === null
+
+watch(workspace, (w) => {
+  if (!w || wizardDismissed.value) return
+  if (isWorkspaceUnconfigured(w)) {
+    wizardOpen.value = true
+  }
+})
+
+function onWizardOpenUpdate(value: boolean) {
+  wizardOpen.value = value
+  if (!value) wizardDismissed.value = true
+}
+
+function onWizardComplete() {
+  queryClient.invalidateQueries({ queryKey: ['me-workspace'] })
+}
+
 function formatCurrency(usd: number): string {
   return `$${usd.toFixed(3)}`
 }
@@ -32,6 +67,12 @@ function formatCurrency(usd: number): string {
 
 <template>
   <div>
+    <AutoSetupWizard
+      :open="wizardOpen"
+      @update:open="onWizardOpenUpdate"
+      @complete="onWizardComplete"
+    />
+
     <h1 class="text-2xl font-bold text-gray-900 mb-6">Dashboard</h1>
 
     <!-- Loading state -->
