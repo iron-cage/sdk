@@ -624,6 +624,35 @@ export function useApi() {
     )
   }
 
+  // Onboarding: FreeForm + workspace + invites
+  async function freeformCompany(text: string): Promise<WorkspaceFreeformResponse> {
+    return fetchApi<WorkspaceFreeformResponse>('/api/v1/freeform/company', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    })
+  }
+
+  async function freeformProviders(text: string): Promise<ApplyProvidersResponse> {
+    return fetchApi<ApplyProvidersResponse>('/api/v1/freeform/providers', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    })
+  }
+
+  async function setWorkspaceBudget(body: SetWorkspaceBudgetRequest): Promise<WorkspaceBudgetResponse> {
+    return fetchApi<WorkspaceBudgetResponse>('/api/v1/workspace/budget', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })
+  }
+
+  async function generateInvite(body: GenerateInviteRequest): Promise<GenerateInviteResponse> {
+    return fetchApi<GenerateInviteResponse>('/api/v1/invites/generate', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })
+  }
+
   return {
     getTokens,
     getToken,
@@ -681,6 +710,11 @@ export function useApi() {
     listBudgetRequests,
     approveBudgetRequest,
     rejectBudgetRequest,
+    // Onboarding
+    freeformCompany,
+    freeformProviders,
+    setWorkspaceBudget,
+    generateInvite,
   }
 }
 
@@ -886,4 +920,47 @@ export interface EventsListResponse {
   pagination: { page: number; per_page: number; total: number; total_pages: number }
   period: string
   calculated_at: string
+}
+
+// Onboarding (FreeForm + workspace + invites)
+export interface WorkspaceFreeformResponse {
+  id: number
+  name: string
+  domain: string
+  account_type: string
+}
+
+export interface AppliedProvider {
+  provider: string
+  key_id: number
+}
+
+export interface ApplyProvidersResponse {
+  applied: AppliedProvider[]
+}
+
+export type BudgetPeriod = 'day' | 'week' | 'month'
+
+export interface SetWorkspaceBudgetRequest {
+  text?: string
+  amount_cents?: number
+  period?: BudgetPeriod
+}
+
+export interface WorkspaceBudgetResponse {
+  workspace_id: number
+  amount_cents: number
+  period: string
+}
+
+export interface GenerateInviteRequest {
+  seats: number
+  expires_in_hours?: number
+}
+
+export interface GenerateInviteResponse {
+  token: string
+  url: string
+  expires_at: number | null
+  seats_total: number
 }
