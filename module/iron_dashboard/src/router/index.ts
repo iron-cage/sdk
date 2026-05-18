@@ -81,6 +81,12 @@ const router = createRouter({
       component: () => import('../views/UsersPage.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/join/:token',
+      name: 'invite-accept',
+      component: () => import('../views/InviteAcceptPage.vue'),
+      meta: { requiresAuth: false },
+    },
   ],
 })
 
