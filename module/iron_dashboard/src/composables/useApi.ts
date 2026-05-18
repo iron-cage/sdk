@@ -692,6 +692,10 @@ export function useApi() {
     })
   }
 
+  async function getMeWorkspace(): Promise<MeWorkspaceResponse> {
+    return fetchApi<MeWorkspaceResponse>('/api/v1/me/workspace')
+  }
+
   return {
     getTokens,
     getToken,
@@ -758,6 +762,7 @@ export function useApi() {
     acceptInvite,
     listPendingInvites,
     approveInviteSeat,
+    getMeWorkspace,
   }
 }
 
@@ -1036,4 +1041,13 @@ export interface PendingInviteSeat {
 
 export interface PendingInvitesResponse {
   pending: PendingInviteSeat[]
+}
+
+export interface MeWorkspaceResponse {
+  workspace_id: number
+  workspace_name: string
+  domain: string
+  default_model: string | null
+  budget_amount_cents: number | null
+  budget_period: string | null
 }

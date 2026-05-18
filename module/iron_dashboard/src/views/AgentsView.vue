@@ -36,7 +36,7 @@ const showDeleteModal = ref(false)
 const name = ref('')
 const selectedProviderKeyId = ref<number | null>(null)
 const initialBudgetUsd = ref<number | undefined>(undefined)
-const selectedOwnerId = ref<string | null>(null)  // For owner assignment
+const selectedOwnerId = ref<string | null>(null) // For owner assignment
 const createError = ref('')
 const selectedAgent = ref<Agent | null>(null)
 const agentToDelete = ref<Agent | null>(null)
@@ -51,7 +51,12 @@ const tokenDialogWarning = ref('')
 const copyMessage = ref('')
 
 // Fetch agents
-const { data: agents, isLoading, error, refetch } = useQuery({
+const {
+  data: agents,
+  isLoading,
+  error,
+  refetch,
+} = useQuery({
   queryKey: ['agents'],
   queryFn: () => api.getAgents(),
 })
@@ -76,7 +81,8 @@ watch(
           statusMap[agent.id] = status
         } catch (err) {
           if (!icTokenError.value) {
-            icTokenError.value = err instanceof Error ? err.message : 'Failed to load IC token status'
+            icTokenError.value =
+              err instanceof Error ? err.message : 'Failed to load IC token status'
           }
         }
       })
@@ -103,8 +109,13 @@ const { data: users } = useQuery({
 
 // Create agent mutation
 const createMutation = useMutation({
-  mutationFn: (data: { name: string; providers: string[]; provider_key_id: number; initial_budget_microdollars: number; owner_id?: string }) =>
-    api.createAgent(data),
+  mutationFn: (data: {
+    name: string
+    providers: string[]
+    provider_key_id: number
+    initial_budget_microdollars: number
+    owner_id?: string
+  }) => api.createAgent(data),
   onSuccess: () => {
     showCreateModal.value = false
     name.value = ''
@@ -121,8 +132,13 @@ const createMutation = useMutation({
 
 // Update agent mutation
 const updateMutation = useMutation({
-  mutationFn: (data: { id: number; name: string; providers: string[]; provider_key_id?: number | null; owner_id?: string }) =>
-    api.updateAgent(data),
+  mutationFn: (data: {
+    id: number
+    name: string
+    providers: string[]
+    provider_key_id?: number | null
+    owner_id?: string
+  }) => api.updateAgent(data),
   onSuccess: () => {
     showUpdateModal.value = false
     selectedAgent.value = null
@@ -162,7 +178,7 @@ function handleCreateAgent() {
   }
 
   const providerKeyId = Number(selectedProviderKeyId.value)
-  const providerRecord = providers.value?.find(p => p.id === providerKeyId)
+  const providerRecord = providers.value?.find((p) => p.id === providerKeyId)
   if (!providerRecord) {
     createError.value = 'Selected provider key not found'
     return
@@ -200,7 +216,7 @@ function handleUpdateAgent() {
   }
 
   const providerKeyId = Number(selectedProviderKeyId.value)
-  const providerRecord = providers.value?.find(p => p.id === providerKeyId)
+  const providerRecord = providers.value?.find((p) => p.id === providerKeyId)
   if (!providerRecord) {
     createError.value = 'Selected provider key not found'
     return
@@ -299,7 +315,11 @@ async function handleRegenerateIcToken(agent: Agent) {
 }
 
 async function handleRevokeIcToken(agent: Agent) {
-  if (!confirm(`Revoke IC token for ${agent.name}? Agents using this token will stop working until a new one is generated.`)) {
+  if (
+    !confirm(
+      `Revoke IC token for ${agent.name}? Agents using this token will stop working until a new one is generated.`
+    )
+  ) {
     return
   }
 
@@ -338,58 +358,96 @@ async function copyTokenToClipboard() {
   <div>
     <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
       <h1 class="text-xl sm:text-2xl font-bold text-gray-900">Agents</h1>
-      <Button v-if="authStore.isAdmin" @click="showCreateModal = true" class="w-full sm:w-auto">
+      <Button
+        v-if="authStore.isAdmin"
+        @click="showCreateModal = true"
+        class="w-full sm:w-auto"
+      >
         Create Agent
       </Button>
     </div>
 
-    <Alert v-if="icTokenError" variant="destructive" class="mb-4">
+    <Alert
+      v-if="icTokenError"
+      variant="destructive"
+      class="mb-4"
+    >
       <AlertDescription>{{ icTokenError }}</AlertDescription>
     </Alert>
 
     <!-- Loading state -->
-    <div v-if="isLoading" class="bg-white rounded-lg shadow p-6">
+    <div
+      v-if="isLoading"
+      class="bg-white rounded-lg shadow p-6"
+    >
       <p class="text-gray-600">Loading agents...</p>
     </div>
 
     <!-- Error state -->
-    <div v-else-if="error" class="bg-white rounded-lg shadow p-6">
+    <div
+      v-else-if="error"
+      class="bg-white rounded-lg shadow p-6"
+    >
       <p class="text-red-600">Error loading agents: {{ error.message }}</p>
-      <Button @click="() => refetch()" variant="secondary" class="mt-4">
+      <Button
+        @click="() => refetch()"
+        variant="secondary"
+        class="mt-4"
+      >
         Retry
       </Button>
     </div>
 
     <!-- Agents table -->
-    <div v-else-if="agents && agents.length > 0" class="bg-white rounded-lg shadow overflow-x-auto touch-pan-x">
+    <div
+      v-else-if="agents && agents.length > 0"
+      class="bg-white rounded-lg shadow overflow-x-auto touch-pan-x"
+    >
       <table class="min-w-[700px] w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
           <tr>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th
+              class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
               Name
             </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th
+              class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
               Owner
             </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th
+              class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
               Providers
             </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th
+              class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
               Provider Key
             </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th
+              class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
               IC Token
             </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th
+              class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
               Created
             </th>
-            <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th
+              class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
               Actions
             </th>
           </tr>
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
-          <tr v-for="agent in agents" :key="agent.id">
+          <tr
+            v-for="agent in agents"
+            :key="agent.id"
+          >
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
               {{ agent.name }}
             </td>
@@ -411,7 +469,10 @@ async function copyTokenToClipboard() {
               {{ agent.provider_key_id ?? 'None' }}
             </td>
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-              <div v-if="icTokenStatusLoading && !getIcTokenStatus(agent.id)" class="text-gray-500">
+              <div
+                v-if="icTokenStatusLoading && !getIcTokenStatus(agent.id)"
+                class="text-gray-500"
+              >
                 Loading...
               </div>
               <div v-else>
@@ -442,9 +503,26 @@ async function copyTokenToClipboard() {
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
               <DropdownMenu>
                 <DropdownMenuTrigger as-child>
-                  <Button variant="ghost" size="sm">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                  >
                     <span class="sr-only">Open menu</span>
-                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4"><path d="M3.625 7.5C3.625 8.12132 3.12132 8.625 2.5 8.625C1.87868 8.625 1.375 8.12132 1.375 7.5C1.375 6.87868 1.87868 6.375 2.5 6.375C3.12132 6.375 3.625 6.87868 3.625 7.5ZM8.625 7.5C8.625 8.12132 8.12132 8.625 7.5 8.625C6.87868 8.625 6.375 8.12132 6.375 7.5C6.375 6.87868 6.87868 6.375 7.5 6.375C8.12132 6.375 8.625 6.87868 8.625 7.5ZM13.625 7.5C13.625 8.12132 13.1213 8.625 12.5 8.625C11.8787 8.625 11.375 8.12132 11.375 7.5C11.375 6.87868 11.8787 6.375 12.5 6.375C13.1213 6.375 13.625 6.87868 13.625 7.5Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 15 15"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      class="h-4 w-4"
+                    >
+                      <path
+                        d="M3.625 7.5C3.625 8.12132 3.12132 8.625 2.5 8.625C1.87868 8.625 1.375 8.12132 1.375 7.5C1.375 6.87868 1.87868 6.375 2.5 6.375C3.12132 6.375 3.625 6.87868 3.625 7.5ZM8.625 7.5C8.625 8.12132 8.12132 8.625 7.5 8.625C6.87868 8.625 6.375 8.12132 6.375 7.5C6.375 6.87868 6.87868 6.375 7.5 6.375C8.12132 6.375 8.625 6.87868 8.625 7.5ZM13.625 7.5C13.625 8.12132 13.1213 8.625 12.5 8.625C11.8787 8.625 11.375 8.12132 11.375 7.5C11.375 6.87868 11.8787 6.375 12.5 6.375C13.1213 6.375 13.625 6.87868 13.625 7.5Z"
+                        fill="currentColor"
+                        fill-rule="evenodd"
+                        clip-rule="evenodd"
+                      ></path>
+                    </svg>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -461,7 +539,11 @@ async function copyTokenToClipboard() {
                       @click="handleRegenerateIcToken(agent)"
                       :disabled="tokenActionLoadingId === agent.id"
                     >
-                      {{ tokenActionLoadingId === agent.id ? 'Regenerating...' : 'Regenerate IC Token' }}
+                      {{
+                        tokenActionLoadingId === agent.id
+                          ? 'Regenerating...'
+                          : 'Regenerate IC Token'
+                      }}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       @click="handleRevokeIcToken(agent)"
@@ -476,7 +558,10 @@ async function copyTokenToClipboard() {
                     <DropdownMenuItem @click="openUpdateModal(agent)">
                       Edit Agent
                     </DropdownMenuItem>
-                    <DropdownMenuItem @click="handleDeleteAgent(agent)" class="text-red-600">
+                    <DropdownMenuItem
+                      @click="handleDeleteAgent(agent)"
+                      class="text-red-600"
+                    >
                       Delete Agent
                     </DropdownMenuItem>
                   </template>
@@ -489,9 +574,15 @@ async function copyTokenToClipboard() {
     </div>
 
     <!-- Empty state -->
-    <div v-else class="bg-white rounded-lg shadow p-6 text-center">
+    <div
+      v-else
+      class="bg-white rounded-lg shadow p-6 text-center"
+    >
       <p class="text-gray-600 mb-4">No agents found</p>
-      <Button v-if="authStore.isAdmin" @click="showCreateModal = true">
+      <Button
+        v-if="authStore.isAdmin"
+        @click="showCreateModal = true"
+      >
         Create First Agent
       </Button>
     </div>
@@ -506,7 +597,11 @@ async function copyTokenToClipboard() {
           </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="createError" variant="destructive" class="mb-4">
+        <Alert
+          v-if="createError"
+          variant="destructive"
+          class="mb-4"
+        >
           <AlertDescription>{{ createError }}</AlertDescription>
         </Alert>
 
@@ -556,7 +651,10 @@ async function copyTokenToClipboard() {
             </p>
           </div>
 
-          <div v-if="authStore.isAdmin" class="space-y-2">
+          <div
+            v-if="authStore.isAdmin"
+            class="space-y-2"
+          >
             <Label for="create-owner">Assign to User (optional)</Label>
             <select
               id="create-owner"
@@ -573,9 +671,7 @@ async function copyTokenToClipboard() {
                 {{ user.username }} ({{ user.email || 'no email' }})
               </option>
             </select>
-            <p class="text-xs text-gray-500">
-              Leave empty to assign to yourself.
-            </p>
+            <p class="text-xs text-gray-500">Leave empty to assign to yourself.</p>
           </div>
         </div>
 
@@ -602,12 +698,14 @@ async function copyTokenToClipboard() {
       <DialogContent class="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Edit Agent</DialogTitle>
-          <DialogDescription>
-            Update agent details and supported providers.
-          </DialogDescription>
+          <DialogDescription> Update agent details and supported providers. </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="createError" variant="destructive" class="mb-4">
+        <Alert
+          v-if="createError"
+          variant="destructive"
+          class="mb-4"
+        >
           <AlertDescription>{{ createError }}</AlertDescription>
         </Alert>
 
@@ -641,7 +739,10 @@ async function copyTokenToClipboard() {
             </select>
           </div>
 
-          <div v-if="authStore.isAdmin" class="space-y-2">
+          <div
+            v-if="authStore.isAdmin"
+            class="space-y-2"
+          >
             <Label for="update-owner">Owner</Label>
             <select
               id="update-owner"
@@ -684,7 +785,8 @@ async function copyTokenToClipboard() {
         <DialogHeader>
           <DialogTitle>Delete Agent</DialogTitle>
           <DialogDescription>
-            Are you sure you want to delete "{{ agentToDelete?.name }}"? This action cannot be undone.
+            Are you sure you want to delete "{{ agentToDelete?.name }}"? This action cannot be
+            undone.
           </DialogDescription>
         </DialogHeader>
 
@@ -713,7 +815,8 @@ async function copyTokenToClipboard() {
         <DialogHeader>
           <DialogTitle>IC Token for {{ tokenDialogAgentName }}</DialogTitle>
           <DialogDescription>
-            Store this token securely. It is shown only once. Update your agents with this value immediately.
+            Store this token securely. It is shown only once. Update your agents with this value
+            immediately.
           </DialogDescription>
         </DialogHeader>
 
@@ -725,20 +828,25 @@ async function copyTokenToClipboard() {
             {{ tokenDialogWarning }}
           </p>
           <p class="text-xs text-gray-500">
-            After closing this dialog you will not be able to view the token again. Regenerate if you need a new value.
+            After closing this dialog you will not be able to view the token again. Regenerate if
+            you need a new value.
           </p>
-          <p v-if="copyMessage" class="text-sm text-gray-600">
+          <p
+            v-if="copyMessage"
+            class="text-sm text-gray-600"
+          >
             {{ copyMessage }}
           </p>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" @click="showTokenDialog = false">
+          <Button
+            variant="outline"
+            @click="showTokenDialog = false"
+          >
             Close
           </Button>
-          <Button @click="copyTokenToClipboard">
-            Copy Token
-          </Button>
+          <Button @click="copyTokenToClipboard"> Copy Token </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

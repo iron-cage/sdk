@@ -87,6 +87,12 @@ const router = createRouter({
       component: () => import('../views/InviteAcceptPage.vue'),
       meta: { requiresAuth: false },
     },
+    {
+      path: '/member',
+      name: 'member-dashboard',
+      component: () => import('../views/MemberDashboardPage.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 
