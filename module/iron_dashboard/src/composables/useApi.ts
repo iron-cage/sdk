@@ -681,6 +681,17 @@ export function useApi() {
     })
   }
 
+  async function listPendingInvites(): Promise<PendingInvitesResponse> {
+    return fetchApi<PendingInvitesResponse>('/api/v1/invites/pending')
+  }
+
+  async function approveInviteSeat(seatId: number): Promise<void> {
+    await fetchApi<void>(`/api/v1/invites/seats/${seatId}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    })
+  }
+
   return {
     getTokens,
     getToken,
@@ -745,6 +756,8 @@ export function useApi() {
     generateInvite,
     getInvitePreview,
     acceptInvite,
+    listPendingInvites,
+    approveInviteSeat,
   }
 }
 
@@ -1009,4 +1022,18 @@ export interface AcceptInviteRequest {
 export interface AcceptInviteResponse {
   user_id: string
   access_token: string
+}
+
+export interface PendingInviteSeat {
+  seat_id: number
+  user_id: string
+  username: string
+  email: string
+  accepted_at: number | null
+  workspace_name: string
+  invite_link_id: string
+}
+
+export interface PendingInvitesResponse {
+  pending: PendingInviteSeat[]
 }

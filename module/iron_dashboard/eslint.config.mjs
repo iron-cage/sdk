@@ -32,6 +32,10 @@ export default [
   },
   eslintConfigPrettier,
   {
-    rules: {},
+    rules: {
+      // Conflicts with Prettier's attribute layout. eslint-config-prettier
+      // does not disable this one - opt out explicitly.
+      'vue/first-attribute-linebreak': 'off',
+    },
   },
 ]
