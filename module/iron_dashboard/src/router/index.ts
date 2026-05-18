@@ -75,6 +75,12 @@ const router = createRouter({
       component: () => import('../views/BudgetPage.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/setup/users',
+      name: 'setup-users',
+      component: () => import('../views/UsersPage.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 
