@@ -35,7 +35,10 @@ function formatCurrency(usd: number): string {
     <h1 class="text-2xl font-bold text-gray-900 mb-6">Dashboard</h1>
 
     <!-- Loading state -->
-    <div v-if="isLoading" class="bg-white rounded-lg shadow p-6">
+    <div
+      v-if="isLoading"
+      class="bg-white rounded-lg shadow p-6"
+    >
       <p class="text-gray-600">Loading dashboard...</p>
     </div>
 
@@ -92,11 +95,24 @@ function formatCurrency(usd: number): string {
             </div>
           </CardHeader>
           <CardContent>
-            <div class="text-3xl font-bold" :class="requestUsage && requestUsage.success_rate >= 95 ? 'text-green-600' : requestUsage && requestUsage.success_rate >= 80 ? 'text-yellow-600' : 'text-red-600'">
+            <div
+              class="text-3xl font-bold"
+              :class="
+                requestUsage && requestUsage.success_rate >= 95
+                  ? 'text-green-600'
+                  : requestUsage && requestUsage.success_rate >= 80
+                    ? 'text-yellow-600'
+                    : 'text-red-600'
+              "
+            >
               {{ requestUsage ? requestUsage.success_rate.toFixed(1) : '0' }}%
             </div>
             <p class="text-xs text-gray-500 mt-1">
-              {{ requestUsage ? `${requestUsage.successful_requests} / ${requestUsage.total_requests} requests` : 'No requests' }}
+              {{
+                requestUsage
+                  ? `${requestUsage.successful_requests} / ${requestUsage.total_requests} requests`
+                  : 'No requests'
+              }}
             </p>
           </CardContent>
         </Card>

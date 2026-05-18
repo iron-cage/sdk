@@ -360,8 +360,8 @@ async function copyTokenToClipboard() {
       <h1 class="text-xl sm:text-2xl font-bold text-gray-900">Agents</h1>
       <Button
         v-if="authStore.isAdmin"
-        @click="showCreateModal = true"
         class="w-full sm:w-auto"
+        @click="showCreateModal = true"
       >
         Create Agent
       </Button>
@@ -390,9 +390,9 @@ async function copyTokenToClipboard() {
     >
       <p class="text-red-600">Error loading agents: {{ error.message }}</p>
       <Button
-        @click="() => refetch()"
         variant="secondary"
         class="mt-4"
+        @click="() => refetch()"
       >
         Retry
       </Button>
@@ -529,15 +529,15 @@ async function copyTokenToClipboard() {
                   <DropdownMenuLabel>Actions</DropdownMenuLabel>
                   <DropdownMenuItem
                     v-if="!getIcTokenStatus(agent.id)?.has_ic_token"
-                    @click="handleGenerateIcToken(agent)"
                     :disabled="tokenActionLoadingId === agent.id"
+                    @click="handleGenerateIcToken(agent)"
                   >
                     {{ tokenActionLoadingId === agent.id ? 'Generating...' : 'Generate IC Token' }}
                   </DropdownMenuItem>
                   <template v-else>
                     <DropdownMenuItem
-                      @click="handleRegenerateIcToken(agent)"
                       :disabled="tokenActionLoadingId === agent.id"
+                      @click="handleRegenerateIcToken(agent)"
                     >
                       {{
                         tokenActionLoadingId === agent.id
@@ -546,9 +546,9 @@ async function copyTokenToClipboard() {
                       }}
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      @click="handleRevokeIcToken(agent)"
                       :disabled="tokenActionLoadingId === agent.id"
                       class="text-red-600"
+                      @click="handleRevokeIcToken(agent)"
                     >
                       Revoke IC Token
                     </DropdownMenuItem>
@@ -559,8 +559,8 @@ async function copyTokenToClipboard() {
                       Edit Agent
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      @click="handleDeleteAgent(agent)"
                       class="text-red-600"
+                      @click="handleDeleteAgent(agent)"
                     >
                       Delete Agent
                     </DropdownMenuItem>
@@ -677,15 +677,15 @@ async function copyTokenToClipboard() {
 
         <DialogFooter>
           <Button
-            @click="showCreateModal = false"
             :disabled="createMutation.isPending.value"
             variant="outline"
+            @click="showCreateModal = false"
           >
             Cancel
           </Button>
           <Button
-            @click="handleCreateAgent"
             :disabled="createMutation.isPending.value"
+            @click="handleCreateAgent"
           >
             {{ createMutation.isPending.value ? 'Creating...' : 'Create Agent' }}
           </Button>
@@ -763,15 +763,15 @@ async function copyTokenToClipboard() {
 
         <DialogFooter>
           <Button
-            @click="showUpdateModal = false"
             :disabled="updateMutation.isPending.value"
             variant="outline"
+            @click="showUpdateModal = false"
           >
             Cancel
           </Button>
           <Button
-            @click="handleUpdateAgent"
             :disabled="updateMutation.isPending.value"
+            @click="handleUpdateAgent"
           >
             {{ updateMutation.isPending.value ? 'Updating...' : 'Update Agent' }}
           </Button>
@@ -792,16 +792,16 @@ async function copyTokenToClipboard() {
 
         <DialogFooter>
           <Button
-            @click="showDeleteModal = false"
             :disabled="deleteMutation.isPending.value"
             variant="outline"
+            @click="showDeleteModal = false"
           >
             Cancel
           </Button>
           <Button
-            @click="confirmDelete"
             :disabled="deleteMutation.isPending.value"
             variant="destructive"
+            @click="confirmDelete"
           >
             {{ deleteMutation.isPending.value ? 'Deleting...' : 'Delete' }}
           </Button>

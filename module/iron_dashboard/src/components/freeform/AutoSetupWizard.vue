@@ -66,7 +66,7 @@ watch(
       copied.value = false
       results.value = { company: null, providers: null, budget: null, invite: null }
     }
-  },
+  }
 )
 
 const companyOpen = computed(() => props.open && step.value === 'company')
@@ -155,25 +155,49 @@ function finish() {
 
 <template>
   <!-- Step 1: company -->
-  <FreeFormDialog :open="companyOpen" title="Step 1 of 4 - Company"
+  <FreeFormDialog
+    :open="companyOpen"
+    title="Step 1 of 4 - Company"
     description="Paste company name, domain, and account type. Example: Acme Corp, acme.com, Client"
-    placeholder="Acme Corp, acme.com, Client" parse-label="Parse and Continue" :parsing="parsing" :error="error"
-    @parse="onCompanyParse" @cancel="cancelAll" />
+    placeholder="Acme Corp, acme.com, Client"
+    parse-label="Parse and Continue"
+    :parsing="parsing"
+    :error="error"
+    @parse="onCompanyParse"
+    @cancel="cancelAll"
+  />
 
   <!-- Step 2: providers -->
-  <FreeFormDialog :open="providersOpen" title="Step 2 of 4 - Providers"
+  <FreeFormDialog
+    :open="providersOpen"
+    title="Step 2 of 4 - Providers"
     description="Paste API keys for each provider, one per line."
-    :placeholder="`openai: sk-proj-...\nanthropic: sk-ant-...\ngemini: AIza...`" parse-label="Parse and Continue"
-    :parsing="parsing" :error="error" @parse="onProvidersParse" @cancel="cancelAll" />
+    :placeholder="`openai: sk-proj-...\nanthropic: sk-ant-...\ngemini: AIza...`"
+    parse-label="Parse and Continue"
+    :parsing="parsing"
+    :error="error"
+    @parse="onProvidersParse"
+    @cancel="cancelAll"
+  />
 
   <!-- Step 3: budget -->
-  <FreeFormDialog :open="budgetOpen" title="Step 3 of 4 - Budget"
+  <FreeFormDialog
+    :open="budgetOpen"
+    title="Step 3 of 4 - Budget"
     description="Set the workspace spending limit. Example: limit all users $100/week"
-    placeholder="limit all users $100/week" parse-label="Parse and Continue" :parsing="parsing" :error="error"
-    @parse="onBudgetParse" @cancel="cancelAll" />
+    placeholder="limit all users $100/week"
+    parse-label="Parse and Continue"
+    :parsing="parsing"
+    :error="error"
+    @parse="onBudgetParse"
+    @cancel="cancelAll"
+  />
 
   <!-- Step 4: invite (form + result) -->
-  <Dialog :open="inviteOpen" @update:open="(v: boolean) => v || cancelAll()">
+  <Dialog
+    :open="inviteOpen"
+    @update:open="(v: boolean) => v || cancelAll()"
+  >
     <DialogContent class="sm:max-w-xl">
       <DialogHeader>
         <DialogTitle>Step 4 of 4 - Invite Link</DialogTitle>
@@ -182,50 +206,107 @@ function finish() {
         </DialogDescription>
       </DialogHeader>
 
-      <div v-if="step === 'invite'" class="space-y-4">
+      <div
+        v-if="step === 'invite'"
+        class="space-y-4"
+      >
         <div class="grid grid-cols-2 gap-4">
           <div class="space-y-2">
-            <label class="text-sm font-medium" for="auto-setup-seats">Seats</label>
-            <input id="auto-setup-seats" v-model.number="inviteSeats" type="number" min="1" max="1000"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm" />
+            <label
+              class="text-sm font-medium"
+              for="auto-setup-seats"
+              >Seats</label
+            >
+            <input
+              id="auto-setup-seats"
+              v-model.number="inviteSeats"
+              type="number"
+              min="1"
+              max="1000"
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+            />
           </div>
           <div class="space-y-2">
-            <label class="text-sm font-medium" for="auto-setup-expiry">Expires in (hours)</label>
-            <input id="auto-setup-expiry" v-model.number="inviteExpiryHours" type="number" min="1"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm" />
+            <label
+              class="text-sm font-medium"
+              for="auto-setup-expiry"
+              >Expires in (hours)</label
+            >
+            <input
+              id="auto-setup-expiry"
+              v-model.number="inviteExpiryHours"
+              type="number"
+              min="1"
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+            />
           </div>
         </div>
-        <p v-if="error" class="text-sm text-destructive">{{ error }}</p>
+        <p
+          v-if="error"
+          class="text-sm text-destructive"
+        >
+          {{ error }}
+        </p>
       </div>
 
-      <div v-else-if="step === 'done' && results.invite" class="space-y-4">
+      <div
+        v-else-if="step === 'done' && results.invite"
+        class="space-y-4"
+      >
         <div class="rounded-md border bg-muted/30 p-3 font-mono text-sm break-all">
           {{ results.invite.url }}
         </div>
         <div class="flex flex-wrap gap-2 text-xs">
           <Badge variant="secondary">{{ results.invite.seats_total }} seats</Badge>
-          <Badge v-if="results.invite.expires_at" variant="secondary">
+          <Badge
+            v-if="results.invite.expires_at"
+            variant="secondary"
+          >
             Expires {{ new Date(results.invite.expires_at).toLocaleString() }}
           </Badge>
-          <Badge v-else variant="secondary">No expiry</Badge>
+          <Badge
+            v-else
+            variant="secondary"
+            >No expiry</Badge
+          >
         </div>
       </div>
 
       <DialogFooter>
         <template v-if="step === 'invite'">
-          <Button type="button" variant="ghost" :disabled="parsing" @click="cancelAll">
+          <Button
+            type="button"
+            variant="ghost"
+            :disabled="parsing"
+            @click="cancelAll"
+          >
             Cancel
           </Button>
-          <Button type="button" :disabled="parsing || inviteSeats < 1" @click="generateInvite">
+          <Button
+            type="button"
+            :disabled="parsing || inviteSeats < 1"
+            @click="generateInvite"
+          >
             {{ parsing ? 'Generating...' : 'Generate' }}
           </Button>
         </template>
         <template v-else>
-          <Button type="button" variant="outline" @click="copyInviteUrl">
-            <component :is="copied ? Check : Copy" class="size-4" />
+          <Button
+            type="button"
+            variant="outline"
+            @click="copyInviteUrl"
+          >
+            <component
+              :is="copied ? Check : Copy"
+              class="size-4"
+            />
             {{ copied ? 'Copied' : 'Copy Link' }}
           </Button>
-          <Button type="button" @click="finish">Done</Button>
+          <Button
+            type="button"
+            @click="finish"
+            >Done</Button
+          >
         </template>
       </DialogFooter>
     </DialogContent>

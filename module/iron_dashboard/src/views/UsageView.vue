@@ -36,67 +36,92 @@ const periodOptions: { value: AnalyticsPeriod; label: string }[] = [
 ]
 
 // Fetch from Protocol 012 endpoints with agent filter
-const { data: requestStats, isLoading: requestsLoading, error: requestsError } = useQuery({
+const {
+  data: requestStats,
+  isLoading: requestsLoading,
+  error: requestsError,
+} = useQuery({
   queryKey: ['analytics-requests', selectedPeriod, selectedAgentId],
-  queryFn: () => api.getAnalyticsUsageRequests({
-    period: selectedPeriod.value,
-    agent_id: selectedAgentId.value ?? undefined,
-  }),
+  queryFn: () =>
+    api.getAnalyticsUsageRequests({
+      period: selectedPeriod.value,
+      agent_id: selectedAgentId.value ?? undefined,
+    }),
 })
 
-const { data: spendingByProvider, isLoading: providerLoading, error: providerError } = useQuery({
+const {
+  data: spendingByProvider,
+  isLoading: providerLoading,
+  error: providerError,
+} = useQuery({
   queryKey: ['analytics-spending-provider', selectedPeriod, selectedAgentId],
-  queryFn: () => api.getAnalyticsSpendingByProvider({
-    period: selectedPeriod.value,
-    agent_id: selectedAgentId.value ?? undefined,
-  }),
+  queryFn: () =>
+    api.getAnalyticsSpendingByProvider({
+      period: selectedPeriod.value,
+      agent_id: selectedAgentId.value ?? undefined,
+    }),
 })
 
-const { data: modelUsage, isLoading: modelLoading, error: modelError } = useQuery({
+const {
+  data: modelUsage,
+  isLoading: modelLoading,
+  error: modelError,
+} = useQuery({
   queryKey: ['analytics-models', selectedPeriod, selectedAgentId],
-  queryFn: () => api.getAnalyticsUsageModels({
-    period: selectedPeriod.value,
-    agent_id: selectedAgentId.value ?? undefined,
-  }),
+  queryFn: () =>
+    api.getAnalyticsUsageModels({
+      period: selectedPeriod.value,
+      agent_id: selectedAgentId.value ?? undefined,
+    }),
 })
 
 const { data: spendingTotal, isLoading: spendingTotalLoading } = useQuery({
   queryKey: ['analytics-spending-total', selectedPeriod, selectedAgentId],
-  queryFn: () => api.getAnalyticsSpendingTotal({
-    period: selectedPeriod.value,
-    agent_id: selectedAgentId.value ?? undefined,
-  }),
+  queryFn: () =>
+    api.getAnalyticsSpendingTotal({
+      period: selectedPeriod.value,
+      agent_id: selectedAgentId.value ?? undefined,
+    }),
 })
 
 // Fetch recent events/logs
-const { data: eventsList, isLoading: eventsLoading, isFetching: eventsFetching } = useQuery({
+const {
+  data: eventsList,
+  isLoading: eventsLoading,
+  isFetching: eventsFetching,
+} = useQuery({
   queryKey: ['analytics-events', selectedPeriod, selectedAgentId, logsPage],
-  queryFn: () => api.getAnalyticsEventsList(
-    {
-      period: selectedPeriod.value,
-      agent_id: selectedAgentId.value ?? undefined,
-    },
-    {
-      page: logsPage.value,
-      per_page: logsPerPage,
-    }
-  ),
+  queryFn: () =>
+    api.getAnalyticsEventsList(
+      {
+        period: selectedPeriod.value,
+        agent_id: selectedAgentId.value ?? undefined,
+      },
+      {
+        page: logsPage.value,
+        per_page: logsPerPage,
+      }
+    ),
 })
 
 // Accumulate logs when new data arrives
-watch(eventsList, (newData) => {
-  if (newData) {
-    if (logsPage.value === 1) {
-      // First page - replace all
-      accumulatedLogs.value = newData.data
-    } else {
-      // Append new logs
-      accumulatedLogs.value = [...accumulatedLogs.value, ...newData.data]
+watch(
+  eventsList,
+  (newData) => {
+    if (newData) {
+      if (logsPage.value === 1) {
+        // First page - replace all
+        accumulatedLogs.value = newData.data
+      } else {
+        // Append new logs
+        accumulatedLogs.value = [...accumulatedLogs.value, ...newData.data]
+      }
+      totalEvents.value = newData.pagination.total
+      totalPages.value = newData.pagination.total_pages
     }
-    totalEvents.value = newData.pagination.total
-    totalPages.value = newData.pagination.total_pages
-  }
-}, { immediate: true })
+  },
+  { immediate: true }
+)
 
 // Reset when filters change
 watch([selectedPeriod, selectedAgentId], () => {
@@ -104,30 +129,32 @@ watch([selectedPeriod, selectedAgentId], () => {
   accumulatedLogs.value = []
 })
 
-const isLoading = computed(() =>
-  requestsLoading.value || providerLoading.value || modelLoading.value || spendingTotalLoading.value
+const isLoading = computed(
+  () =>
+    requestsLoading.value ||
+    providerLoading.value ||
+    modelLoading.value ||
+    spendingTotalLoading.value
 )
-const error = computed(() =>
-  requestsError.value || providerError.value || modelError.value
-)
+const error = computed(() => requestsError.value || providerError.value || modelError.value)
 
 // Computed values from Protocol 012 responses
 const totalRequests = computed(() => requestStats.value?.total_requests || 0)
 const successRate = computed(() => requestStats.value?.success_rate || 0)
 const totalSpend = computed(() => spendingTotal.value?.total_spend || 0)
-const totalInputTokens = computed(() =>
-  modelUsage.value?.data.reduce((sum, m) => sum + m.input_tokens, 0) || 0
+const totalInputTokens = computed(
+  () => modelUsage.value?.data.reduce((sum, m) => sum + m.input_tokens, 0) || 0
 )
-const totalOutputTokens = computed(() =>
-  modelUsage.value?.data.reduce((sum, m) => sum + m.output_tokens, 0) || 0
+const totalOutputTokens = computed(
+  () => modelUsage.value?.data.reduce((sum, m) => sum + m.output_tokens, 0) || 0
 )
 
 // Provider breakdown with visual bars
 const providerBreakdown = computed(() => {
   if (!spendingByProvider.value?.data) return []
   const data = spendingByProvider.value.data
-  const maxCost = Math.max(...data.map(p => p.spending), 0.001)
-  return data.map(p => ({
+  const maxCost = Math.max(...data.map((p) => p.spending), 0.001)
+  return data.map((p) => ({
     ...p,
     percentage: maxCost > 0 ? (p.spending / maxCost) * 100 : 0,
   }))
@@ -137,8 +164,8 @@ const providerBreakdown = computed(() => {
 const modelBreakdown = computed(() => {
   if (!modelUsage.value?.data) return []
   const data = modelUsage.value.data
-  const maxRequests = Math.max(...data.map(m => m.request_count), 1)
-  return data.map(m => ({
+  const maxRequests = Math.max(...data.map((m) => m.request_count), 1)
+  return data.map((m) => ({
     ...m,
     percentage: maxRequests > 0 ? (m.request_count / maxRequests) * 100 : 0,
   }))
@@ -177,7 +204,11 @@ function loadMoreLogs() {
           class="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option :value="null">All Agents</option>
-          <option v-for="agent in agents" :key="agent.id" :value="agent.id">
+          <option
+            v-for="agent in agents"
+            :key="agent.id"
+            :value="agent.id"
+          >
             {{ agent.name }}
           </option>
         </select>
@@ -187,7 +218,11 @@ function loadMoreLogs() {
           v-model="selectedPeriod"
           class="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          <option v-for="option in periodOptions" :key="option.value" :value="option.value">
+          <option
+            v-for="option in periodOptions"
+            :key="option.value"
+            :value="option.value"
+          >
             {{ option.label }}
           </option>
         </select>
@@ -195,12 +230,18 @@ function loadMoreLogs() {
     </div>
 
     <!-- Loading state -->
-    <div v-if="isLoading" class="bg-white rounded-lg shadow p-6">
+    <div
+      v-if="isLoading"
+      class="bg-white rounded-lg shadow p-6"
+    >
       <p class="text-gray-600">Loading usage analytics...</p>
     </div>
 
     <!-- Error state -->
-    <div v-else-if="error" class="bg-white rounded-lg shadow p-6">
+    <div
+      v-else-if="error"
+      class="bg-white rounded-lg shadow p-6"
+    >
       <p class="text-red-600">Error loading usage analytics: {{ (error as Error).message }}</p>
     </div>
 
@@ -226,7 +267,10 @@ function loadMoreLogs() {
             <CardTitle class="text-sm font-medium text-gray-600">Success Rate</CardTitle>
           </CardHeader>
           <CardContent>
-            <div class="text-3xl font-bold" :class="successRate >= 95 ? 'text-green-600' : 'text-yellow-600'">
+            <div
+              class="text-3xl font-bold"
+              :class="successRate >= 95 ? 'text-green-600' : 'text-yellow-600'"
+            >
               {{ successRate.toFixed(1) }}%
             </div>
           </CardContent>
@@ -277,11 +321,20 @@ function loadMoreLogs() {
             <CardTitle>Usage by Provider</CardTitle>
           </CardHeader>
           <CardContent>
-            <div v-if="providerBreakdown.length === 0" class="text-center text-gray-600">
+            <div
+              v-if="providerBreakdown.length === 0"
+              class="text-center text-gray-600"
+            >
               No provider data available
             </div>
-            <div v-else class="space-y-4">
-              <div v-for="provider in providerBreakdown" :key="provider.provider">
+            <div
+              v-else
+              class="space-y-4"
+            >
+              <div
+                v-for="provider in providerBreakdown"
+                :key="provider.provider"
+              >
                 <div class="flex justify-between items-center mb-2">
                   <span class="text-sm font-medium text-gray-900">{{ provider.provider }}</span>
                   <div class="text-right">
@@ -310,11 +363,20 @@ function loadMoreLogs() {
             <CardTitle>Usage by Model</CardTitle>
           </CardHeader>
           <CardContent>
-            <div v-if="modelBreakdown.length === 0" class="text-center text-gray-600">
+            <div
+              v-if="modelBreakdown.length === 0"
+              class="text-center text-gray-600"
+            >
               No model data available
             </div>
-            <div v-else class="space-y-4">
-              <div v-for="model in modelBreakdown" :key="model.model">
+            <div
+              v-else
+              class="space-y-4"
+            >
+              <div
+                v-for="model in modelBreakdown"
+                :key="model.model"
+              >
                 <div class="flex justify-between items-center mb-2">
                   <span class="text-sm font-medium text-gray-900">{{ model.model }}</span>
                   <div class="text-right">
@@ -342,15 +404,24 @@ function loadMoreLogs() {
       <Card>
         <CardHeader class="flex flex-row items-center justify-between">
           <CardTitle>Recent Logs</CardTitle>
-          <span v-if="totalEvents > 0" class="text-sm text-gray-500">
+          <span
+            v-if="totalEvents > 0"
+            class="text-sm text-gray-500"
+          >
             Showing {{ accumulatedLogs.length }} of {{ totalEvents }} events
           </span>
         </CardHeader>
         <CardContent>
-          <div v-if="eventsLoading && accumulatedLogs.length === 0" class="text-center text-gray-600 py-4">
+          <div
+            v-if="eventsLoading && accumulatedLogs.length === 0"
+            class="text-center text-gray-600 py-4"
+          >
             Loading logs...
           </div>
-          <div v-else-if="accumulatedLogs.length === 0" class="text-center text-gray-600 py-4">
+          <div
+            v-else-if="accumulatedLogs.length === 0"
+            class="text-center text-gray-600 py-4"
+          >
             No logs available
           </div>
           <div v-else>
@@ -358,16 +429,43 @@ function loadMoreLogs() {
               <table class="min-w-[600px] w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                   <tr>
-                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
-                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Agent</th>
-                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Model</th>
-                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tokens</th>
-                    <th class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cost</th>
+                    <th
+                      class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+                    >
+                      Time
+                    </th>
+                    <th
+                      class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+                    >
+                      Agent
+                    </th>
+                    <th
+                      class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+                    >
+                      Model
+                    </th>
+                    <th
+                      class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+                    >
+                      Status
+                    </th>
+                    <th
+                      class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+                    >
+                      Tokens
+                    </th>
+                    <th
+                      class="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"
+                    >
+                      Cost
+                    </th>
                   </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
-                  <tr v-for="event in accumulatedLogs" :key="event.event_id">
+                  <tr
+                    v-for="event in accumulatedLogs"
+                    :key="event.event_id"
+                  >
                     <td class="px-3 sm:px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {{ formatTimestamp(event.timestamp_ms) }}
                     </td>
@@ -380,9 +478,11 @@ function loadMoreLogs() {
                     <td class="px-3 sm:px-4 py-3 whitespace-nowrap">
                       <span
                         class="px-2 py-1 text-xs font-medium rounded-full"
-                        :class="event.event_type === 'llm_request_completed'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'"
+                        :class="
+                          event.event_type === 'llm_request_completed'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                        "
                       >
                         {{ event.event_type === 'llm_request_completed' ? 'Success' : 'Failed' }}
                       </span>
@@ -399,8 +499,15 @@ function loadMoreLogs() {
             </div>
 
             <!-- Load More Button -->
-            <div v-if="logsPage < totalPages" class="mt-4 text-center">
-              <Button variant="outline" @click="loadMoreLogs" :disabled="eventsFetching">
+            <div
+              v-if="logsPage < totalPages"
+              class="mt-4 text-center"
+            >
+              <Button
+                variant="outline"
+                :disabled="eventsFetching"
+                @click="loadMoreLogs"
+              >
                 {{ eventsFetching ? 'Loading...' : 'Load More Logs' }}
               </Button>
             </div>

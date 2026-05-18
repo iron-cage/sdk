@@ -43,7 +43,12 @@ const { data: usersList } = useQuery({
 })
 
 // Fetch tokens
-const { data: tokens, isLoading, error, refetch } = useQuery({
+const {
+  data: tokens,
+  isLoading,
+  error,
+  refetch,
+} = useQuery({
   queryKey: ['tokens'],
   queryFn: () => api.getTokens(),
 })
@@ -119,51 +124,77 @@ function copyToken(token: string) {
   <div>
     <div class="flex justify-between items-center mb-6">
       <h1 class="text-2xl font-bold text-gray-900">Token Management</h1>
-      <Button @click="showCreateModal = true">
-        Generate New Token
-      </Button>
+      <Button @click="showCreateModal = true"> Generate New Token </Button>
     </div>
 
     <!-- Loading state -->
-    <div v-if="isLoading" class="bg-white rounded-lg shadow p-6">
+    <div
+      v-if="isLoading"
+      class="bg-white rounded-lg shadow p-6"
+    >
       <p class="text-gray-600">Loading tokens...</p>
     </div>
 
     <!-- Error state -->
-    <div v-else-if="error" class="bg-white rounded-lg shadow p-6">
+    <div
+      v-else-if="error"
+      class="bg-white rounded-lg shadow p-6"
+    >
       <p class="text-red-600">Error loading tokens: {{ error.message }}</p>
-      <Button @click="() => refetch()" variant="secondary" class="mt-4">
+      <Button
+        variant="secondary"
+        class="mt-4"
+        @click="() => refetch()"
+      >
         Retry
       </Button>
     </div>
 
     <!-- Tokens table -->
-    <div v-else-if="tokens && tokens.length > 0" class="bg-white rounded-lg shadow overflow-hidden">
+    <div
+      v-else-if="tokens && tokens.length > 0"
+      class="bg-white rounded-lg shadow overflow-hidden"
+    >
       <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
           <tr>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th
+              class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
               ID
             </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th
+              class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
               Provider
             </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th
+              class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
               Description
             </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th
+              class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
               Created
             </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th
+              class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
               Status
             </th>
-            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th
+              class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
               Actions
             </th>
           </tr>
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
-          <tr v-for="token in tokens" :key="token.id">
+          <tr
+            v-for="token in tokens"
+            :key="token.id"
+          >
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
               {{ token.id }}
             </td>
@@ -184,20 +215,20 @@ function copyToken(token: string) {
             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
               <Button
                 v-if="token.is_active"
-                @click="handleRotateToken(token)"
                 :disabled="rotateMutation.isPending.value"
                 variant="ghost"
                 size="sm"
+                @click="handleRotateToken(token)"
               >
                 Rotate
               </Button>
               <Button
                 v-if="token.is_active"
-                @click="handleRevokeToken(token)"
                 :disabled="revokeMutation.isPending.value"
                 variant="ghost"
                 size="sm"
                 class="text-destructive hover:text-destructive"
+                @click="handleRevokeToken(token)"
               >
                 Revoke
               </Button>
@@ -208,11 +239,12 @@ function copyToken(token: string) {
     </div>
 
     <!-- Empty state -->
-    <div v-else class="bg-white rounded-lg shadow p-6 text-center">
+    <div
+      v-else
+      class="bg-white rounded-lg shadow p-6 text-center"
+    >
       <p class="text-gray-600 mb-4">No tokens found</p>
-      <Button @click="showCreateModal = true">
-        Generate First Token
-      </Button>
+      <Button @click="showCreateModal = true"> Generate First Token </Button>
     </div>
 
     <!-- Create token modal -->
@@ -225,7 +257,11 @@ function copyToken(token: string) {
           </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="createError" variant="destructive" class="mb-4">
+        <Alert
+          v-if="createError"
+          variant="destructive"
+          class="mb-4"
+        >
           <AlertDescription>{{ createError }}</AlertDescription>
         </Alert>
 
@@ -237,9 +273,9 @@ function copyToken(token: string) {
                 <SelectValue placeholder="Select a user" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem 
-                  v-for="user in usersList?.users" 
-                  :key="user.id" 
+                <SelectItem
+                  v-for="user in usersList?.users"
+                  :key="user.id"
                   :value="user.username"
                 >
                   {{ user.username }}
@@ -271,15 +307,15 @@ function copyToken(token: string) {
 
         <DialogFooter>
           <Button
-            @click="showCreateModal = false"
             :disabled="createMutation.isPending.value"
             variant="outline"
+            @click="showCreateModal = false"
           >
             Cancel
           </Button>
           <Button
-            @click="handleCreateToken"
             :disabled="createMutation.isPending.value"
+            @click="handleCreateToken"
           >
             {{ createMutation.isPending.value ? 'Generating...' : 'Generate Token' }}
           </Button>
@@ -297,13 +333,19 @@ function copyToken(token: string) {
           </DialogDescription>
         </DialogHeader>
 
-        <Alert variant="default" class="bg-yellow-50 border-yellow-400">
+        <Alert
+          variant="default"
+          class="bg-yellow-50 border-yellow-400"
+        >
           <AlertDescription class="text-yellow-800">
             <strong>Important:</strong> Save this token now. You won't be able to see it again!
           </AlertDescription>
         </Alert>
 
-        <div v-if="newTokenData" class="space-y-4 py-4">
+        <div
+          v-if="newTokenData"
+          class="space-y-4 py-4"
+        >
           <div class="space-y-2">
             <Label>Token</Label>
             <div class="flex space-x-2">
@@ -313,8 +355,8 @@ function copyToken(token: string) {
                 class="font-mono text-sm bg-muted"
               />
               <Button
-                @click="copyToken(newTokenData.token)"
                 variant="secondary"
+                @click="copyToken(newTokenData.token)"
               >
                 Copy
               </Button>
@@ -342,9 +384,7 @@ function copyToken(token: string) {
         </div>
 
         <DialogFooter>
-          <Button @click="showTokenModal = false">
-            Close
-          </Button>
+          <Button @click="showTokenModal = false"> Close </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
