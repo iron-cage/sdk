@@ -88,6 +88,7 @@ static MIGRATIONS: &[(&str, &str)] = &[
   migration!("031_add_workspaces_and_policy"),
   migration!("032_add_invite_links"),
   migration!("033_add_invite_seats"),
+  migration!("034_seed_default_workspace"),
 ];
 
 /// Applies all migrations to the database pool.
