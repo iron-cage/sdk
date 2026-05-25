@@ -58,7 +58,7 @@ async fn setup() -> (TestState, String) {
   .await
   .expect("LOUD FAILURE: Failed to seed workspace");
 
-  let now_ms: i64 = std::time::SystemTime::now()
+  let now_ms = std::time::SystemTime::now()
     .duration_since(std::time::UNIX_EPOCH)
     .unwrap()
     .as_millis()
@@ -527,4 +527,108 @@ async fn test_approve_unknown_user_returns_404() {
     .unwrap();
 
   assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+// Concurrency -----------------------------------------------------------------
+
+/// Reproduces the TOCTOU seat-limit race in `post_invite_accept` (issue-pr68-corr3).
+///
+/// ## Root Cause
+/// `post_invite_accept` reads `seats_used`/`seats_total`, checks
+/// `seats_used >= seats_total`, then inserts the user, inserts the seat, and
+/// runs `UPDATE invite_links SET seats_used = seats_used + 1` as four separate
+/// un-transacted statements. Concurrent accepts on a one-seat link all observe
+/// `seats_used = 0`, all pass the check, and all claim a seat.
+///
+/// ## Why Not Caught Initially
+/// Existing accept tests are single-request; none fired concurrent accepts at
+/// the same link, so the missing transaction boundary was invisible.
+///
+/// ## Fix Applied
+/// Wrap the check-and-claim sequence in a single `BEGIN IMMEDIATE` transaction
+/// and re-check `seats_used < seats_total` inside it before claiming the seat.
+///
+/// ## Prevention
+/// Any check-then-write against a shared counter must run inside one
+/// transaction with write-intent locking (`BEGIN IMMEDIATE` for `SQLite`).
+///
+/// ## Pitfall to Avoid
+/// Individually "atomic" statements do not make a multi-statement sequence
+/// atomic; only an explicit transaction does.
+// test_kind: bug_reproducer(issue-pr68-corr3)
+#[tokio::test]
+async fn test_concurrent_accept_respects_single_seat() {
+  let (state, bearer) = setup().await;
+  let pool = state.invite.pool.clone();
+  let app = build_router(state);
+
+  // Generate a link with exactly ONE seat.
+  let gen_body = body_json(
+    app
+      .clone()
+      .oneshot(
+        Request::builder()
+          .method(Method::POST)
+          .uri("/api/v1/invites/generate")
+          .header("Content-Type", "application/json")
+          .header("Authorization", bearer)
+          .body(Body::from(json!({"seats": 1}).to_string()))
+          .unwrap(),
+      )
+      .await
+      .unwrap(),
+  )
+  .await;
+  let token = gen_body["token"].as_str().unwrap().to_string();
+
+  // Fire 10 concurrent accepts at the single-seat link.
+  let mut handles = Vec::new();
+  for _ in 0..10 {
+    let app_clone = app.clone();
+    let token_clone = token.clone();
+    handles.push(tokio::spawn(async move {
+      app_clone
+        .oneshot(
+          Request::builder()
+            .method(Method::POST)
+            .uri(format!("/api/v1/invites/{token_clone}/accept"))
+            .header("Content-Type", "application/json")
+            .body(Body::from(json!({"password": "secure_pw_123"}).to_string()))
+            .unwrap(),
+        )
+        .await
+    }));
+  }
+
+  let mut created = 0;
+  for handle in handles {
+    if let Ok(Ok(resp)) = handle.await {
+      if resp.status() == StatusCode::CREATED {
+        created += 1;
+      }
+    }
+  }
+
+  // Exactly one accept may claim the single seat.
+  assert_eq!(
+    created, 1,
+    "single-seat link must accept exactly one member under concurrency"
+  );
+
+  // The counter must not exceed the limit.
+  let seats_used = sqlx::query_scalar::<_, i64>("SELECT seats_used FROM invite_links")
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+  assert_eq!(seats_used, 1, "seats_used must never exceed seats_total");
+
+  // Exactly one seat row must be recorded.
+  let seat_rows = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM invite_seats")
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+  assert_eq!(
+    seat_rows, 1,
+    "exactly one invite_seats row must be recorded"
+  );
 }
