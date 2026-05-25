@@ -322,3 +322,60 @@ async fn test_unauthenticated_returns_401() {
 
   assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
 }
+
+// test_kind: bug_reproducer(issue-pr68-corr5)
+//
+// Root Cause: `post_workspace_budget` (workspace.rs:90) guards with
+//   `Permission::ManageUsers`. Setting the workspace budget is an
+//   IC-token-tier control, so the correct guard is `Permission::ManageIcTokens`
+//   (matching ic_token.rs:94). Under the RBAC matrix (rbac.rs:91) `Manager`
+//   holds `ManageIcTokens` but NOT `ManageUsers`, so a Manager is wrongly
+//   rejected with 403 from a control they are entitled to use.
+//
+// Why Not Caught: the existing RBAC tests cover only Admin (allowed, holds all
+//   permissions) and Developer (denied, holds none). Manager is the only role
+//   that distinguishes `ManageUsers` from `ManageIcTokens`, and it was never
+//   exercised against this endpoint.
+//
+// Fix Applied: change the guard from `Permission::ManageUsers` to
+//   `Permission::ManageIcTokens` in `post_workspace_budget`.
+//
+// Prevention: when choosing an RBAC permission for an endpoint, test the
+//   boundary role that holds the intended permission but not the adjacent one,
+//   not just the all-or-nothing Admin/Developer roles.
+//
+// Pitfall to Avoid: assert on the status transition (Manager: 403 -> 200), not
+//   on the 403 body text, so the test pins authorization behavior rather than
+//   error wording.
+#[tokio::test]
+async fn test_manager_can_set_budget() {
+  let (state, _) = setup().await;
+  let app = build_router(state);
+
+  let jwt = JwtSecret::new(TEST_JWT_SECRET.to_string());
+  let token = jwt
+    .generate_access_token("mgr_user", "mgr@test.com", "manager", "tok_mgr")
+    .unwrap();
+  let bearer = format!("Bearer {token}");
+
+  let resp = app
+    .oneshot(
+      Request::builder()
+        .method(Method::POST)
+        .uri("/api/v1/workspace/budget")
+        .header("Content-Type", "application/json")
+        .header("Authorization", bearer)
+        .body(Body::from(
+          json!({"amount_cents": 5000, "period": "week"}).to_string(),
+        ))
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(
+    resp.status(),
+    StatusCode::OK,
+    "Manager holds ManageIcTokens and must be allowed to set the workspace budget"
+  );
+}
