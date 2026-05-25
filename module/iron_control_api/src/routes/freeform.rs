@@ -5,7 +5,6 @@
 //! - POST `/api/v1/freeform/providers` — parse + apply provider keys (Admin)
 
 use core::fmt::{Debug, Formatter, Result as FmtResult};
-use core::str::FromStr;
 use std::sync::Arc;
 
 use axum::{
@@ -23,7 +22,7 @@ use crate::{
     invites, providers,
   },
   jwt_auth::AuthenticatedUser,
-  rbac::{Permission, PermissionChecker, Role},
+  rbac::Permission,
 };
 use iron_secrets::crypto::CryptoService;
 use iron_token_manager::provider_key_storage::{CreateKeyParams, ProviderKeyStorage, ProviderType};
@@ -87,19 +86,6 @@ pub struct ApplyProvidersResponse {
   pub queued_invites: usize,
 }
 
-fn check_permission(role_str: &str, permission: Permission) -> Result<(), ApiError> {
-  let role = Role::from_str(role_str)
-    .map_err(|_| ApiError::Forbidden(format!("Invalid role: {role_str}")))?;
-  let checker = PermissionChecker::new();
-  if checker.has_permission(role, permission) {
-    Ok(())
-  } else {
-    Err(ApiError::Forbidden(format!(
-      "Permission {permission:?} required"
-    )))
-  }
-}
-
 fn account_type_to_str(t: &AccountType) -> &'static str {
   match t {
     AccountType::Client => "client",
@@ -135,7 +121,7 @@ pub async fn post_company(
   AuthenticatedUser(claims): AuthenticatedUser,
   JsonBody(body): JsonBody<TextRequest>,
 ) -> ApiResult<impl IntoResponse> {
-  check_permission(&claims.role, Permission::ManageUsers)?;
+  super::check_permission(&claims.role, Permission::ManageUsers)?;
 
   let company =
     company_setup::parse(&body.text).map_err(|e| ApiError::BadRequest(e.to_string()))?;
@@ -187,7 +173,7 @@ pub async fn post_providers(
   AuthenticatedUser(claims): AuthenticatedUser,
   JsonBody(body): JsonBody<TextRequest>,
 ) -> ApiResult<impl IntoResponse> {
-  check_permission(&claims.role, Permission::ManageProviderKeys)?;
+  super::check_permission(&claims.role, Permission::ManageProviderKeys)?;
 
   // Split the mixed paste before parsing: bare-email lines (contain '@', no ':')
   // are invite-queue entries; everything else goes to the provider-key parser.

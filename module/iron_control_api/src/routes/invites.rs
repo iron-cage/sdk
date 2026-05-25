@@ -9,7 +9,6 @@
 //! - POST `/api/v1/invites/seats/{id}/approve` — approve pending member by seat id (Admin)
 
 use core::net::SocketAddr;
-use core::str::FromStr;
 use std::sync::Arc;
 
 use axum::{
@@ -31,7 +30,7 @@ use crate::{
   error::{ApiError, ApiResult, JsonBody},
   jwt_auth::{AuthenticatedUser, JwtSecret},
   rate_limiter::LoginRateLimiter,
-  rbac::{Permission, PermissionChecker, Role},
+  rbac::Permission,
 };
 
 /// `BCrypt` cost for new member passwords (matches `UserService::BCRYPT_COST`).
@@ -52,19 +51,6 @@ impl core::fmt::Debug for InviteState {
       .field("pool", &"<SqlitePool>")
       .field("jwt_secret", &"<JwtSecret>")
       .finish()
-  }
-}
-
-fn check_permission(role_str: &str, permission: Permission) -> Result<(), ApiError> {
-  let role = Role::from_str(role_str)
-    .map_err(|_| ApiError::Forbidden(format!("Invalid role: {role_str}")))?;
-  let checker = PermissionChecker::new();
-  if checker.has_permission(role, permission) {
-    Ok(())
-  } else {
-    Err(ApiError::Forbidden(format!(
-      "Permission {permission:?} required"
-    )))
   }
 }
 
@@ -167,7 +153,7 @@ pub async fn post_invite_generate(
   AuthenticatedUser(claims): AuthenticatedUser,
   JsonBody(body): JsonBody<GenerateInviteRequest>,
 ) -> ApiResult<impl IntoResponse> {
-  check_permission(&claims.role, Permission::ManageUsers)?;
+  super::check_permission(&claims.role, Permission::ManageUsers)?;
 
   if body.seats < 1 {
     return Err(ApiError::BadRequest("seats must be at least 1".into()));
@@ -489,7 +475,7 @@ pub async fn post_invite_approve(
   Path(token): Path<String>,
   JsonBody(body): JsonBody<ApproveInviteRequest>,
 ) -> ApiResult<impl IntoResponse> {
-  check_permission(&claims.role, Permission::ManageUsers)?;
+  super::check_permission(&claims.role, Permission::ManageUsers)?;
 
   let token_hash = hash_token(&token);
 
@@ -581,7 +567,7 @@ pub async fn get_pending_invites(
   State(state): State<InviteState>,
   AuthenticatedUser(claims): AuthenticatedUser,
 ) -> ApiResult<impl IntoResponse> {
-  check_permission(&claims.role, Permission::ManageUsers)?;
+  super::check_permission(&claims.role, Permission::ManageUsers)?;
 
   let rows: Vec<PendingInviteSeatRow> = sqlx::query_as(
     r"
@@ -636,7 +622,7 @@ pub async fn post_invite_seat_approve(
   AuthenticatedUser(claims): AuthenticatedUser,
   Path(seat_id): Path<i64>,
 ) -> ApiResult<impl IntoResponse> {
-  check_permission(&claims.role, Permission::ManageUsers)?;
+  super::check_permission(&claims.role, Permission::ManageUsers)?;
 
   let approved_at = now_ms();
   let rows_affected = sqlx::query(

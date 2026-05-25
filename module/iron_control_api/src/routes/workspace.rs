@@ -4,8 +4,6 @@
 //! - POST `/api/v1/workspace/budget` - upsert workspace spending policy (requires `ManageIcTokens`: Admin or Manager)
 //! - GET  `/api/v1/me/workspace` - read the current user's workspace info
 
-use core::str::FromStr;
-
 use axum::{
   extract::State,
   http::StatusCode,
@@ -18,21 +16,8 @@ use crate::{
   error::{ApiError, ApiResult, JsonBody},
   freeform::usage_policy::{self, CapPeriod},
   jwt_auth::AuthenticatedUser,
-  rbac::{Permission, PermissionChecker, Role},
+  rbac::Permission,
 };
-
-fn check_permission(role_str: &str, permission: Permission) -> Result<(), ApiError> {
-  let role = Role::from_str(role_str)
-    .map_err(|_| ApiError::Forbidden(format!("Invalid role: {role_str}")))?;
-  let checker = PermissionChecker::new();
-  if checker.has_permission(role, permission) {
-    Ok(())
-  } else {
-    Err(ApiError::Forbidden(format!(
-      "Permission {permission:?} required"
-    )))
-  }
-}
 
 fn period_to_str(period: &CapPeriod) -> &'static str {
   match period {
@@ -115,7 +100,7 @@ pub async fn post_workspace_budget(
   AuthenticatedUser(claims): AuthenticatedUser,
   JsonBody(body): JsonBody<BudgetRequest>,
 ) -> ApiResult<impl IntoResponse> {
-  check_permission(&claims.role, Permission::ManageIcTokens)?;
+  super::check_permission(&claims.role, Permission::ManageIcTokens)?;
 
   let (amount_cents, period_str, default_model, requestable_str) = if let Some(ref raw) = body.text
   {
