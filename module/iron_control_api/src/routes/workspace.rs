@@ -93,7 +93,7 @@ pub async fn post_workspace_budget(
     let policy = usage_policy::parse(raw).map_err(|errors| {
       let msg = errors
         .iter()
-        .map(std::string::ToString::to_string)
+        .map(ToString::to_string)
         .collect::<Vec<_>>()
         .join("; ");
       ApiError::BadRequest(msg)

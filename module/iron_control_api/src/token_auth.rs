@@ -3,7 +3,7 @@
 //! Authenticates requests using API tokens (`iron_xxx` format) instead of JWT.
 //! Used for external API access (key fetching, runtime calls).
 
-use axum::extract::FromRef;
+use axum::extract::{FromRef, FromRequestParts};
 use iron_token_manager::storage::TokenStorage;
 use std::sync::Arc;
 
@@ -28,10 +28,10 @@ pub struct ApiTokenState {
   pub token_storage: Arc<TokenStorage>,
 }
 
-impl<S> axum::extract::FromRequestParts<S> for ApiTokenAuth
+impl<S> FromRequestParts<S> for ApiTokenAuth
 where
   S: Send + Sync,
-  ApiTokenState: axum::extract::FromRef<S>,
+  ApiTokenState: FromRef<S>,
 {
   type Rejection = (axum::http::StatusCode, axum::Json<serde_json::Value>);
 

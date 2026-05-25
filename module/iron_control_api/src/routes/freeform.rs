@@ -194,7 +194,7 @@ pub async fn post_providers(
   let entries = providers::parse(&body.text).map_err(|errors| {
     let msg = errors
       .iter()
-      .map(std::string::ToString::to_string)
+      .map(ToString::to_string)
       .collect::<Vec<_>>()
       .join("; ");
     ApiError::BadRequest(msg)

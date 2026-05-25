@@ -20,7 +20,8 @@ use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use rand::RngExt;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use sqlx::SqlitePool;
+use sqlx::{pool::PoolConnection, Sqlite, SqlitePool};
+
 use uuid::Uuid;
 
 use crate::{
@@ -267,6 +268,86 @@ pub async fn get_invite_preview(
   ))
 }
 
+/// Re-check the seat limit and claim one seat, all on a single connection.
+///
+/// Must be called between `BEGIN IMMEDIATE` and `COMMIT` on `conn`: the
+/// `seats_used` re-check, the user insert, the seat insert, and the counter
+/// increment must be atomic to prevent two concurrent accepts from both
+/// claiming the last seat (TOCTOU race).
+async fn claim_invite_seat(
+  conn: &mut PoolConnection<Sqlite>,
+  token_hash: &str,
+  user_id: &str,
+  username: &str,
+  password_hash: &str,
+  user_email: &str,
+) -> Result<(), ApiError> {
+  let row = sqlx::query_as::<_, (String, i64, i64, Option<i64>)>(
+    r"
+      SELECT id, seats_total, seats_used, expires_at
+      FROM invite_links
+      WHERE token_hash = ?
+    ",
+  )
+  .bind(token_hash)
+  .fetch_optional(conn.as_mut())
+  .await
+  .map_err(|_| ApiError::Internal("Failed to query invite".into()))?;
+
+  let (link_id, seats_total, seats_used, expires_at) =
+    row.ok_or_else(|| ApiError::NotFound("Invite not found".into()))?;
+
+  if let Some(exp) = expires_at {
+    if now_ms() > exp {
+      return Err(ApiError::BadRequest("Invite link has expired".into()));
+    }
+  }
+
+  if seats_used >= seats_total {
+    return Err(ApiError::BadRequest("Invite link is full".into()));
+  }
+
+  sqlx::query(
+    r"
+      INSERT INTO users (id, username, password_hash, email, role, is_active, created_at)
+      VALUES (?, ?, ?, ?, 'developer', 1, ?)
+    ",
+  )
+  .bind(user_id)
+  .bind(username)
+  .bind(password_hash)
+  .bind(user_email)
+  .bind(now_ms())
+  .execute(conn.as_mut())
+  .await
+  .map_err(|_| ApiError::Internal("Failed to create member account".into()))?;
+
+  sqlx::query(
+    r"
+      INSERT INTO invite_seats (invite_link_id, user_id, accepted_at)
+      VALUES (?, ?, ?)
+    ",
+  )
+  .bind(&link_id)
+  .bind(user_id)
+  .bind(now_ms())
+  .execute(conn.as_mut())
+  .await
+  .map_err(|_| ApiError::Internal("Failed to record invite seat".into()))?;
+
+  sqlx::query(
+    r"
+      UPDATE invite_links SET seats_used = seats_used + 1 WHERE id = ?
+    ",
+  )
+  .bind(&link_id)
+  .execute(conn.as_mut())
+  .await
+  .map_err(|_| ApiError::Internal("Failed to update seat count".into()))?;
+
+  Ok(())
+}
+
 /// `POST /api/v1/invites/{token}/accept`
 ///
 /// Create a member account and claim a seat on this invite link.
@@ -290,76 +371,52 @@ pub async fn post_invite_accept(
 
   let token_hash = hash_token(&token);
 
-  let row: Option<(String, i64, i64, Option<i64>)> = sqlx::query_as(
-    r"
-      SELECT id, seats_total, seats_used, expires_at
-      FROM invite_links
-      WHERE token_hash = ?
-    ",
-  )
-  .bind(&token_hash)
-  .fetch_optional(&state.pool)
-  .await
-  .map_err(|_| ApiError::Internal("Failed to query invite".into()))?;
-
-  let (link_id, seats_total, seats_used, expires_at) =
-    row.ok_or_else(|| ApiError::NotFound("Invite not found".into()))?;
-
-  if let Some(exp) = expires_at {
-    if now_ms() > exp {
-      return Err(ApiError::BadRequest("Invite link has expired".into()));
-    }
-  }
-
-  if seats_used >= seats_total {
-    return Err(ApiError::BadRequest("Invite link is full".into()));
-  }
-
+  // Generate the identity and hash the password BEFORE opening the write
+  // transaction: bcrypt is deliberately expensive, and we must not hold the
+  // SQLite write lock for its duration.
   let user_id = Uuid::new_v4().to_string();
   let username = format!("member_{}", &user_id[..8]);
   let user_email = format!("{user_id}@invite.local");
-
   let password_hash = bcrypt::hash(&body.password, BCRYPT_COST)
     .map_err(|_| ApiError::Internal("Failed to hash password".into()))?;
 
-  sqlx::query(
-    r"
-      INSERT INTO users (id, username, password_hash, email, role, is_active, created_at)
-      VALUES (?, ?, ?, ?, 'developer', 1, ?)
-    ",
-  )
-  .bind(&user_id)
-  .bind(&username)
-  .bind(&password_hash)
-  .bind(&user_email)
-  .bind(now_ms())
-  .execute(&state.pool)
-  .await
-  .map_err(|_| ApiError::Internal("Failed to create member account".into()))?;
-  let accepted_at = now_ms();
+  // Claim the seat inside a single BEGIN IMMEDIATE transaction so the
+  // seats_used check and the counter increment are atomic. pool.begin() emits
+  // BEGIN (deferred); we need BEGIN IMMEDIATE to block concurrent accepts from
+  // both passing the check on a full link (TOCTOU race).
+  let mut conn = state
+    .pool
+    .acquire()
+    .await
+    .map_err(|_| ApiError::Internal("Failed to acquire connection".into()))?;
+  sqlx::query("BEGIN IMMEDIATE")
+    .execute(conn.as_mut())
+    .await
+    .map_err(|_| ApiError::Internal("Failed to begin transaction".into()))?;
 
-  sqlx::query(
-    r"
-      INSERT INTO invite_seats (invite_link_id, user_id, accepted_at)
-      VALUES (?, ?, ?)
-    ",
+  let claim = claim_invite_seat(
+    &mut conn,
+    &token_hash,
+    &user_id,
+    &username,
+    &password_hash,
+    &user_email,
   )
-  .bind(&link_id)
-  .bind(&user_id)
-  .bind(accepted_at)
-  .execute(&state.pool)
-  .await
-  .map_err(|_| ApiError::Internal("Failed to record invite seat".into()))?;
+  .await;
 
-  sqlx::query(
-    r"
-      UPDATE invite_links SET seats_used = seats_used + 1 WHERE id = ?
-    ",
-  )
-  .bind(&link_id)
-  .execute(&state.pool)
-  .await
-  .map_err(|_| ApiError::Internal("Failed to update seat count".into()))?;
+  match claim {
+    Ok(()) => {
+      sqlx::query("COMMIT")
+        .execute(conn.as_mut())
+        .await
+        .map_err(|_| ApiError::Internal("Failed to commit transaction".into()))?;
+    }
+    Err(e) => {
+      // Best-effort rollback; surface the original error.
+      let _ = sqlx::query("ROLLBACK").execute(conn.as_mut()).await;
+      return Err(e);
+    }
+  }
 
   let token_jti = Uuid::new_v4().to_string();
   let access_token = state
