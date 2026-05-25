@@ -20,7 +20,7 @@ use crate::{
   error::{ApiError, ApiResult, JsonBody},
   freeform::{
     company_setup::{self, AccountType},
-    providers,
+    invites, providers,
   },
   jwt_auth::AuthenticatedUser,
   rbac::{Permission, PermissionChecker, Role},
@@ -83,6 +83,8 @@ pub struct AppliedProvider {
 pub struct ApplyProvidersResponse {
   /// List of successfully applied provider keys.
   pub applied: Vec<AppliedProvider>,
+  /// Number of bare-email lines queued as pending invite seats.
+  pub queued_invites: usize,
 }
 
 fn check_permission(role_str: &str, permission: Permission) -> Result<(), ApiError> {
@@ -140,7 +142,7 @@ pub async fn post_company(
 
   let account_type_str = account_type_to_str(&company.account_type);
 
-  let id: i64 = sqlx::query_scalar(
+  let id = sqlx::query_scalar::<_, i64>(
     r"
       INSERT INTO workspaces (id, name, domain, account_type, created_at)
       VALUES (1, ?, ?, ?, strftime('%s', 'now') * 1000)
@@ -171,13 +173,15 @@ pub async fn post_company(
 
 /// POST /api/v1/freeform/providers
 ///
-/// Parse a provider-key block and apply all keys transactionally.
-/// Returns the list of applied provider names and their new key IDs.
+/// Parse a mixed onboarding paste: `provider: key` lines are applied as
+/// provider keys, while bare-email lines are queued as pending invite seats
+/// (`invite_link_id IS NULL`). Returns the applied keys plus the count of newly
+/// queued invites. Crypto is required only when provider keys are present.
 ///
 /// # Errors
 ///
-/// Returns `ApiError` on permission failure, parse error, crypto unavailability,
-/// or database error.
+/// Returns `ApiError` on permission failure, parse error, crypto unavailability
+/// (only when provider keys are present), or database error.
 pub async fn post_providers(
   State(state): State<FreeformState>,
   AuthenticatedUser(claims): AuthenticatedUser,
@@ -185,13 +189,26 @@ pub async fn post_providers(
 ) -> ApiResult<impl IntoResponse> {
   check_permission(&claims.role, Permission::ManageProviderKeys)?;
 
-  let crypto = state.crypto.as_ref().ok_or_else(|| {
-    ApiError::ServiceUnavailable(
-      "Provider key encryption is disabled. Set IRON_SECRETS_MASTER_KEY to enable.".into(),
-    )
-  })?;
+  // Split the mixed paste before parsing: bare-email lines (contain '@', no ':')
+  // are invite-queue entries; everything else goes to the provider-key parser.
+  // Both parsers are all-or-nothing, so they must not see each other's lines.
+  let mut provider_block = String::new();
+  let mut email_block = String::new();
+  for raw in body.text.lines() {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() || trimmed.starts_with('#') {
+      continue;
+    }
+    if trimmed.contains('@') && !trimmed.contains(':') {
+      email_block.push_str(trimmed);
+      email_block.push('\n');
+    } else {
+      provider_block.push_str(trimmed);
+      provider_block.push('\n');
+    }
+  }
 
-  let entries = providers::parse(&body.text).map_err(|errors| {
+  let entries = providers::parse(&provider_block).map_err(|errors| {
     let msg = errors
       .iter()
       .map(ToString::to_string)
@@ -200,39 +217,91 @@ pub async fn post_providers(
     ApiError::BadRequest(msg)
   })?;
 
-  let mut applied: Vec<AppliedProvider> = Vec::with_capacity(entries.len());
+  let emails = invites::parse(&email_block).map_err(|errors| {
+    let msg = errors
+      .iter()
+      .map(ToString::to_string)
+      .collect::<Vec<_>>()
+      .join("; ");
+    ApiError::BadRequest(msg)
+  })?;
 
-  for entry in &entries {
-    let provider_type = map_known_provider(&entry.provider)?;
-    let encrypted = crypto
-      .encrypt(&entry.key)
-      .map_err(|_| ApiError::Internal("Failed to encrypt provider key".into()))?;
+  // Crypto is only needed to encrypt provider keys; an emails-only paste is fine
+  // without IRON_SECRETS_MASTER_KEY set.
+  let applied = if entries.is_empty() {
+    Vec::new()
+  } else {
+    let crypto = state.crypto.as_ref().ok_or_else(|| {
+      ApiError::ServiceUnavailable(
+        "Provider key encryption is disabled. Set IRON_SECRETS_MASTER_KEY to enable.".into(),
+      )
+    })?;
 
-    let key_id = state
-      .provider_storage
-      .create_key_within_quota(&CreateKeyParams {
-        provider: provider_type,
-        encrypted_api_key: &encrypted.ciphertext_base64(),
-        encryption_nonce: &encrypted.nonce_base64(),
-        base_url: None,
-        description: Some("Added via FreeForm onboarding"),
-        user_id: &claims.sub,
-        max_keys: MAX_KEYS_PER_USER_PER_PROVIDER,
-      })
-      .await
-      .map_err(|e| {
-        if matches!(e, iron_token_manager::error::TokenError::KeyQuotaExceeded) {
-          ApiError::TooManyRequests(format!("Quota exceeded for provider {:?}", entry.provider))
-        } else {
-          ApiError::Internal("Failed to store provider key".into())
-        }
-      })?;
+    let mut applied: Vec<AppliedProvider> = Vec::with_capacity(entries.len());
+    for entry in &entries {
+      let provider_type = map_known_provider(&entry.provider)?;
+      let encrypted = crypto
+        .encrypt(&entry.key)
+        .map_err(|_| ApiError::Internal("Failed to encrypt provider key".into()))?;
 
-    applied.push(AppliedProvider {
-      provider: provider_type.to_string(),
-      key_id,
-    });
+      let key_id = state
+        .provider_storage
+        .create_key_within_quota(&CreateKeyParams {
+          provider: provider_type,
+          encrypted_api_key: &encrypted.ciphertext_base64(),
+          encryption_nonce: &encrypted.nonce_base64(),
+          base_url: None,
+          description: Some("Added via FreeForm onboarding"),
+          user_id: &claims.sub,
+          max_keys: MAX_KEYS_PER_USER_PER_PROVIDER,
+        })
+        .await
+        .map_err(|e| {
+          if matches!(e, iron_token_manager::error::TokenError::KeyQuotaExceeded) {
+            ApiError::TooManyRequests(format!("Quota exceeded for provider {:?}", entry.provider))
+          } else {
+            ApiError::Internal("Failed to store provider key".into())
+          }
+        })?;
+
+      applied.push(AppliedProvider {
+        provider: provider_type.to_string(),
+        key_id,
+      });
+    }
+    applied
+  };
+
+  // Queue bare emails as pending invite seats. Idempotent: re-pasting the same
+  // address does not create a duplicate queued seat.
+  let mut queued_invites = 0_usize;
+  for email in &emails {
+    let result = sqlx::query(
+      r"
+        INSERT INTO invite_seats (invite_link_id, user_id, email, accepted_at)
+        SELECT NULL, NULL, ?, NULL
+        WHERE NOT EXISTS (
+          SELECT 1 FROM invite_seats
+          WHERE email = ? AND invite_link_id IS NULL
+        )
+      ",
+    )
+    .bind(email)
+    .bind(email)
+    .execute(&state.pool)
+    .await
+    .map_err(|_| ApiError::Internal("Failed to queue invite email".into()))?;
+
+    if result.rows_affected() > 0 {
+      queued_invites += 1;
+    }
   }
 
-  Ok((StatusCode::OK, Json(ApplyProvidersResponse { applied })))
+  Ok((
+    StatusCode::OK,
+    Json(ApplyProvidersResponse {
+      applied,
+      queued_invites,
+    }),
+  ))
 }
