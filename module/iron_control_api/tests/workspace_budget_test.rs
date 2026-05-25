@@ -43,7 +43,7 @@ async fn setup() -> (TestState, String) {
 
   sqlx::query(
     r"
-      INSERT OR IGNORE INTO workspaces (id, name, domain, account_type)
+      INSERT OR REPLACE INTO workspaces (id, name, domain, account_type)
       VALUES (1, 'Test Workspace', 'test.example.com', 'client')
     ",
   )
