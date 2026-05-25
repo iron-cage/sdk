@@ -1,4 +1,6 @@
 //! Integration tests for invite link endpoints.
+//!
+//! `test_kind`: integration
 
 #![allow(missing_docs)]
 

@@ -1,4 +1,7 @@
 //! Tests for `freeform::invites` paste-block parser.
+//!
+//! `test_kind`: unit
+
 use iron_control_api::freeform::invites;
 
 #[test]

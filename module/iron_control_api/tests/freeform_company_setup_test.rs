@@ -1,4 +1,7 @@
 //! Tests for `freeform::company_setup` CSV-line parser.
+//!
+//! `test_kind`: unit
+
 use iron_control_api::freeform::company_setup::{self, AccountType, ParseErrorKind};
 
 #[test]

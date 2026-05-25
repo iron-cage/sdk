@@ -1,4 +1,7 @@
 //! Tests for `freeform::providers` paste-block parser.
+//!
+//! `test_kind`: unit
+
 use iron_control_api::freeform::providers::{self, KnownProvider, LineErrorKind};
 
 #[test]

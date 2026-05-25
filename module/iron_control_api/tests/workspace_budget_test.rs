@@ -1,4 +1,6 @@
 //! Integration tests for POST /api/v1/workspace/budget endpoint.
+//!
+//! `test_kind`: integration
 
 #![allow(missing_docs)]
 

@@ -1,4 +1,6 @@
 //! Integration tests for POST /freeform/company and POST /freeform/providers handlers.
+//!
+//! `test_kind`: integration
 
 #![allow(missing_docs)]
 

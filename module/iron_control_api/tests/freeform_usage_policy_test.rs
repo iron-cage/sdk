@@ -1,4 +1,7 @@
 //! Tests for `freeform::usage_policy` paste-block parser.
+//!
+//! `test_kind`: unit
+
 use iron_control_api::freeform::usage_policy::{self, CapPeriod, ParseErrorKind, SpendingCap};
 
 #[test]
@@ -120,5 +123,8 @@ fn requestable_combines_with_other_directives() {
   let policy = usage_policy::parse(input).unwrap();
   assert!(policy.spending_cap.is_some());
   assert_eq!(policy.default_model.as_deref(), Some("gpt-4o"));
-  assert_eq!(policy.requestable_models, vec!["claude-4-6-sonnet".to_string()]);
+  assert_eq!(
+    policy.requestable_models,
+    vec!["claude-4-6-sonnet".to_string()]
+  );
 }
