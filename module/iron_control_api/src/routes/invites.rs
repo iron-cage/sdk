@@ -8,17 +8,20 @@
 //! - POST `/api/v1/invites/{token}/approve`    — approve pending member by token (Admin)
 //! - POST `/api/v1/invites/seats/{id}/approve` — approve pending member by seat id (Admin)
 
+use core::net::SocketAddr;
 use core::str::FromStr;
 use std::sync::Arc;
 
 use axum::{
-  extract::{Path, State},
-  http::StatusCode,
-  response::{IntoResponse, Json},
+  extract::{ConnectInfo, Path, Request, State},
+  http::{header, StatusCode},
+  middleware::Next,
+  response::{IntoResponse, Json, Response},
 };
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use rand::RngExt;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use sha2::{Digest, Sha256};
 use sqlx::{pool::PoolConnection, Sqlite, SqlitePool};
 
@@ -27,6 +30,7 @@ use uuid::Uuid;
 use crate::{
   error::{ApiError, ApiResult, JsonBody},
   jwt_auth::{AuthenticatedUser, JwtSecret},
+  rate_limiter::LoginRateLimiter,
   rbac::{Permission, PermissionChecker, Role},
 };
 
@@ -346,6 +350,43 @@ async fn claim_invite_seat(
   .map_err(|_| ApiError::Internal("Failed to update seat count".into()))?;
 
   Ok(())
+}
+
+/// Per-IP rate-limit guard for the public, bcrypt-heavy invite-accept endpoint.
+///
+/// `POST /invites/{token}/accept` is unauthenticated and runs `bcrypt::hash`
+/// (cost 12) on every call, so an unthrottled caller could exhaust CPU. This
+/// middleware applies the same per-IP sliding window used by the login endpoint
+/// and rejects bursts with `429 Too Many Requests` BEFORE the handler (and its
+/// bcrypt work) runs. The client IP comes from `ConnectInfo` (the TCP peer),
+/// never a spoofable `X-Forwarded-For` header.
+pub async fn invite_accept_rate_limit(
+  ConnectInfo(addr): ConnectInfo<SocketAddr>,
+  State(limiter): State<LoginRateLimiter>,
+  request: Request,
+  next: Next,
+) -> Response {
+  let client_ip = addr.ip();
+  if let Err(retry_after_secs) = limiter.check_and_record(client_ip) {
+    tracing::warn!(
+      client_ip = %client_ip,
+      retry_after_secs = retry_after_secs,
+      "Rate limit exceeded for invite accept"
+    );
+    return (
+      StatusCode::TOO_MANY_REQUESTS,
+      [(header::RETRY_AFTER, retry_after_secs.to_string())],
+      Json(json!({
+        "error": "RATE_LIMIT_EXCEEDED",
+        "message": format!(
+          "Too many invite attempts. Please try again in {retry_after_secs} seconds."
+        ),
+        "retry_after": retry_after_secs,
+      })),
+    )
+      .into_response();
+  }
+  next.run(request).await
 }
 
 /// `POST /api/v1/invites/{token}/accept`

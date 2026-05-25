@@ -56,6 +56,7 @@ use std::{env, fs, path::Path, sync::Arc};
 use axum::{
   extract::FromRef,
   http::{header, HeaderValue, Method},
+  middleware::from_fn_with_state,
   routing::{delete, get, patch, post, put},
   Router,
 };
@@ -68,6 +69,7 @@ use zeroize::Zeroizing;
 
 use iron_control_api::{
   ic_token::{IcTokenManager, IcTokenRateLimiter},
+  rate_limiter::LoginRateLimiter,
   rbac::PermissionChecker,
   routes::{
     self, analytics::AnalyticsState, auth::AuthState, budget::BudgetState, freeform::FreeformState,
@@ -696,6 +698,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     tracing::info!("   - {}", origin.to_str()?);
   }
 
+  // Per-IP rate limiter for the public, bcrypt-heavy invite-accept endpoint.
+  // Reuses the login sliding-window limiter (5 attempts / 5 min per IP) to cap
+  // CPU spent on bcrypt before the handler runs.
+  let invite_accept_limiter = LoginRateLimiter::new();
+
   // Build router with all endpoints
   let app = Router::new()
     // Health check (FR-2: Health endpoint at /api/health)
@@ -828,9 +835,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
       "/api/v1/invites/{token}",
       get(routes::invites::get_invite_preview),
     )
+    // Per-IP rate limit applies to this route only (layer on the MethodRouter),
+    // rejecting bursts with 429 before bcrypt runs in the handler.
     .route(
       "/api/v1/invites/{token}/accept",
-      post(routes::invites::post_invite_accept),
+      post(routes::invites::post_invite_accept).layer(from_fn_with_state(
+        invite_accept_limiter,
+        routes::invites::invite_accept_rate_limit,
+      )),
     )
     .route(
       "/api/v1/invites/{token}/approve",
