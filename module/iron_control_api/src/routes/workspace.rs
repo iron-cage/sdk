@@ -1,7 +1,7 @@
 //! Workspace management API endpoints
 //!
 //! Endpoints:
-//! - POST `/api/v1/workspace/budget` - upsert workspace spending policy (Admin)
+//! - POST `/api/v1/workspace/budget` - upsert workspace spending policy (requires `ManageIcTokens`: Admin or Manager)
 //! - GET  `/api/v1/me/workspace` - read the current user's workspace info
 
 use core::str::FromStr;
@@ -87,7 +87,7 @@ pub async fn post_workspace_budget(
   AuthenticatedUser(claims): AuthenticatedUser,
   JsonBody(body): JsonBody<BudgetRequest>,
 ) -> ApiResult<impl IntoResponse> {
-  check_permission(&claims.role, Permission::ManageUsers)?;
+  check_permission(&claims.role, Permission::ManageIcTokens)?;
 
   let (amount_cents, period_str, default_model) = if let Some(ref raw) = body.text {
     let policy = usage_policy::parse(raw).map_err(|errors| {
