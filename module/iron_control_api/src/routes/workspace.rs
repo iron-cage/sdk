@@ -42,6 +42,29 @@ fn period_to_str(period: &CapPeriod) -> &'static str {
   }
 }
 
+/// Joins a model list into the comma-separated form stored in `workspace_policy`.
+/// Returns `None` for an empty list so the upsert preserves the existing value.
+fn join_models(models: &[String]) -> Option<String> {
+  if models.is_empty() {
+    None
+  } else {
+    Some(models.join(","))
+  }
+}
+
+/// Splits the stored comma-separated `requestable_models` column into a list.
+fn split_models(stored: Option<&str>) -> Vec<String> {
+  stored
+    .map(|s| {
+      s.split(',')
+        .map(str::trim)
+        .filter(|m| !m.is_empty())
+        .map(str::to_string)
+        .collect()
+    })
+    .unwrap_or_default()
+}
+
 /// Request body for `POST /api/v1/workspace/budget`.
 ///
 /// Accepts either a raw freeform string or structured fields.
@@ -58,6 +81,9 @@ pub struct BudgetRequest {
   /// Optional default model for the workspace. When omitted, the existing
   /// value (if any) is preserved.
   pub default_model: Option<String>,
+  /// Optional gated models members may request (structured input). When omitted,
+  /// the existing value is preserved; `text` input uses the `requestable:` line.
+  pub requestable_models: Option<Vec<String>>,
 }
 
 /// Response from `POST /api/v1/workspace/budget`.
@@ -71,6 +97,8 @@ pub struct WorkspaceBudgetResponse {
   pub period: String,
   /// Effective default model after the upsert (may be `None` if never set).
   pub default_model: Option<String>,
+  /// Effective gated models members may request after the upsert.
+  pub requestable_models: Vec<String>,
 }
 
 /// POST /api/v1/workspace/budget
@@ -89,7 +117,8 @@ pub async fn post_workspace_budget(
 ) -> ApiResult<impl IntoResponse> {
   check_permission(&claims.role, Permission::ManageIcTokens)?;
 
-  let (amount_cents, period_str, default_model) = if let Some(ref raw) = body.text {
+  let (amount_cents, period_str, default_model, requestable_str) = if let Some(ref raw) = body.text
+  {
     let policy = usage_policy::parse(raw).map_err(|errors| {
       let msg = errors
         .iter()
@@ -105,7 +134,7 @@ pub async fn post_workspace_budget(
       )
     })?;
 
-    let cents: i64 = cap
+    let cents = cap
       .amount_cents
       .try_into()
       .map_err(|_| ApiError::BadRequest("Budget amount too large".into()))?;
@@ -114,6 +143,7 @@ pub async fn post_workspace_budget(
       cents,
       period_to_str(&cap.period).to_string(),
       policy.default_model,
+      join_models(&policy.requestable_models),
     )
   } else {
     let amount = body.amount_cents.ok_or_else(|| {
@@ -138,27 +168,34 @@ pub async fn post_workspace_budget(
       ));
     }
 
-    (amount, valid_period, body.default_model.clone())
+    (
+      amount,
+      valid_period,
+      body.default_model.clone(),
+      body.requestable_models.as_deref().and_then(join_models),
+    )
   };
 
-  // COALESCE on default_model preserves the existing value when this request
-  // does not specify one (e.g. admin edits only the budget amount).
-  let row: (i64, Option<String>) = sqlx::query_as(
+  // COALESCE preserves existing default_model / requestable_models when this
+  // request does not specify them (e.g. admin edits only the budget amount).
+  let row = sqlx::query_as::<_, (i64, Option<String>, Option<String>)>(
     r"
       INSERT INTO workspace_policy
-        (workspace_id, budget_amount_cents, budget_period, default_model, updated_at)
-      VALUES (1, ?, ?, ?, strftime('%s', 'now') * 1000)
+        (workspace_id, budget_amount_cents, budget_period, default_model, requestable_models, updated_at)
+      VALUES (1, ?, ?, ?, ?, strftime('%s', 'now') * 1000)
       ON CONFLICT(workspace_id) DO UPDATE SET
         budget_amount_cents = excluded.budget_amount_cents,
         budget_period       = excluded.budget_period,
         default_model       = COALESCE(excluded.default_model, workspace_policy.default_model),
+        requestable_models  = COALESCE(excluded.requestable_models, workspace_policy.requestable_models),
         updated_at          = excluded.updated_at
-      RETURNING workspace_id, default_model
+      RETURNING workspace_id, default_model, requestable_models
     ",
   )
   .bind(amount_cents)
   .bind(&period_str)
   .bind(&default_model)
+  .bind(&requestable_str)
   .fetch_one(&pool)
   .await
   .map_err(|_| ApiError::Internal("Failed to upsert workspace policy".into()))?;
@@ -170,6 +207,7 @@ pub async fn post_workspace_budget(
       amount_cents,
       period: period_str,
       default_model: row.1,
+      requestable_models: split_models(row.2.as_deref()),
     }),
   ))
 }
@@ -189,6 +227,8 @@ pub struct MeWorkspaceResponse {
   pub budget_amount_cents: Option<i64>,
   /// Workspace billing period (`day`, `week`, `month`), if configured.
   pub budget_period: Option<String>,
+  /// Gated models members may request access to, if configured.
+  pub requestable_models: Vec<String>,
 }
 
 /// DB row returned by the `/me/workspace` query.
@@ -200,6 +240,7 @@ struct MeWorkspaceRow {
   default_model: Option<String>,
   budget_amount_cents: Option<i64>,
   budget_period: Option<String>,
+  requestable_models: Option<String>,
 }
 
 /// `GET /api/v1/me/workspace`
@@ -214,12 +255,13 @@ pub async fn get_me_workspace(
   State(pool): State<SqlitePool>,
   AuthenticatedUser(_claims): AuthenticatedUser,
 ) -> ApiResult<impl IntoResponse> {
-  let row: Option<MeWorkspaceRow> = sqlx::query_as(
+  let row = sqlx::query_as::<_, MeWorkspaceRow>(
     r"
       SELECT w.id, w.name, w.domain,
              wp.default_model,
              wp.budget_amount_cents,
-             wp.budget_period
+             wp.budget_period,
+             wp.requestable_models
       FROM workspaces w
       LEFT JOIN workspace_policy wp ON wp.workspace_id = w.id
       WHERE w.id = 1
@@ -240,6 +282,7 @@ pub async fn get_me_workspace(
       default_model: row.default_model,
       budget_amount_cents: row.budget_amount_cents,
       budget_period: row.budget_period,
+      requestable_models: split_models(row.requestable_models.as_deref()),
     }),
   ))
 }

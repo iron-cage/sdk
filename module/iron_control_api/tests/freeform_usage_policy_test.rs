@@ -83,3 +83,42 @@ fn all_or_nothing_on_mixed_error() {
   let input = "limit all users $100/week\nbadline";
   assert!(usage_policy::parse(input).is_err());
 }
+
+#[test]
+fn parses_requestable_models() {
+  let input = "requestable: claude-4-6-sonnet, gemini-3.1-pro-preview";
+  let policy = usage_policy::parse(input).unwrap();
+  assert_eq!(
+    policy.requestable_models,
+    vec![
+      "claude-4-6-sonnet".to_string(),
+      "gemini-3.1-pro-preview".to_string()
+    ]
+  );
+}
+
+#[test]
+fn requestable_models_trims_and_skips_blanks() {
+  let input = "requestable:  gpt-4o , , claude-4-6-sonnet ,";
+  let policy = usage_policy::parse(input).unwrap();
+  assert_eq!(
+    policy.requestable_models,
+    vec!["gpt-4o".to_string(), "claude-4-6-sonnet".to_string()]
+  );
+}
+
+#[test]
+fn rejects_empty_requestable_list() {
+  let input = "requestable:";
+  let errs = usage_policy::parse(input).unwrap_err();
+  assert_eq!(errs[0].kind, ParseErrorKind::EmptyModelId);
+}
+
+#[test]
+fn requestable_combines_with_other_directives() {
+  let input = "limit all users $100/week\ndefault: gpt-4o\nrequestable: claude-4-6-sonnet";
+  let policy = usage_policy::parse(input).unwrap();
+  assert!(policy.spending_cap.is_some());
+  assert_eq!(policy.default_model.as_deref(), Some("gpt-4o"));
+  assert_eq!(policy.requestable_models, vec!["claude-4-6-sonnet".to_string()]);
+}

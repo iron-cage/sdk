@@ -39,6 +39,9 @@ pub struct ParsedPolicy {
   pub spending_cap: Option<SpendingCap>,
   /// Default model all members receive from `default: <model>`.
   pub default_model: Option<String>,
+  /// Models members may request gated access to, from `requestable: a, b, c`
+  /// Empty when the directive is absent.
+  pub requestable_models: Vec<String>,
 }
 
 /// A per-line parse error.
@@ -84,6 +87,7 @@ impl core::fmt::Display for ParseError {
 /// Supported directives (keywords are case-insensitive):
 /// - `limit all users $N/<period>` — workspace spending cap
 /// - `default: <model>` or `default model: <model>`
+/// - `requestable: <model>, <model>, ...` — comma-separated gated models
 ///
 /// # Errors
 ///
@@ -134,6 +138,22 @@ pub fn parse(input: &str) -> Result<ParsedPolicy, Vec<ParseError>> {
       } else {
         policy.default_model = Some(model);
       }
+    } else if lower.starts_with("requestable:") {
+      let models = trimmed["requestable:".len()..]
+        .split(',')
+        .map(str::trim)
+        .filter(|m| !m.is_empty())
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+      if models.is_empty() {
+        errors.push(ParseError {
+          line: line_no,
+          content: trimmed.to_string(),
+          kind: ParseErrorKind::EmptyModelId,
+        });
+      } else {
+        policy.requestable_models = models;
+      }
     } else {
       errors.push(ParseError {
         line: line_no,
@@ -158,9 +178,9 @@ fn parse_spend_cap(s: &str) -> Result<SpendingCap, ParseErrorKind> {
     .split_once('/')
     .ok_or(ParseErrorKind::InvalidSpendAmount)?;
 
-  let amount_dollars: f64 = amount_str
+  let amount_dollars = amount_str
     .trim()
-    .parse()
+    .parse::<f64>()
     .map_err(|_| ParseErrorKind::InvalidSpendAmount)?;
   let cents = (amount_dollars * 100.0).round();
   if !cents.is_finite() || cents < 0.0 || cents > u64::MAX as f64 {
