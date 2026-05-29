@@ -51,8 +51,18 @@ async function handleLogout() {
           class="lg:hidden text-gray-400 hover:text-white"
           @click="sidebarOpen = false"
         >
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          <svg
+            class="w-6 h-6"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"
+            />
           </svg>
         </button>
       </div>
@@ -191,6 +201,60 @@ async function handleLogout() {
           </svg>
           Users
         </router-link>
+
+        <!-- Workspace Setup (FreeForm onboarding follow-ups) -->
+        <div
+          v-if="authStore.isAdmin"
+          class="pt-4 mt-4 border-t border-gray-800"
+        >
+          <p
+            class="px-4 mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500"
+          >
+            Workspace Setup
+          </p>
+
+          <router-link
+            to="/setup/budget"
+            :class="navLinkClass('/setup/budget')"
+            @click="handleNavClick"
+          >
+            <svg
+              class="w-5 h-5 mr-3 flex-shrink-0"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M3 10h18M5 6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z"
+              />
+            </svg>
+            Budget
+          </router-link>
+
+          <router-link
+            to="/setup/users"
+            :class="navLinkClass('/setup/users')"
+            @click="handleNavClick"
+          >
+            <svg
+              class="w-5 h-5 mr-3 flex-shrink-0"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+              />
+            </svg>
+            Invite Members
+          </router-link>
+        </div>
       </nav>
     </div>
 
@@ -204,16 +268,26 @@ async function handleLogout() {
             class="lg:hidden p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
             @click="sidebarOpen = true"
           >
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+            <svg
+              class="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M4 6h16M4 12h16M4 18h16"
+              />
             </svg>
           </button>
 
           <div class="flex items-center space-x-2 sm:space-x-4 ml-auto">
             <span class="text-sm text-gray-700 hidden sm:inline">{{ authStore.username }}</span>
             <button
-              @click="handleLogout"
               class="px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 focus:outline-none"
+              @click="handleLogout"
             >
               Logout
             </button>

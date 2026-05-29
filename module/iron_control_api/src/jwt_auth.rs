@@ -259,7 +259,7 @@ pub struct AuthenticatedUser(pub AccessTokenClaims);
 impl<S> axum::extract::FromRequestParts<S> for AuthenticatedUser
 where
   S: Send + Sync,
-  crate::routes::auth::AuthState: axum::extract::FromRef<S>,
+  crate::routes::auth::AuthState: FromRef<S>,
 {
   type Rejection = (axum::http::StatusCode, axum::Json<serde_json::Value>);
 

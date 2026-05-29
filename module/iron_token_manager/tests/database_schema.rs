@@ -41,7 +41,7 @@
 //! - ✅ Index naming pattern (all `idx_*` for discoverability)
 //!
 //! **State Transitions:**
-//! - ✅ Empty database → Migrated database (5 tables, 51 indexes)
+//! - ✅ Empty database → Migrated database (23 application tables, 60 indexes)
 //! - ✅ Token with usage → Token deleted → Usage deleted (cascade)
 //! - ✅ User with tokens → User deleted → Tokens deleted (cascade)
 //!
@@ -64,7 +64,7 @@ async fn test_schema_creates_all_tables() {
   core::mem::forget(db);
 
   // Verify all 5 tables exist
-  let table_count: i64 = sqlx::query_scalar(
+  let table_count = sqlx::query_scalar::<_, i64>(
     "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN \
      ('api_tokens', 'token_usage', 'usage_limits', 'api_call_traces', 'audit_log')",
   )
@@ -102,7 +102,7 @@ async fn test_api_tokens_table_structure() {
   );
 
   // Verify token was inserted
-  let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM api_tokens")
+  let count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM api_tokens")
     .fetch_one(&pool)
     .await
     .expect("LOUD FAILURE: Failed to count tokens");
@@ -225,7 +225,7 @@ async fn test_cascade_delete_removes_usage_records() {
   .expect("LOUD FAILURE: Usage insert failed");
 
   // Verify usage record exists
-  let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM token_usage WHERE token_id = 1")
+  let count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM token_usage WHERE token_id = 1")
     .fetch_one(&pool)
     .await
     .expect("LOUD FAILURE: Count query failed");
@@ -241,7 +241,7 @@ async fn test_cascade_delete_removes_usage_records() {
     .expect("LOUD FAILURE: Token delete failed");
 
   // Verify usage record was cascade-deleted
-  let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM token_usage WHERE token_id = 1")
+  let count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM token_usage WHERE token_id = 1")
     .fetch_one(&pool)
     .await
     .expect("LOUD FAILURE: Count query failed");
@@ -378,7 +378,7 @@ async fn test_api_tokens_cascade_delete_on_user_deletion() {
     .expect("LOUD FAILURE: Token insert 2 failed");
 
   // Verify tokens exist
-  let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM api_tokens WHERE user_id = $1")
+  let count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM api_tokens WHERE user_id = $1")
     .bind("user_cascade")
     .fetch_one(&pool)
     .await
@@ -393,7 +393,7 @@ async fn test_api_tokens_cascade_delete_on_user_deletion() {
     .expect("LOUD FAILURE: User delete failed");
 
   // Verify tokens were cascade-deleted
-  let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM api_tokens WHERE user_id = $1")
+  let count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM api_tokens WHERE user_id = $1")
     .bind("user_cascade")
     .fetch_one(&pool)
     .await
@@ -411,7 +411,7 @@ async fn test_all_indexes_created() {
   core::mem::forget(db);
 
   // Count indexes (excluding sqlite internal indexes)
-  let index_count: i64 = sqlx::query_scalar(
+  let index_count = sqlx::query_scalar::<_, i64>(
     "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'",
   )
   .fetch_one(&pool)
@@ -436,9 +436,16 @@ async fn test_all_indexes_created() {
   // Migration 019: Rebuilds budget_leases, agent_budgets, usage_limits (now recreates idx_agent_budgets_updated)
   // Migration 020: 1 index (idx_agents_provider_key_id)
   // Migration 022: 1 index (idx_agents_ic_token_hash)
-  // Total: 15 + 2 + 5 + 4 + 4 + 2 + 3 + 1 + 2 + 8 + 1 + 0 + 1 + 1 + 0 + 1 + 1 = 51
+  // Subtotal through migration 022: 15 + 2 + 5 + 4 + 4 + 2 + 3 + 1 + 2 + 8 + 1 + 0 + 1 + 1 + 0 + 1 + 1 = 51
+  // Migrations 024-030: +3 (provider-key/spending/agent-token indexes) -> 54
+  // Migration 032: +2 (idx_invite_links_token_hash, idx_invite_links_workspace)
+  // Migration 033: +2 (idx_invite_seats_link, idx_invite_seats_user)
+  // Migration 035: rebuilds invite_seats - drops 033's 2, recreates 3 (link/user/email) -> net +1
+  // Migration 037: +1 (idx_magic_link_tokens_email)
+  // Migrations 031/036/038 add tables/columns only, no idx_ indexes
+  // Total: 54 + 2 + 2 + 1 + 1 = 60
   assert_eq!(
-    index_count, 54,
-    "Expected 54 indexes to be created across all migrations"
+    index_count, 60,
+    "Expected 60 indexes to be created across all migrations"
   );
 }

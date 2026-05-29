@@ -27,7 +27,7 @@ async function handleLogin() {
     })
     router.push('/dashboard')
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unexpected error"
+    error.value = err instanceof Error ? err.message : 'Unexpected error'
   } finally {
     loading.value = false
   }
@@ -39,13 +39,17 @@ async function handleLogin() {
     <Card class="w-full max-w-md">
       <CardHeader class="space-y-1">
         <CardTitle class="text-3xl text-center">Iron Cage Dashboard</CardTitle>
-        <CardDescription class="text-center">
-          Sign in to your account
-        </CardDescription>
+        <CardDescription class="text-center"> Sign in to your account </CardDescription>
       </CardHeader>
       <CardContent>
-        <form class="space-y-4" @submit.prevent="handleLogin">
-          <Alert v-if="error" variant="destructive">
+        <form
+          class="space-y-4"
+          @submit.prevent="handleLogin"
+        >
+          <Alert
+            v-if="error"
+            variant="destructive"
+          >
             <AlertDescription>{{ error }}</AlertDescription>
           </Alert>
 
@@ -71,7 +75,11 @@ async function handleLogin() {
             />
           </div>
 
-          <Button type="submit" :disabled="loading" class="w-full">
+          <Button
+            type="submit"
+            :disabled="loading"
+            class="w-full"
+          >
             {{ loading ? 'Signing in...' : 'Sign in' }}
           </Button>
         </form>

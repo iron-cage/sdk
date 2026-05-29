@@ -62,7 +62,7 @@ interface LimitRecord {
   project_id?: string
   max_tokens_per_day?: number
   max_requests_per_minute?: number
-  max_cost_per_month_microdollars?: number  // Backend uses microdollars (1 cent = 10,000 microdollars)
+  max_cost_per_month_microdollars?: number // Backend uses microdollars (1 cent = 10,000 microdollars)
   created_at: number
 }
 
@@ -71,13 +71,13 @@ interface CreateLimitRequest {
   project_id?: string
   max_tokens_per_day?: number
   max_requests_per_minute?: number
-  max_cost_per_month_microdollars?: number  // Backend uses microdollars
+  max_cost_per_month_microdollars?: number // Backend uses microdollars
 }
 
 interface UpdateLimitRequest {
   max_tokens_per_day?: number
   max_requests_per_minute?: number
-  max_cost_per_month_microdollars?: number  // Backend uses microdollars
+  max_cost_per_month_microdollars?: number // Backend uses microdollars
 }
 
 // AI Provider Key types
@@ -158,6 +158,10 @@ interface RejectBudgetRequestResponse {
   rejected_at: number
 }
 
+export interface ApiFetchError extends Error {
+  status?: number
+}
+
 export function useApi() {
   const authStore = useAuthStore()
 
@@ -180,7 +184,9 @@ export function useApi() {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Request failed' }))
-      throw new Error(error.error || `HTTP ${response.status}`)
+      const err = new Error(error.error || `HTTP ${response.status}`) as ApiFetchError
+      err.status = response.status
+      throw err
     }
 
     // Handle empty responses (204 No Content, or empty body)
@@ -246,7 +252,7 @@ export function useApi() {
       total_input_tokens: 0, // Backend doesnt track separately
       total_output_tokens: aggregate.total_tokens,
       total_cost: aggregate.total_cost_cents / 100, // Convert cents to dollars
-      by_provider: aggregate.providers.map(p => ({
+      by_provider: aggregate.providers.map((p) => ({
         provider: p.provider,
         requests: p.requests,
         cost: p.cost_cents / 100, // Convert cents to dollars
@@ -304,7 +310,10 @@ export function useApi() {
     })
   }
 
-  async function updateProviderKey(id: number, data: UpdateProviderKeyRequest): Promise<ProviderKey> {
+  async function updateProviderKey(
+    id: number,
+    data: UpdateProviderKeyRequest
+  ): Promise<ProviderKey> {
     return fetchApi<ProviderKey>(`/api/v1/providers/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -331,15 +340,23 @@ export function useApi() {
   }
 
   // User API methods
-  async function getUsers(params?: { role?: string; is_active?: boolean; search?: string; page?: number; page_size?: number }): Promise<{ users: User[]; total: number; page: number; page_size: number }> {
+  async function getUsers(params?: {
+    role?: string
+    is_active?: boolean
+    search?: string
+    page?: number
+    page_size?: number
+  }): Promise<{ users: User[]; total: number; page: number; page_size: number }> {
     const query = new URLSearchParams()
     if (params?.role) query.append('role', params.role)
     if (params?.is_active !== undefined) query.append('is_active', String(params.is_active))
     if (params?.search) query.append('search', params.search)
     if (params?.page) query.append('page', String(params.page))
     if (params?.page_size) query.append('page_size', String(params.page_size))
-    
-    return fetchApi<{ users: User[]; total: number; page: number; page_size: number }>(`/api/v1/users?${query.toString()}`)
+
+    return fetchApi<{ users: User[]; total: number; page: number; page_size: number }>(
+      `/api/v1/users?${query.toString()}`
+    )
   }
 
   async function createUser(data: CreateUserRequest): Promise<User> {
@@ -377,7 +394,11 @@ export function useApi() {
     })
   }
 
-  async function resetUserPassword(id: number, newPassword: string, forceChange: boolean): Promise<User> {
+  async function resetUserPassword(
+    id: number,
+    newPassword: string,
+    forceChange: boolean
+  ): Promise<User> {
     return fetchApi<User>(`/api/v1/users/${id}/reset-password`, {
       method: 'POST',
       body: JSON.stringify({ new_password: newPassword, force_change: forceChange }),
@@ -404,7 +425,7 @@ export function useApi() {
     providers: string[]
     provider_key_id: number
     initial_budget_microdollars: number
-    owner_id?: string  // Admins can assign to other users
+    owner_id?: string // Admins can assign to other users
   }): Promise<Agent> {
     return fetchApi<Agent>('/api/v1/agents', {
       method: 'POST',
@@ -417,7 +438,7 @@ export function useApi() {
     name?: string
     providers?: string[]
     provider_key_id?: number | null
-    owner_id?: string  // Admins can reassign to other users
+    owner_id?: string // Admins can reassign to other users
   }): Promise<Agent> {
     const { id, ...updateData } = data
     return fetchApi<Agent>(`/api/v1/agents/${id}`, {
@@ -426,7 +447,10 @@ export function useApi() {
     })
   }
 
-  async function updateAgentBudget(agentId: number, total_allocated_microdollars: number): Promise<AgentBudgetResponse> {
+  async function updateAgentBudget(
+    agentId: number,
+    total_allocated_microdollars: number
+  ): Promise<AgentBudgetResponse> {
     return fetchApi<AgentBudgetResponse>(`/api/v1/agents/${agentId}/budget`, {
       method: 'PUT',
       body: JSON.stringify({ total_allocated_microdollars }),
@@ -443,7 +467,12 @@ export function useApi() {
     return fetchApi<TokenMetadata[]>(`/api/v1/agents/${agentId}/tokens`)
   }
 
-  async function createAgentToken(data: { agent_id: number; user_id: string; provider: string; description?: string }): Promise<CreateTokenResponse> {
+  async function createAgentToken(data: {
+    agent_id: number
+    user_id: string
+    provider: string
+    description?: string
+  }): Promise<CreateTokenResponse> {
     // TODO: Update backend to accept agent_id and provider
     return fetchApi<CreateTokenResponse>('/api/v1/api-tokens', {
       method: 'POST',
@@ -554,10 +583,7 @@ export function useApi() {
     return fetchApi(`/api/v1/analytics/events/list${query ? `?${query}` : ''}`)
   }
 
-  async function getBudgetStatus(
-    page?: number,
-    per_page?: number
-  ): Promise<BudgetStatusResponse> {
+  async function getBudgetStatus(page?: number, per_page?: number): Promise<BudgetStatusResponse> {
     const params = new URLSearchParams()
     if (page) params.append('page', String(page))
     if (per_page) params.append('per_page', String(per_page))
@@ -599,29 +625,81 @@ export function useApi() {
     )
   }
 
-  async function approveBudgetRequest(
-    requestId: string
-  ): Promise<ApproveBudgetRequestResponse> {
-    return fetchApi<ApproveBudgetRequestResponse>(
-      `/api/v1/budget/requests/${requestId}/approve`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify({}),
-      }
-    )
+  async function approveBudgetRequest(requestId: string): Promise<ApproveBudgetRequestResponse> {
+    return fetchApi<ApproveBudgetRequestResponse>(`/api/v1/budget/requests/${requestId}/approve`, {
+      method: 'PATCH',
+      body: JSON.stringify({}),
+    })
   }
 
   async function rejectBudgetRequest(
     requestId: string,
     data: RejectBudgetRequestRequest
   ): Promise<RejectBudgetRequestResponse> {
-    return fetchApi<RejectBudgetRequestResponse>(
-      `/api/v1/budget/requests/${requestId}/reject`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify(data),
-      }
-    )
+    return fetchApi<RejectBudgetRequestResponse>(`/api/v1/budget/requests/${requestId}/reject`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    })
+  }
+
+  // Onboarding: FreeForm + workspace + invites
+  async function freeformCompany(text: string): Promise<WorkspaceFreeformResponse> {
+    return fetchApi<WorkspaceFreeformResponse>('/api/v1/freeform/company', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    })
+  }
+
+  async function freeformProviders(text: string): Promise<ApplyProvidersResponse> {
+    return fetchApi<ApplyProvidersResponse>('/api/v1/freeform/providers', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    })
+  }
+
+  async function setWorkspaceBudget(
+    body: SetWorkspaceBudgetRequest
+  ): Promise<WorkspaceBudgetResponse> {
+    return fetchApi<WorkspaceBudgetResponse>('/api/v1/workspace/budget', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })
+  }
+
+  async function generateInvite(body: GenerateInviteRequest): Promise<GenerateInviteResponse> {
+    return fetchApi<GenerateInviteResponse>('/api/v1/invites/generate', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })
+  }
+
+  async function getInvitePreview(token: string): Promise<InvitePreviewResponse> {
+    return fetchApi<InvitePreviewResponse>(`/api/v1/invites/${encodeURIComponent(token)}`)
+  }
+
+  async function acceptInvite(
+    token: string,
+    body: AcceptInviteRequest
+  ): Promise<AcceptInviteResponse> {
+    return fetchApi<AcceptInviteResponse>(`/api/v1/invites/${encodeURIComponent(token)}/accept`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })
+  }
+
+  async function listPendingInvites(): Promise<PendingInvitesResponse> {
+    return fetchApi<PendingInvitesResponse>('/api/v1/invites/pending')
+  }
+
+  async function approveInviteSeat(seatId: number): Promise<void> {
+    await fetchApi<void>(`/api/v1/invites/seats/${seatId}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    })
+  }
+
+  async function getMeWorkspace(): Promise<MeWorkspaceResponse> {
+    return fetchApi<MeWorkspaceResponse>('/api/v1/me/workspace')
   }
 
   return {
@@ -681,6 +759,16 @@ export function useApi() {
     listBudgetRequests,
     approveBudgetRequest,
     rejectBudgetRequest,
+    // Onboarding
+    freeformCompany,
+    freeformProviders,
+    setWorkspaceBudget,
+    generateInvite,
+    getInvitePreview,
+    acceptInvite,
+    listPendingInvites,
+    approveInviteSeat,
+    getMeWorkspace,
   }
 }
 
@@ -886,4 +974,86 @@ export interface EventsListResponse {
   pagination: { page: number; per_page: number; total: number; total_pages: number }
   period: string
   calculated_at: string
+}
+
+// Onboarding (FreeForm + workspace + invites)
+export interface WorkspaceFreeformResponse {
+  id: number
+  name: string
+  domain: string
+  account_type: string
+}
+
+export interface AppliedProvider {
+  provider: string
+  key_id: number
+}
+
+export interface ApplyProvidersResponse {
+  applied: AppliedProvider[]
+}
+
+export type BudgetPeriod = 'day' | 'week' | 'month'
+
+export interface SetWorkspaceBudgetRequest {
+  text?: string
+  amount_cents?: number
+  period?: BudgetPeriod
+}
+
+export interface WorkspaceBudgetResponse {
+  workspace_id: number
+  amount_cents: number
+  period: string
+}
+
+export interface GenerateInviteRequest {
+  seats: number
+  expires_in_hours?: number
+}
+
+export interface GenerateInviteResponse {
+  token: string
+  url: string
+  expires_at: number | null
+  seats_total: number
+}
+
+export interface InvitePreviewResponse {
+  workspace_name: string
+  domain: string
+  default_model: string | null
+  seats_remaining: number
+}
+
+export interface AcceptInviteRequest {
+  password: string
+}
+
+export interface AcceptInviteResponse {
+  user_id: string
+  access_token: string
+}
+
+export interface PendingInviteSeat {
+  seat_id: number
+  user_id: string
+  username: string
+  email: string
+  accepted_at: number | null
+  workspace_name: string
+  invite_link_id: string
+}
+
+export interface PendingInvitesResponse {
+  pending: PendingInviteSeat[]
+}
+
+export interface MeWorkspaceResponse {
+  workspace_id: number
+  workspace_name: string
+  domain: string
+  default_model: string | null
+  budget_amount_cents: number | null
+  budget_period: string | null
 }

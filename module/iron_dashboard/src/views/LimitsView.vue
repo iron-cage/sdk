@@ -37,11 +37,19 @@ const budgetUsd = ref<number | undefined>(undefined)
 const budgetError = ref('')
 
 // Fetch limits (hidden - global limits not integrated)
-const { data: _limits, isLoading: _isLoading, error: _error, refetch: _refetch } = useQuery({
+const {
+  data: _limits,
+  isLoading: _isLoading,
+  error: _error,
+  refetch: _refetch,
+} = useQuery({
   queryKey: ['limits'],
   queryFn: () => api.getLimits(),
 })
-void _limits; void _isLoading; void _error; void _refetch
+void _limits
+void _isLoading
+void _error
+void _refetch
 
 // Fetch agents (for owner lookup)
 const { data: agents } = useQuery({
@@ -50,42 +58,61 @@ const { data: agents } = useQuery({
 })
 
 // Fetch agent budget status
-const { data: budgetStatus, isLoading: isBudgetLoading, error: budgetQueryError, refetch: refetchBudget } = useQuery({
+const {
+  data: budgetStatus,
+  isLoading: isBudgetLoading,
+  error: budgetQueryError,
+  refetch: refetchBudget,
+} = useQuery({
   queryKey: ['budget-status'],
   queryFn: () => api.getBudgetStatus(),
 })
 
 // Create limit mutation
 const createMutation = useMutation({
-  mutationFn: ( data: { user_id: string; project_id?: string; max_tokens_per_day?: number; max_requests_per_minute?: number; max_cost_per_month_microdollars?: number } ) =>
-    api.createLimit( data ),
+  mutationFn: (data: {
+    user_id: string
+    project_id?: string
+    max_tokens_per_day?: number
+    max_requests_per_minute?: number
+    max_cost_per_month_microdollars?: number
+  }) => api.createLimit(data),
   onSuccess: () => {
     showCreateModal.value = false
     resetForm()
     queryClient.invalidateQueries({ queryKey: ['limits'] })
   },
-  onError: ( err ) => {
+  onError: (err) => {
     createError.value = err instanceof Error ? err.message : 'Failed to create limit'
   },
 })
 
 // Update limit mutation
 const updateMutation = useMutation({
-  mutationFn: ( data: { id: number; max_tokens_per_day?: number; max_requests_per_minute?: number; max_cost_per_month_microdollars?: number } ) =>
-    api.updateLimit( data.id, { max_tokens_per_day: data.max_tokens_per_day, max_requests_per_minute: data.max_requests_per_minute, max_cost_per_month_microdollars: data.max_cost_per_month_microdollars } ),
+  mutationFn: (data: {
+    id: number
+    max_tokens_per_day?: number
+    max_requests_per_minute?: number
+    max_cost_per_month_microdollars?: number
+  }) =>
+    api.updateLimit(data.id, {
+      max_tokens_per_day: data.max_tokens_per_day,
+      max_requests_per_minute: data.max_requests_per_minute,
+      max_cost_per_month_microdollars: data.max_cost_per_month_microdollars,
+    }),
   onSuccess: () => {
     showEditModal.value = false
     editingLimit.value = null
     queryClient.invalidateQueries({ queryKey: ['limits'] })
   },
-  onError: ( err ) => {
+  onError: (err) => {
     editError.value = err instanceof Error ? err.message : 'Failed to update limit'
   },
 })
 
 // Delete limit mutation
 const deleteMutation = useMutation({
-  mutationFn: ( id: number ) => api.deleteLimit( id ),
+  mutationFn: (id: number) => api.deleteLimit(id),
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: ['limits'] })
   },
@@ -102,13 +129,13 @@ function resetForm() {
 }
 
 // Convert cents to microdollars (1 cent = 10,000 microdollars)
-function centsToMicrodollars( cents: number | undefined ): number | undefined {
+function centsToMicrodollars(cents: number | undefined): number | undefined {
   return cents ? cents * 10000 : undefined
 }
 
 // Convert microdollars to cents (1 cent = 10,000 microdollars)
-function microdollarsToCents( microdollars: number | undefined ): number | undefined {
-  return microdollars ? Math.round( microdollars / 10000 ) : undefined
+function microdollarsToCents(microdollars: number | undefined): number | undefined {
+  return microdollars ? Math.round(microdollars / 10000) : undefined
 }
 
 function handleCreateLimit() {
@@ -117,7 +144,7 @@ function handleCreateLimit() {
   const userId = overrideUserId.value || authStore.username || 'default'
 
   // Validate at least one limit is set
-  if( !maxTokensPerDay.value && !maxRequestsPerMinute.value && !maxCostPerMonthCents.value ) {
+  if (!maxTokensPerDay.value && !maxRequestsPerMinute.value && !maxCostPerMonthCents.value) {
     createError.value = 'At least one limit must be specified'
     return
   }
@@ -129,27 +156,27 @@ function handleCreateLimit() {
     max_tokens_per_day: maxTokensPerDay.value || undefined,
     max_requests_per_minute: maxRequestsPerMinute.value || undefined,
     // Convert cents (UI) to microdollars (backend)
-    max_cost_per_month_microdollars: centsToMicrodollars( maxCostPerMonthCents.value ),
+    max_cost_per_month_microdollars: centsToMicrodollars(maxCostPerMonthCents.value),
   })
 }
 
-function _openEditModal( limit: LimitRecord ) {
+function _openEditModal(limit: LimitRecord) {
   editingLimit.value = limit
   maxTokensPerDay.value = limit.max_tokens_per_day
   maxRequestsPerMinute.value = limit.max_requests_per_minute
   // Convert microdollars (backend) to cents (UI)
-  maxCostPerMonthCents.value = microdollarsToCents( limit.max_cost_per_month_microdollars )
+  maxCostPerMonthCents.value = microdollarsToCents(limit.max_cost_per_month_microdollars)
   editError.value = ''
   showEditModal.value = true
 }
 void _openEditModal
 
 function handleUpdateLimit() {
-  if( !editingLimit.value ) return
+  if (!editingLimit.value) return
   editError.value = ''
 
   // Validate at least one limit is set
-  if( !maxTokensPerDay.value && !maxRequestsPerMinute.value && !maxCostPerMonthCents.value ) {
+  if (!maxTokensPerDay.value && !maxRequestsPerMinute.value && !maxCostPerMonthCents.value) {
     editError.value = 'At least one limit must be specified'
     return
   }
@@ -160,24 +187,24 @@ function handleUpdateLimit() {
     max_tokens_per_day: maxTokensPerDay.value || undefined,
     max_requests_per_minute: maxRequestsPerMinute.value || undefined,
     // Convert cents (UI) to microdollars (backend)
-    max_cost_per_month_microdollars: centsToMicrodollars( maxCostPerMonthCents.value ),
+    max_cost_per_month_microdollars: centsToMicrodollars(maxCostPerMonthCents.value),
   })
 }
 
-function _handleDeleteLimit( limit: LimitRecord ) {
-  if( confirm( `Delete limit ${limit.id}? This action cannot be undone.` ) ) {
-    deleteMutation.mutate( limit.id )
+function _handleDeleteLimit(limit: LimitRecord) {
+  if (confirm(`Delete limit ${limit.id}? This action cannot be undone.`)) {
+    deleteMutation.mutate(limit.id)
   }
 }
 void _handleDeleteLimit
 
-function _formatDate( timestamp: number ): string {
-  return new Date( timestamp ).toLocaleString()
+function _formatDate(timestamp: number): string {
+  return new Date(timestamp).toLocaleString()
 }
 void _formatDate
 
-function formatCost( cents: number ): string {
-  return `$${( cents / 100 ).toFixed( 2 )}`
+function formatCost(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`
 }
 
 function findOwnerByAgentId(agentId: number): string | null {
@@ -347,44 +374,69 @@ function handleUpdateBudget() {
           <p class="text-sm text-gray-500">Allocated, spent, and remaining budget per agent.</p>
         </div>
         <div class="space-x-2">
-          <Button variant="outline" size="sm" @click="refetchBudget">
+          <Button
+            variant="outline"
+            size="sm"
+            @click="refetchBudget"
+          >
             Refresh
           </Button>
         </div>
       </div>
 
-      <div v-if="isBudgetLoading" class="p-6 text-gray-600">
+      <div
+        v-if="isBudgetLoading"
+        class="p-6 text-gray-600"
+      >
         Loading agent budgets...
       </div>
-      <div v-else-if="budgetQueryError" class="p-6 text-red-600">
+      <div
+        v-else-if="budgetQueryError"
+        class="p-6 text-red-600"
+      >
         Error loading budgets: {{ budgetQueryError.message }}
       </div>
       <div v-else-if="budgetStatus?.data?.length">
         <table class="min-w-[600px] w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
             <tr>
-              <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th
+                class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+              >
                 Agent
               </th>
-              <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th
+                class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+              >
                 Allocated
               </th>
-              <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th
+                class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+              >
                 Spent
               </th>
-              <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th
+                class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+              >
                 Remaining
               </th>
-              <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th
+                class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+              >
                 Used
               </th>
-              <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th
+                class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+              >
                 Actions
               </th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-for="row in budgetStatus?.data" :key="row.agent_id">
+            <tr
+              v-for="row in budgetStatus?.data"
+              :key="row.agent_id"
+            >
               <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                 {{ row.agent_name }}
               </td>
@@ -414,7 +466,10 @@ function handleUpdateBudget() {
           </tbody>
         </table>
       </div>
-      <div v-else class="p-6 text-gray-600">
+      <div
+        v-else
+        class="p-6 text-gray-600"
+      >
         No agent budget data available.
       </div>
     </div>
@@ -429,7 +484,10 @@ function handleUpdateBudget() {
           </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="createError" variant="destructive">
+        <Alert
+          v-if="createError"
+          variant="destructive"
+        >
           <AlertDescription>{{ createError }}</AlertDescription>
         </Alert>
 
@@ -478,23 +536,29 @@ function handleUpdateBudget() {
               placeholder="e.g., 10000 for $100.00"
               :disabled="createMutation.isPending.value"
             />
-            <p v-if="maxCostPerMonthCents" class="text-sm text-gray-500">
-              = {{ formatCost( maxCostPerMonthCents ) }}/month
+            <p
+              v-if="maxCostPerMonthCents"
+              class="text-sm text-gray-500"
+            >
+              = {{ formatCost(maxCostPerMonthCents) }}/month
             </p>
           </div>
         </div>
 
         <DialogFooter>
           <Button
-            @click="showCreateModal = false; resetForm()"
             :disabled="createMutation.isPending.value"
             variant="outline"
+            @click="
+              showCreateModal = false
+              resetForm()
+            "
           >
             Cancel
           </Button>
           <Button
-            @click="handleCreateLimit"
             :disabled="createMutation.isPending.value"
+            @click="handleCreateLimit"
           >
             {{ createMutation.isPending.value ? 'Creating...' : 'Create Limit' }}
           </Button>
@@ -512,11 +576,17 @@ function handleUpdateBudget() {
           </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="editError" variant="destructive">
+        <Alert
+          v-if="editError"
+          variant="destructive"
+        >
           <AlertDescription>{{ editError }}</AlertDescription>
         </Alert>
 
-        <div v-if="editingLimit" class="space-y-4 py-4">
+        <div
+          v-if="editingLimit"
+          class="space-y-4 py-4"
+        >
           <div class="space-y-2">
             <Label for="editMaxTokensPerDay">Max Tokens per Day (optional)</Label>
             <Input
@@ -551,23 +621,29 @@ function handleUpdateBudget() {
               placeholder="e.g., 10000 for $100.00"
               :disabled="updateMutation.isPending.value"
             />
-            <p v-if="maxCostPerMonthCents" class="text-sm text-gray-500">
-              = {{ formatCost( maxCostPerMonthCents ) }}/month
+            <p
+              v-if="maxCostPerMonthCents"
+              class="text-sm text-gray-500"
+            >
+              = {{ formatCost(maxCostPerMonthCents) }}/month
             </p>
           </div>
         </div>
 
         <DialogFooter>
           <Button
-            @click="showEditModal = false; editingLimit = null"
             :disabled="updateMutation.isPending.value"
             variant="outline"
+            @click="
+              showEditModal = false
+              editingLimit = null
+            "
           >
             Cancel
           </Button>
           <Button
-            @click="handleUpdateLimit"
             :disabled="updateMutation.isPending.value"
+            @click="handleUpdateLimit"
           >
             {{ updateMutation.isPending.value ? 'Updating...' : 'Update Limit' }}
           </Button>
@@ -581,11 +657,15 @@ function handleUpdateBudget() {
         <DialogHeader>
           <DialogTitle>Update Agent Budget</DialogTitle>
           <DialogDescription>
-            Set the total allocated budget for {{ budgetAgentName }} (in USD). Remaining will be recalculated automatically.
+            Set the total allocated budget for {{ budgetAgentName }} (in USD). Remaining will be
+            recalculated automatically.
           </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="budgetError" variant="destructive">
+        <Alert
+          v-if="budgetError"
+          variant="destructive"
+        >
           <AlertDescription>{{ budgetError }}</AlertDescription>
         </Alert>
 
@@ -607,12 +687,13 @@ function handleUpdateBudget() {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" @click="showBudgetModal = false">
+          <Button
+            variant="outline"
+            @click="showBudgetModal = false"
+          >
             Cancel
           </Button>
-          <Button @click="handleUpdateBudget">
-            Update Budget
-          </Button>
+          <Button @click="handleUpdateBudget"> Update Budget </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

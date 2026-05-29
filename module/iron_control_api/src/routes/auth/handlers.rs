@@ -98,12 +98,13 @@ pub async fn login(
 
   // Check account lockout before attempting authentication
   // Protocol 007: "Account lockout after 10 failed attempts"
-  let lockout_check: Option<(i64, Option<i64>)> =
-    sqlx::query_as("SELECT failed_login_count, locked_until FROM users WHERE email = ?")
-      .bind(&request.email)
-      .fetch_optional(&state.db_pool)
-      .await
-      .unwrap_or(None);
+  let lockout_check = sqlx::query_as::<_, (i64, Option<i64>)>(
+    "SELECT failed_login_count, locked_until FROM users WHERE email = ?",
+  )
+  .bind(&request.email)
+  .fetch_optional(&state.db_pool)
+  .await
+  .unwrap_or(None);
 
   if let Some((failed_count, Some(locked_until_ts))) = lockout_check {
     let now = chrono::Utc::now().timestamp_millis();
@@ -142,7 +143,7 @@ pub async fn login(
         // Protocol 007: Account lockout after 10 failed attempts (15-30 min duration)
         let now = chrono::Utc::now().timestamp_millis();
 
-        let failed_count: Option<i64> = sqlx::query_scalar(
+        let failed_count = sqlx::query_scalar::<_, i64>(
           "UPDATE users SET
          failed_login_count = failed_login_count + 1,
          last_failed_login = ?

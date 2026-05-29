@@ -56,6 +56,7 @@ use std::{env, fs, path::Path, sync::Arc};
 use axum::{
   extract::FromRef,
   http::{header, HeaderValue, Method},
+  middleware::from_fn_with_state,
   routing::{delete, get, patch, post, put},
   Router,
 };
@@ -68,11 +69,12 @@ use zeroize::Zeroizing;
 
 use iron_control_api::{
   ic_token::{IcTokenManager, IcTokenRateLimiter},
+  rate_limiter::LoginRateLimiter,
   rbac::PermissionChecker,
   routes::{
-    self, analytics::AnalyticsState, auth::AuthState, budget::BudgetState, ic_token::IcTokenState,
-    keys::KeysState, limits::LimitsState, providers::ProvidersState, tokens::TokenState,
-    usage::UsageState, users::UserManagementState,
+    self, analytics::AnalyticsState, auth::AuthState, budget::BudgetState, freeform::FreeformState,
+    ic_token::IcTokenState, invites::InviteState, keys::KeysState, limits::LimitsState,
+    providers::ProvidersState, tokens::TokenState, usage::UsageState, users::UserManagementState,
   },
   token_auth::ApiTokenState,
 };
@@ -216,6 +218,8 @@ struct AppState {
   providers: ProvidersState,
   keys: KeysState,
   users: UserManagementState,
+  freeform: FreeformState,
+  invites: InviteState,
   agents: SqlitePool,
   budget: BudgetState,
   analytics: AnalyticsState,
@@ -275,6 +279,20 @@ impl FromRef<AppState> for KeysState {
 impl FromRef<AppState> for UserManagementState {
   fn from_ref(state: &AppState) -> Self {
     state.users.clone()
+  }
+}
+
+/// Enable freeform routes to access `FreeformState` from combined `AppState`
+impl FromRef<AppState> for FreeformState {
+  fn from_ref(state: &AppState) -> Self {
+    state.freeform.clone()
+  }
+}
+
+/// Enable invite routes to access `InviteState` from combined `AppState`
+impl FromRef<AppState> for InviteState {
+  fn from_ref(state: &AppState) -> Self {
+    state.invites.clone()
   }
 }
 
@@ -447,7 +465,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
       // agent_1 during handshake — a development convenience that must never
       // be active in production as it bypasses the key-assignment requirement
       // and could expose unguarded API key paths.
-      if env::var("IRON_ALLOW_DEV_KEYS").ok().filter(|v| v != "0" && v != "false" && !v.is_empty()).is_some() {
+      if env::var("IRON_ALLOW_DEV_KEYS")
+        .ok()
+        .filter(|v| v != "0" && v != "false" && !v.is_empty())
+        .is_some()
+      {
         tracing::error!(
           "[CRITICAL] CRITICAL: IRON_ALLOW_DEV_KEYS is set in a production environment"
         );
@@ -550,6 +572,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
   // Clone crypto_service for BudgetState (Feature 014: Agent Provider Key)
   let crypto_service_for_budget = crypto_service.clone();
+  // Clone crypto_service for FreeformState (provider key encryption during onboarding)
+  let crypto_service_for_freeform = crypto_service.clone();
 
   let keys_state = KeysState {
     token_storage: token_state.storage.clone(),
@@ -591,8 +615,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
     ic_token_manager: ic_token_manager.clone(),
   };
 
+  // Initialize FreeForm onboarding state
+  let freeform_state = FreeformState {
+    pool: agents_pool.clone(),
+    provider_storage: providers_state.storage.clone(),
+    crypto: Some(crypto_service_for_freeform),
+  };
+
+  // Initialize invite link state
+  let invite_state = InviteState {
+    pool: agents_pool.clone(),
+    jwt_secret: auth_state.jwt_secret.clone(),
+  };
+
   // Seed database with test data if empty (development convenience)
-  let user_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
+  let user_count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM users")
     .fetch_one(&agents_pool)
     .await
     .unwrap_or(0);
@@ -632,6 +669,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     providers: providers_state,
     keys: keys_state,
     users: user_management_state,
+    freeform: freeform_state,
+    invites: invite_state,
     agents: agents_pool,
     budget: budget_state,
     analytics: analytics_state,
@@ -644,7 +683,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
   let allowed_origins_str = env::var("ALLOWED_ORIGINS")
     .expect("ALLOWED_ORIGINS environment variable required (comma-separated URLs)");
 
-  let allowed_origins: Vec<HeaderValue> = allowed_origins_str
+  let allowed_origins = allowed_origins_str
     .split(',')
     .map(|origin| {
       origin
@@ -652,12 +691,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .parse::<HeaderValue>()
         .unwrap_or_else(|_| panic!("Invalid origin in ALLOWED_ORIGINS: {origin}"))
     })
-    .collect();
+    .collect::<Vec<_>>();
 
   tracing::info!("✅ Configured CORS for {} origins", allowed_origins.len());
   for origin in &allowed_origins {
     tracing::info!("   - {}", origin.to_str()?);
   }
+
+  // Per-IP rate limiter for the public, bcrypt-heavy invite-accept endpoint.
+  // Reuses the login sliding-window limiter (5 attempts / 5 min per IP) to cap
+  // CPU spent on bcrypt before the handler runs.
+  let invite_accept_limiter = LoginRateLimiter::new();
 
   // Build router with all endpoints
   let app = Router::new()
@@ -670,6 +714,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     .route("/api/v1/auth/refresh", post(routes::auth::refresh))
     .route("/api/v1/auth/logout", post(routes::auth::logout))
     .route("/api/v1/auth/validate", post(routes::auth::validate))
+    .route(
+      "/api/v1/auth/magic-link/send",
+      post(routes::auth::magic_link_send),
+    )
+    .route(
+      "/api/v1/auth/magic-link/verify",
+      post(routes::auth::magic_link_verify),
+    )
     // User management endpoints
     .route("/api/v1/users", post(routes::users::create_user))
     .route("/api/v1/users", get(routes::users::list_users))
@@ -755,6 +807,54 @@ async fn main() -> Result<(), Box<dyn Error>> {
     .route(
       "/api/v1/projects/{project_id}/provider",
       delete(routes::providers::unassign_provider_from_project),
+    )
+    // FreeForm onboarding endpoints (Admin)
+    .route(
+      "/api/v1/freeform/company",
+      post(routes::freeform::post_company),
+    )
+    .route(
+      "/api/v1/freeform/providers",
+      post(routes::freeform::post_providers),
+    )
+    // Workspace management endpoints (Admin)
+    .route(
+      "/api/v1/workspace/budget",
+      post(routes::workspace::post_workspace_budget),
+    )
+    .route(
+      "/api/v1/me/workspace",
+      get(routes::workspace::get_me_workspace),
+    )
+    // Invite link endpoints
+    .route(
+      "/api/v1/invites/generate",
+      post(routes::invites::post_invite_generate),
+    )
+    .route(
+      "/api/v1/invites/pending",
+      get(routes::invites::get_pending_invites),
+    )
+    .route(
+      "/api/v1/invites/seats/{seat_id}/approve",
+      post(routes::invites::post_invite_seat_approve),
+    )
+    .route(
+      "/api/v1/invites/{token}",
+      get(routes::invites::get_invite_preview),
+    )
+    // Per-IP rate limit applies to this route only (layer on the MethodRouter),
+    // rejecting bursts with 429 before bcrypt runs in the handler.
+    .route(
+      "/api/v1/invites/{token}/accept",
+      post(routes::invites::post_invite_accept).layer(from_fn_with_state(
+        invite_accept_limiter,
+        routes::invites::invite_accept_rate_limit,
+      )),
+    )
+    .route(
+      "/api/v1/invites/{token}/approve",
+      post(routes::invites::post_invite_approve),
     )
     // Key fetch endpoint (API token authentication)
     .route("/api/v1/keys", get(routes::keys::get_key))
@@ -888,7 +988,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
   let server_port_str = env::var("SERVER_PORT")
     .expect("SERVER_PORT environment variable required (port number 1-65535)");
 
-  let server_port: u16 = server_port_str
+  let server_port = server_port_str
     .parse::<u16>()
     .unwrap_or_else(|_| panic!("Invalid SERVER_PORT: {server_port_str} (must be 1-65535)"));
 

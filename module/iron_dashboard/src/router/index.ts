@@ -57,6 +57,42 @@ const router = createRouter({
       component: () => import('../views/BudgetRequestsView.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/setup/company',
+      name: 'setup-company',
+      component: () => import('../views/CompanySetupPage.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
+    {
+      path: '/setup/providers',
+      name: 'setup-providers',
+      component: () => import('../views/ProvidersPage.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
+    {
+      path: '/setup/budget',
+      name: 'setup-budget',
+      component: () => import('../views/BudgetPage.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
+    {
+      path: '/setup/users',
+      name: 'setup-users',
+      component: () => import('../views/UsersPage.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
+    {
+      path: '/join/:token',
+      name: 'invite-accept',
+      component: () => import('../views/InviteAcceptPage.vue'),
+      meta: { requiresAuth: false },
+    },
+    {
+      path: '/member',
+      name: 'member-dashboard',
+      component: () => import('../views/MemberDashboardPage.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 
@@ -67,6 +103,10 @@ router.beforeEach((to, _from, next) => {
 
   if (requiresAuth && !authStore.isAuthenticated) {
     next('/login')
+  } else if (to.meta.requiresAdmin && !authStore.isAdmin) {
+    // Admin-only routes (e.g. /setup/*): non-admins are redirected away.
+    // This is a UX guard; the server enforces RBAC independently.
+    next('/dashboard')
   } else if (to.path === '/login' && authStore.isAuthenticated) {
     next('/dashboard')
   } else {

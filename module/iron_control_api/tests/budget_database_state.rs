@@ -95,11 +95,7 @@ async fn create_test_budget_state(pool: SqlitePool) -> BudgetState {
 }
 
 /// Helper: Generate IC Token for test agent
-async fn create_ic_token(
-  pool: &sqlx::SqlitePool,
-  agent_id: i64,
-  manager: &IcTokenManager,
-) -> String {
+async fn create_ic_token(pool: &SqlitePool, agent_id: i64, manager: &IcTokenManager) -> String {
   let claims = IcTokenClaims::new(
     format!("agent_{agent_id}"),
     format!("budget_{agent_id}"),
@@ -175,8 +171,8 @@ async fn seed_agent_with_budget(pool: &SqlitePool, agent_id: i64, budget_microdo
   // Create real encrypted provider key for testing
   let test_provider_key = format!("sk-test_key_for_agent_{agent_id}");
   let provider_key_master: [u8; 32] = [42u8; 32]; // Test master key (must match create_test_budget_state)
-  let crypto_service = iron_secrets::crypto::CryptoService::new(&provider_key_master)
-    .expect("LOUD FAILURE: Should create crypto service");
+  let crypto_service =
+    CryptoService::new(&provider_key_master).expect("LOUD FAILURE: Should create crypto service");
   let encrypted = crypto_service
     .encrypt(&test_provider_key)
     .expect("LOUD FAILURE: Should encrypt provider key");

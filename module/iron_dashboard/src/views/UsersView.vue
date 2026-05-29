@@ -23,7 +23,6 @@ import {
 } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
-
 const api = useApi()
 const queryClient = useQueryClient()
 
@@ -63,15 +62,21 @@ const roleError = ref('')
 const passwordError = ref('')
 
 // Fetch users
-const { data: usersData, isLoading, error, refetch } = useQuery({
+const {
+  data: usersData,
+  isLoading,
+  error,
+  refetch,
+} = useQuery({
   queryKey: ['users', page, pageSize, search, roleFilter, isActiveFilter],
-  queryFn: () => api.getUsers({
-    page: page.value,
-    page_size: pageSize.value,
-    search: search.value || undefined,
-    role: roleFilter.value === 'all' ? undefined : roleFilter.value,
-    is_active: isActiveFilter.value
-  }),
+  queryFn: () =>
+    api.getUsers({
+      page: page.value,
+      page_size: pageSize.value,
+      search: search.value || undefined,
+      role: roleFilter.value === 'all' ? undefined : roleFilter.value,
+      is_active: isActiveFilter.value,
+    }),
 })
 
 // Create user mutation
@@ -192,7 +197,7 @@ function confirmChangeRole() {
 
 // Reset password mutation
 const resetPasswordMutation = useMutation({
-  mutationFn: ({ id, password, force }: { id: number; password: string; force: boolean }) => 
+  mutationFn: ({ id, password, force }: { id: number; password: string; force: boolean }) =>
     api.resetUserPassword(id, password, force),
   onSuccess: () => {
     showResetPasswordModal.value = false
@@ -215,10 +220,10 @@ function handleResetPassword(user: User) {
 
 function confirmResetPassword() {
   if (userToResetPassword.value) {
-    resetPasswordMutation.mutate({ 
-      id: userToResetPassword.value.id, 
-      password: newPassword.value, 
-      force: forcePasswordChange.value 
+    resetPasswordMutation.mutate({
+      id: userToResetPassword.value.id,
+      password: newPassword.value,
+      force: forcePasswordChange.value,
     })
   }
 }
@@ -233,7 +238,10 @@ watch(search, () => {
   <div>
     <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
       <h1 class="text-xl sm:text-2xl font-bold text-gray-900">User Management</h1>
-      <Button @click="showCreateModal = true" class="w-full sm:w-auto">
+      <Button
+        class="w-full sm:w-auto"
+        @click="showCreateModal = true"
+      >
         Create New User
       </Button>
     </div>
@@ -242,9 +250,13 @@ watch(search, () => {
     <div class="bg-white rounded-lg shadow p-4 mb-6 flex flex-wrap gap-4 items-end">
       <div class="w-full md:w-64">
         <Label for="search">Search</Label>
-        <Input id="search" v-model="search" placeholder="Search by username or email..." />
+        <Input
+          id="search"
+          v-model="search"
+          placeholder="Search by username or email..."
+        />
       </div>
-      
+
       <div class="w-full md:w-40">
         <Label for="role-filter">Role</Label>
         <Select v-model="roleFilter">
@@ -262,42 +274,68 @@ watch(search, () => {
     </div>
 
     <!-- Loading state -->
-    <div v-if="isLoading" class="bg-white rounded-lg shadow p-6">
+    <div
+      v-if="isLoading"
+      class="bg-white rounded-lg shadow p-6"
+    >
       <p class="text-gray-600">Loading users...</p>
     </div>
 
     <!-- Error state -->
-    <div v-else-if="error" class="bg-white rounded-lg shadow p-6">
+    <div
+      v-else-if="error"
+      class="bg-white rounded-lg shadow p-6"
+    >
       <p class="text-red-600">Error loading users: {{ error.message }}</p>
-      <Button @click="() => refetch()" variant="secondary" class="mt-4">
+      <Button
+        variant="secondary"
+        class="mt-4"
+        @click="() => refetch()"
+      >
         Retry
       </Button>
     </div>
 
     <!-- Users table -->
-    <div v-else-if="usersData && usersData.users.length > 0" class="bg-white rounded-lg shadow overflow-x-auto touch-pan-x">
+    <div
+      v-else-if="usersData && usersData.users.length > 0"
+      class="bg-white rounded-lg shadow overflow-x-auto touch-pan-x"
+    >
       <table class="min-w-[700px] w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
           <tr>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th
+              class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
               User
             </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th
+              class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
               Role
             </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th
+              class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
               Status
             </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th
+              class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
               Created
             </th>
-            <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th
+              class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
               Actions
             </th>
           </tr>
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
-          <tr v-for="user in usersData.users" :key="user.id">
+          <tr
+            v-for="user in usersData.users"
+            :key="user.id"
+          >
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
               <div class="flex flex-col">
                 <span class="text-sm font-medium text-gray-900">{{ user.username }}</span>
@@ -320,8 +358,8 @@ watch(search, () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  @click="handleChangeRole(user)"
                   :disabled="user.username === 'admin'"
+                  @click="handleChangeRole(user)"
                 >
                   Role
                 </Button>
@@ -335,9 +373,13 @@ watch(search, () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  :class="user.is_active ? 'text-orange-600 hover:text-orange-900' : 'text-green-600 hover:text-green-900'"
-                  @click="handleToggleStatus(user)"
+                  :class="
+                    user.is_active
+                      ? 'text-orange-600 hover:text-orange-900'
+                      : 'text-green-600 hover:text-green-900'
+                  "
                   :disabled="user.username === 'admin'"
+                  @click="handleToggleStatus(user)"
                 >
                   {{ user.is_active ? 'Suspend' : 'Activate' }}
                 </Button>
@@ -345,8 +387,8 @@ watch(search, () => {
                   variant="ghost"
                   size="sm"
                   class="text-red-600 hover:text-red-900"
-                  @click="handleDeleteUser(user)"
                   :disabled="user.username === 'admin'"
+                  @click="handleDeleteUser(user)"
                 >
                   Delete
                 </Button>
@@ -355,34 +397,49 @@ watch(search, () => {
           </tr>
         </tbody>
       </table>
-      
+
       <!-- Pagination -->
-      <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+      <div
+        class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6"
+      >
         <div class="flex-1 flex justify-between sm:hidden">
-          <Button :disabled="page === 1" @click="page--">Previous</Button>
-          <Button :disabled="page * pageSize >= usersData.total" @click="page++">Next</Button>
+          <Button
+            :disabled="page === 1"
+            @click="page--"
+            >Previous</Button
+          >
+          <Button
+            :disabled="page * pageSize >= usersData.total"
+            @click="page++"
+            >Next</Button
+          >
         </div>
         <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
           <div>
             <p class="text-sm text-gray-700">
-              Showing <span class="font-medium">{{ (page - 1) * pageSize + 1 }}</span> to <span class="font-medium">{{ Math.min(page * pageSize, usersData.total) }}</span> of <span class="font-medium">{{ usersData.total }}</span> results
+              Showing <span class="font-medium">{{ (page - 1) * pageSize + 1 }}</span> to
+              <span class="font-medium">{{ Math.min(page * pageSize, usersData.total) }}</span> of
+              <span class="font-medium">{{ usersData.total }}</span> results
             </p>
           </div>
           <div>
-            <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-              <Button 
-                variant="outline" 
-                :disabled="page === 1" 
-                @click="page--"
+            <nav
+              class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
+              aria-label="Pagination"
+            >
+              <Button
+                variant="outline"
+                :disabled="page === 1"
                 class="rounded-l-md"
+                @click="page--"
               >
                 Previous
               </Button>
-              <Button 
-                variant="outline" 
-                :disabled="page * pageSize >= usersData.total" 
-                @click="page++"
+              <Button
+                variant="outline"
+                :disabled="page * pageSize >= usersData.total"
                 class="rounded-r-md"
+                @click="page++"
               >
                 Next
               </Button>
@@ -393,11 +450,12 @@ watch(search, () => {
     </div>
 
     <!-- Empty state -->
-    <div v-else class="bg-white rounded-lg shadow p-6 text-center">
+    <div
+      v-else
+      class="bg-white rounded-lg shadow p-6 text-center"
+    >
       <p class="text-gray-600 mb-4">No users found</p>
-      <Button @click="showCreateModal = true">
-        Create First User
-      </Button>
+      <Button @click="showCreateModal = true"> Create First User </Button>
     </div>
 
     <!-- Create user modal -->
@@ -405,12 +463,14 @@ watch(search, () => {
       <DialogContent class="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Create New User</DialogTitle>
-          <DialogDescription>
-            Create a new user account.
-          </DialogDescription>
+          <DialogDescription> Create a new user account. </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="createError" variant="destructive" class="mb-4">
+        <Alert
+          v-if="createError"
+          variant="destructive"
+          class="mb-4"
+        >
           <AlertDescription>{{ createError }}</AlertDescription>
         </Alert>
 
@@ -429,8 +489,8 @@ watch(search, () => {
             <Label for="email">Email</Label>
             <Input
               id="email"
-              type="email"
               v-model="email"
+              type="email"
               placeholder="user@example.com"
               :disabled="createMutation.isPending.value"
             />
@@ -440,8 +500,8 @@ watch(search, () => {
             <Label for="password">Password</Label>
             <Input
               id="password"
-              type="password"
               v-model="password"
+              type="password"
               placeholder="password"
               :disabled="createMutation.isPending.value"
             />
@@ -464,15 +524,15 @@ watch(search, () => {
 
         <DialogFooter>
           <Button
-            @click="showCreateModal = false"
             :disabled="createMutation.isPending.value"
             variant="outline"
+            @click="showCreateModal = false"
           >
             Cancel
           </Button>
           <Button
-            @click="handleCreateUser"
             :disabled="createMutation.isPending.value"
+            @click="handleCreateUser"
           >
             {{ createMutation.isPending.value ? 'Creating...' : 'Create User' }}
           </Button>
@@ -486,11 +546,16 @@ watch(search, () => {
         <DialogHeader>
           <DialogTitle>Suspend User</DialogTitle>
           <DialogDescription>
-            Are you sure you want to suspend user <strong>{{ userToDisable?.username }}</strong>?
+            Are you sure you want to suspend user <strong>{{ userToDisable?.username }}</strong
+            >?
           </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="updateError" variant="destructive" class="mb-4">
+        <Alert
+          v-if="updateError"
+          variant="destructive"
+          class="mb-4"
+        >
           <AlertDescription>{{ updateError }}</AlertDescription>
         </Alert>
 
@@ -506,16 +571,16 @@ watch(search, () => {
 
         <DialogFooter>
           <Button
-            @click="showDisableConfirm = false"
             :disabled="suspendMutation.isPending.value"
             variant="outline"
+            @click="showDisableConfirm = false"
           >
             Cancel
           </Button>
           <Button
-            @click="confirmDisable"
             :disabled="suspendMutation.isPending.value"
             variant="destructive"
+            @click="confirmDisable"
           >
             {{ suspendMutation.isPending.value ? 'Suspending...' : 'Suspend User' }}
           </Button>
@@ -529,27 +594,31 @@ watch(search, () => {
         <DialogHeader>
           <DialogTitle>Delete User</DialogTitle>
           <DialogDescription>
-            Are you sure you want to delete user <strong>{{ userToDelete?.username }}</strong>?
-            This action cannot be undone.
+            Are you sure you want to delete user <strong>{{ userToDelete?.username }}</strong
+            >? This action cannot be undone.
           </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="deleteError" variant="destructive" class="mb-4">
+        <Alert
+          v-if="deleteError"
+          variant="destructive"
+          class="mb-4"
+        >
           <AlertDescription>{{ deleteError }}</AlertDescription>
         </Alert>
 
         <DialogFooter>
           <Button
-            @click="showDeleteConfirm = false"
             :disabled="deleteMutation.isPending.value"
             variant="outline"
+            @click="showDeleteConfirm = false"
           >
             Cancel
           </Button>
           <Button
-            @click="confirmDelete"
             :disabled="deleteMutation.isPending.value"
             variant="destructive"
+            @click="confirmDelete"
           >
             {{ deleteMutation.isPending.value ? 'Deleting...' : 'Delete User' }}
           </Button>
@@ -563,11 +632,16 @@ watch(search, () => {
         <DialogHeader>
           <DialogTitle>Change User Role</DialogTitle>
           <DialogDescription>
-            Change role for user <strong>{{ userToChangeRole?.username }}</strong>.
+            Change role for user <strong>{{ userToChangeRole?.username }}</strong
+            >.
           </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="roleError" variant="destructive" class="mb-4">
+        <Alert
+          v-if="roleError"
+          variant="destructive"
+          class="mb-4"
+        >
           <AlertDescription>{{ roleError }}</AlertDescription>
         </Alert>
 
@@ -587,15 +661,15 @@ watch(search, () => {
 
         <DialogFooter>
           <Button
-            @click="showChangeRoleModal = false"
             :disabled="changeRoleMutation.isPending.value"
             variant="outline"
+            @click="showChangeRoleModal = false"
           >
             Cancel
           </Button>
           <Button
-            @click="confirmChangeRole"
             :disabled="changeRoleMutation.isPending.value"
+            @click="confirmChangeRole"
           >
             {{ changeRoleMutation.isPending.value ? 'Saving...' : 'Save Changes' }}
           </Button>
@@ -609,11 +683,16 @@ watch(search, () => {
         <DialogHeader>
           <DialogTitle>Reset Password</DialogTitle>
           <DialogDescription>
-            Reset password for user <strong>{{ userToResetPassword?.username }}</strong>.
+            Reset password for user <strong>{{ userToResetPassword?.username }}</strong
+            >.
           </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="passwordError" variant="destructive" class="mb-4">
+        <Alert
+          v-if="passwordError"
+          variant="destructive"
+          class="mb-4"
+        >
           <AlertDescription>{{ passwordError }}</AlertDescription>
         </Alert>
 
@@ -622,20 +701,20 @@ watch(search, () => {
             <Label for="new-password">New Password</Label>
             <Input
               id="new-password"
-              type="password"
               v-model="newPassword"
+              type="password"
               placeholder="New secure password"
               :disabled="resetPasswordMutation.isPending.value"
             />
           </div>
-          
+
           <div class="flex items-center space-x-2">
-            <input 
-              id="force-change" 
-              type="checkbox" 
+            <input
+              id="force-change"
+              type="checkbox"
               class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-              :checked="forcePasswordChange" 
-              @change="forcePasswordChange = ($event.target as HTMLInputElement).checked" 
+              :checked="forcePasswordChange"
+              @change="forcePasswordChange = ($event.target as HTMLInputElement).checked"
             />
             <Label for="force-change">Force password change on next login</Label>
           </div>
@@ -643,15 +722,15 @@ watch(search, () => {
 
         <DialogFooter>
           <Button
-            @click="showResetPasswordModal = false"
             :disabled="resetPasswordMutation.isPending.value"
             variant="outline"
+            @click="showResetPasswordModal = false"
           >
             Cancel
           </Button>
           <Button
-            @click="confirmResetPassword"
             :disabled="resetPasswordMutation.isPending.value"
+            @click="confirmResetPassword"
           >
             {{ resetPasswordMutation.isPending.value ? 'Resetting...' : 'Reset Password' }}
           </Button>

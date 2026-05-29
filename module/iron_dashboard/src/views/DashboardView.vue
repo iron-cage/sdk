@@ -1,9 +1,15 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
+import { Sparkles } from 'lucide-vue-next'
 import { useApi } from '../composables/useApi'
+import { useAuthStore } from '@/stores/auth'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import AutoSetupWizard from '@/components/freeform/AutoSetupWizard.vue'
 
 const api = useApi()
+const authStore = useAuthStore()
 
 // Fetch spending analytics
 const { data: spending, isLoading: spendingLoading } = useQuery({
@@ -25,6 +31,8 @@ const { data: agents, isLoading: agentsLoading } = useQuery({
 
 const isLoading = spendingLoading || requestsLoading || agentsLoading
 
+const wizardOpen = ref(false)
+
 function formatCurrency(usd: number): string {
   return `$${usd.toFixed(3)}`
 }
@@ -32,10 +40,24 @@ function formatCurrency(usd: number): string {
 
 <template>
   <div>
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">Dashboard</h1>
+    <AutoSetupWizard v-model:open="wizardOpen" />
+
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
+      <Button
+        v-if="authStore.isAdmin"
+        @click="wizardOpen = true"
+      >
+        <Sparkles class="size-4" />
+        Setup Wizard
+      </Button>
+    </div>
 
     <!-- Loading state -->
-    <div v-if="isLoading" class="bg-white rounded-lg shadow p-6">
+    <div
+      v-if="isLoading"
+      class="bg-white rounded-lg shadow p-6"
+    >
       <p class="text-gray-600">Loading dashboard...</p>
     </div>
 
@@ -92,11 +114,24 @@ function formatCurrency(usd: number): string {
             </div>
           </CardHeader>
           <CardContent>
-            <div class="text-3xl font-bold" :class="requestUsage && requestUsage.success_rate >= 95 ? 'text-green-600' : requestUsage && requestUsage.success_rate >= 80 ? 'text-yellow-600' : 'text-red-600'">
+            <div
+              class="text-3xl font-bold"
+              :class="
+                requestUsage && requestUsage.success_rate >= 95
+                  ? 'text-green-600'
+                  : requestUsage && requestUsage.success_rate >= 80
+                    ? 'text-yellow-600'
+                    : 'text-red-600'
+              "
+            >
               {{ requestUsage ? requestUsage.success_rate.toFixed(1) : '0' }}%
             </div>
             <p class="text-xs text-gray-500 mt-1">
-              {{ requestUsage ? `${requestUsage.successful_requests} / ${requestUsage.total_requests} requests` : 'No requests' }}
+              {{
+                requestUsage
+                  ? `${requestUsage.successful_requests} / ${requestUsage.total_requests} requests`
+                  : 'No requests'
+              }}
             </p>
           </CardContent>
         </Card>

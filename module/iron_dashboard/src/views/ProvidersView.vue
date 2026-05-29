@@ -42,7 +42,12 @@ const createError = ref('')
 const editError = ref('')
 
 // Fetch provider keys
-const { data: providerKeys, isLoading, error, refetch } = useQuery({
+const {
+  data: providerKeys,
+  isLoading,
+  error,
+  refetch,
+} = useQuery({
   queryKey: ['providerKeys'],
   queryFn: () => api.getProviderKeys(),
 })
@@ -51,8 +56,12 @@ const { data: providerKeys, isLoading, error, refetch } = useQuery({
 
 // Create provider key mutation
 const createMutation = useMutation({
-  mutationFn: (data: { provider: ProviderType; api_key: string; base_url?: string; description?: string }) =>
-    api.createProviderKey(data),
+  mutationFn: (data: {
+    provider: ProviderType
+    api_key: string
+    base_url?: string
+    description?: string
+  }) => api.createProviderKey(data),
   onSuccess: () => {
     showCreateModal.value = false
     resetForm()
@@ -65,8 +74,17 @@ const createMutation = useMutation({
 
 // Update provider key mutation
 const updateMutation = useMutation({
-  mutationFn: (data: { id: number; base_url?: string; description?: string; is_enabled?: boolean }) =>
-    api.updateProviderKey(data.id, { base_url: data.base_url, description: data.description, is_enabled: data.is_enabled }),
+  mutationFn: (data: {
+    id: number
+    base_url?: string
+    description?: string
+    is_enabled?: boolean
+  }) =>
+    api.updateProviderKey(data.id, {
+      base_url: data.base_url,
+      description: data.description,
+      is_enabled: data.is_enabled,
+    }),
   onSuccess: () => {
     showEditModal.value = false
     editingKey.value = null
@@ -93,8 +111,6 @@ const toggleMutation = useMutation({
     queryClient.invalidateQueries({ queryKey: ['providerKeys'] })
   },
 })
-
-
 
 function resetForm() {
   provider.value = 'openai'
@@ -153,8 +169,6 @@ function handleToggleEnabled(key: ProviderKey) {
   toggleMutation.mutate({ id: key.id, is_enabled: !key.is_enabled })
 }
 
-
-
 function formatDate(timestamp: number): string {
   return new Date(timestamp).toLocaleString()
 }
@@ -172,51 +186,82 @@ function getProviderBadgeClass(providerType: ProviderType): string {
   <div>
     <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
       <h1 class="text-xl sm:text-2xl font-bold text-gray-900">AI Provider Keys</h1>
-      <Button @click="showCreateModal = true" class="w-full sm:w-auto">
+      <Button
+        class="w-full sm:w-auto"
+        @click="showCreateModal = true"
+      >
         Add Provider Key
       </Button>
     </div>
 
     <!-- Loading state -->
-    <div v-if="isLoading" class="bg-white rounded-lg shadow p-6">
+    <div
+      v-if="isLoading"
+      class="bg-white rounded-lg shadow p-6"
+    >
       <p class="text-gray-600">Loading provider keys...</p>
     </div>
 
     <!-- Error state -->
-    <div v-else-if="error" class="bg-white rounded-lg shadow p-6">
+    <div
+      v-else-if="error"
+      class="bg-white rounded-lg shadow p-6"
+    >
       <p class="text-red-600">Error loading provider keys: {{ (error as Error).message }}</p>
-      <Button @click="() => refetch()" variant="secondary" class="mt-4">
+      <Button
+        variant="secondary"
+        class="mt-4"
+        @click="() => refetch()"
+      >
         Retry
       </Button>
     </div>
 
     <!-- Provider keys table -->
-    <div v-else-if="providerKeys && providerKeys.length > 0" class="bg-white rounded-lg shadow overflow-x-auto touch-pan-x">
+    <div
+      v-else-if="providerKeys && providerKeys.length > 0"
+      class="bg-white rounded-lg shadow overflow-x-auto touch-pan-x"
+    >
       <table class="min-w-[700px] w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
           <tr>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th
+              class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
               Provider
             </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th
+              class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
               Description
             </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th
+              class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
               API Key
             </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th
+              class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
               Status
             </th>
-            <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th
+              class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
               Created
             </th>
-            <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th
+              class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
               Actions
             </th>
           </tr>
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
-          <tr v-for="key in providerKeys" :key="key.id">
+          <tr
+            v-for="key in providerKeys"
+            :key="key.id"
+          >
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
               <Badge :class="getProviderBadgeClass(key.provider)">
                 {{ getProviderLabel(key.provider) }}
@@ -230,11 +275,11 @@ function getProviderBadgeClass(providerType: ProviderType): string {
             </td>
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
               <Button
-                @click="handleToggleEnabled(key)"
                 :disabled="toggleMutation.isPending.value"
                 :variant="key.is_enabled ? 'default' : 'outline'"
                 size="sm"
                 :class="key.is_enabled ? 'bg-green-600 hover:bg-green-700' : ''"
+                @click="handleToggleEnabled(key)"
               >
                 {{ key.is_enabled ? 'Enabled' : 'Disabled' }}
               </Button>
@@ -242,21 +287,23 @@ function getProviderBadgeClass(providerType: ProviderType): string {
             <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
               {{ formatDate(key.created_at) }}
             </td>
-            <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+            <td
+              class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2"
+            >
               <Button
-                @click="openEditModal(key)"
                 :disabled="updateMutation.isPending.value"
                 variant="ghost"
                 size="sm"
+                @click="openEditModal(key)"
               >
                 Edit
               </Button>
               <Button
-                @click="handleDeleteKey(key)"
                 :disabled="deleteMutation.isPending.value"
                 variant="ghost"
                 size="sm"
                 class="text-destructive hover:text-destructive"
+                @click="handleDeleteKey(key)"
               >
                 Delete
               </Button>
@@ -267,12 +314,15 @@ function getProviderBadgeClass(providerType: ProviderType): string {
     </div>
 
     <!-- Empty state -->
-    <div v-else class="bg-white rounded-lg shadow p-6 text-center">
+    <div
+      v-else
+      class="bg-white rounded-lg shadow p-6 text-center"
+    >
       <p class="text-gray-600 mb-4">No AI provider keys configured</p>
-      <p class="text-sm text-gray-500 mb-4">Add your OpenAI or Anthropic API keys to start using AI services.</p>
-      <Button @click="showCreateModal = true">
-        Add First Provider Key
-      </Button>
+      <p class="text-sm text-gray-500 mb-4">
+        Add your OpenAI or Anthropic API keys to start using AI services.
+      </p>
+      <Button @click="showCreateModal = true"> Add First Provider Key </Button>
     </div>
 
     <!-- Create provider key modal -->
@@ -285,14 +335,20 @@ function getProviderBadgeClass(providerType: ProviderType): string {
           </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="createError" variant="destructive">
+        <Alert
+          v-if="createError"
+          variant="destructive"
+        >
           <AlertDescription>{{ createError }}</AlertDescription>
         </Alert>
 
         <div class="space-y-4 py-4">
           <div class="space-y-2">
             <Label for="provider">Provider</Label>
-            <Select v-model="provider" :disabled="createMutation.isPending.value">
+            <Select
+              v-model="provider"
+              :disabled="createMutation.isPending.value"
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Select provider" />
               </SelectTrigger>
@@ -343,15 +399,18 @@ function getProviderBadgeClass(providerType: ProviderType): string {
 
         <DialogFooter>
           <Button
-            @click="showCreateModal = false; resetForm()"
             :disabled="createMutation.isPending.value"
             variant="outline"
+            @click="
+              showCreateModal = false
+              resetForm()
+            "
           >
             Cancel
           </Button>
           <Button
-            @click="handleCreateKey"
             :disabled="createMutation.isPending.value"
+            @click="handleCreateKey"
           >
             {{ createMutation.isPending.value ? 'Adding...' : 'Add Key' }}
           </Button>
@@ -365,15 +424,22 @@ function getProviderBadgeClass(providerType: ProviderType): string {
         <DialogHeader>
           <DialogTitle>Edit Provider Key</DialogTitle>
           <DialogDescription>
-            Update the description or base URL. The API key cannot be changed - delete and create a new key instead.
+            Update the description or base URL. The API key cannot be changed - delete and create a
+            new key instead.
           </DialogDescription>
         </DialogHeader>
 
-        <Alert v-if="editError" variant="destructive">
+        <Alert
+          v-if="editError"
+          variant="destructive"
+        >
           <AlertDescription>{{ editError }}</AlertDescription>
         </Alert>
 
-        <div v-if="editingKey" class="space-y-4 py-4">
+        <div
+          v-if="editingKey"
+          class="space-y-4 py-4"
+        >
           <div class="space-y-2">
             <Label>Provider</Label>
             <p class="text-sm text-gray-900">{{ getProviderLabel(editingKey.provider) }}</p>
@@ -402,8 +468,8 @@ function getProviderBadgeClass(providerType: ProviderType): string {
           <div class="flex items-center space-x-2">
             <input
               id="editEnabled"
-              type="checkbox"
               v-model="isEnabled"
+              type="checkbox"
               :disabled="updateMutation.isPending.value"
               class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
             />
@@ -413,15 +479,18 @@ function getProviderBadgeClass(providerType: ProviderType): string {
 
         <DialogFooter>
           <Button
-            @click="showEditModal = false; editingKey = null"
             :disabled="updateMutation.isPending.value"
             variant="outline"
+            @click="
+              showEditModal = false
+              editingKey = null
+            "
           >
             Cancel
           </Button>
           <Button
-            @click="handleUpdateKey"
             :disabled="updateMutation.isPending.value"
+            @click="handleUpdateKey"
           >
             {{ updateMutation.isPending.value ? 'Updating...' : 'Update Key' }}
           </Button>

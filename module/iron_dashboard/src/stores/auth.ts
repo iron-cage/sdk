@@ -12,7 +12,7 @@ interface AuthTokens {
   token_type: string
   expires_in: number
   user: {
-    id: string  // User ID like 'user_admin' - used for FK relations
+    id: string // User ID like 'user_admin' - used for FK relations
     email: string
     role: string
     name: string
@@ -36,7 +36,7 @@ export const useAuthStore = defineStore('auth', () => {
     const storedUsername = localStorage.getItem('username')
     const storedRole = localStorage.getItem('role')
 
-    if (storedAccessToken && storedRefreshToken) {
+    if (storedAccessToken) {
       accessToken.value = storedAccessToken
       refreshToken.value = storedRefreshToken
       username.value = storedUsername
@@ -81,9 +81,9 @@ export const useAuthStore = defineStore('auth', () => {
     })
 
     if (!response.ok) {
-      let msg: string;
+      let msg: string
       try {
-        const error = await response.json();
+        const error = await response.json()
         msg = error.error.message
       } catch (error) {
         msg = 'Log  in failed'
@@ -92,7 +92,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     const tokens: AuthTokens = await response.json()
-    saveTokens(tokens, tokens.user.id)  // Use user.id for FK relations, not email
+    saveTokens(tokens, tokens.user.id) // Use user.id for FK relations, not email
   }
 
   // Refresh access token
@@ -115,7 +115,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     const tokens: AuthTokens = await response.json()
-    saveTokens(tokens, tokens.user.id)  // Use user.id from response
+    saveTokens(tokens, tokens.user.id) // Use user.id from response
   }
 
   // Logout
@@ -137,6 +137,19 @@ export const useAuthStore = defineStore('auth', () => {
     clearTokens()
   }
 
+  // Save a member session (invite-accept flow has no refresh token).
+  function setMemberSession(accessTokenValue: string, userId: string, userRole: string) {
+    accessToken.value = accessTokenValue
+    refreshToken.value = null
+    username.value = userId
+    role.value = userRole
+
+    localStorage.setItem('access_token', accessTokenValue)
+    localStorage.removeItem('refresh_token')
+    localStorage.setItem('username', userId)
+    localStorage.setItem('role', userRole)
+  }
+
   // Get authorization header
   function getAuthHeader() {
     return accessToken.value ? `Bearer ${accessToken.value}` : null
@@ -156,5 +169,6 @@ export const useAuthStore = defineStore('auth', () => {
     refresh,
     logout,
     getAuthHeader,
+    setMemberSession,
   }
 })
