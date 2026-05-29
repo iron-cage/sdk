@@ -629,7 +629,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
   };
 
   // Seed database with test data if empty (development convenience)
-  let user_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
+  let user_count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM users")
     .fetch_one(&agents_pool)
     .await
     .unwrap_or(0);
@@ -683,7 +683,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
   let allowed_origins_str = env::var("ALLOWED_ORIGINS")
     .expect("ALLOWED_ORIGINS environment variable required (comma-separated URLs)");
 
-  let allowed_origins: Vec<HeaderValue> = allowed_origins_str
+  let allowed_origins = allowed_origins_str
     .split(',')
     .map(|origin| {
       origin
@@ -691,7 +691,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .parse::<HeaderValue>()
         .unwrap_or_else(|_| panic!("Invalid origin in ALLOWED_ORIGINS: {origin}"))
     })
-    .collect();
+    .collect::<Vec<_>>();
 
   tracing::info!("✅ Configured CORS for {} origins", allowed_origins.len());
   for origin in &allowed_origins {
@@ -714,6 +714,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     .route("/api/v1/auth/refresh", post(routes::auth::refresh))
     .route("/api/v1/auth/logout", post(routes::auth::logout))
     .route("/api/v1/auth/validate", post(routes::auth::validate))
+    .route(
+      "/api/v1/auth/magic-link/send",
+      post(routes::auth::magic_link_send),
+    )
+    .route(
+      "/api/v1/auth/magic-link/verify",
+      post(routes::auth::magic_link_verify),
+    )
     // User management endpoints
     .route("/api/v1/users", post(routes::users::create_user))
     .route("/api/v1/users", get(routes::users::list_users))
@@ -980,7 +988,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
   let server_port_str = env::var("SERVER_PORT")
     .expect("SERVER_PORT environment variable required (port number 1-65535)");
 
-  let server_port: u16 = server_port_str
+  let server_port = server_port_str
     .parse::<u16>()
     .unwrap_or_else(|_| panic!("Invalid SERVER_PORT: {server_port_str} (must be 1-65535)"));
 

@@ -10,6 +10,7 @@
 //!
 //! - `shared`: Authentication state, request/response types
 //! - `handlers`: Authentication handlers (4 endpoints)
+//! - `magic_link`: Magic-link sign-in handlers (Task 029 Slide 1)
 //!
 //! # Endpoints
 //!
@@ -17,6 +18,8 @@
 //! - POST /api/v1/auth/logout - User logout (invalidate User Token)
 //! - POST /api/v1/auth/refresh - User Token refresh (extend expiration)
 //! - POST /api/v1/auth/validate - User Token validation (check if valid)
+//! - POST /api/v1/auth/magic-link/send - issue a one-time magic link (Task 029 Slide 1)
+//! - POST /api/v1/auth/magic-link/verify - redeem a magic link, return a session
 //!
 //! # Token Types
 //!
@@ -32,6 +35,7 @@
 //! - Account lockout after 10 failed attempts
 
 mod handlers;
+mod magic_link;
 mod shared;
 
 // Re-export shared types and state
@@ -42,3 +46,4 @@ pub use shared::{
 
 // Re-export all handler functions
 pub use handlers::{login, logout, refresh, validate};
+pub use magic_link::{magic_link_send, magic_link_verify};
