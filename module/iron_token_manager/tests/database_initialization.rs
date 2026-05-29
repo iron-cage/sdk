@@ -12,7 +12,7 @@
 //! | `test_production_schema_matches_test_schema` | Schema consistency | Compare production vs test | Identical table/index structure | ✅ |
 //! | `test_seed_data_is_idempotent` | Multiple seed runs | Run seed script 3x | Same data, no duplicates | ✅ |
 //! | `test_temp_databases_cleanup` | Resource cleanup | Create test DB, drop handle | Database file deleted | ✅ |
-//! | `test_all_migrations_have_guards` | Migration safety | Check migrations 002-023 | All have guard tables | ✅ |
+//! | `test_all_migrations_have_guards` | Migration safety | Check migrations 001-036 | All have guard tables | ✅ |
 //! | `test_foreign_keys_enabled` | Schema enforcement | Create test DB | PRAGMA `foreign_keys` = ON | ✅ |
 //! | `test_seed_data_token_hashes_valid` | Token hash validation | Run seed script | Token hashes match SHA-256 | ✅ |
 //!
@@ -47,7 +47,7 @@
 mod common;
 
 use common::create_test_db;
-use sqlx::{query_scalar, SqlitePool};
+use sqlx::SqlitePool;
 
 #[tokio::test]
 async fn test_migrations_are_idempotent() {
@@ -71,7 +71,7 @@ async fn test_migrations_are_idempotent() {
 
   // Verify table count unchanged (no duplicates)
   // Exclude migration guard tables (_migration_*) and sqlite_sequence
-  let table_count: i64 = query_scalar(
+  let table_count = sqlx::query_scalar::<_, i64>(
     "SELECT COUNT(*) FROM sqlite_master
      WHERE type='table'
      AND substr(name, 1, 1) != '_'
@@ -82,8 +82,8 @@ async fn test_migrations_are_idempotent() {
   .expect("LOUD FAILURE: Failed to count tables");
 
   assert_eq!(
-    table_count, 18,
-    "Should have exactly 18 application tables after multiple runs"
+    table_count, 22,
+    "Should have exactly 22 application tables after multiple runs"
   );
 }
 
@@ -108,14 +108,14 @@ async fn test_isolated_test_databases() {
     .expect("LOUD FAILURE: Insert into DB1 failed");
 
   // Verify first database has data
-  let count1: i64 = query_scalar("SELECT COUNT(*) FROM api_tokens")
+  let count1 = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM api_tokens")
     .fetch_one(&pool1)
     .await
     .expect("LOUD FAILURE: Count query failed");
   assert_eq!(count1, 1, "DB1 should have 1 token");
 
   // Verify second database is still empty (isolation)
-  let count2: i64 = query_scalar("SELECT COUNT(*) FROM api_tokens")
+  let count2 = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM api_tokens")
     .fetch_one(&pool2)
     .await
     .expect("LOUD FAILURE: Count query failed");
@@ -129,7 +129,7 @@ async fn test_production_schema_matches_test_schema() {
   core::mem::forget(db);
 
   // Get all application table names (exclude migration guards and sqlite internals)
-  let tables: Vec<String> = sqlx::query_scalar(
+  let tables = sqlx::query_scalar::<_, String>(
     "SELECT name FROM sqlite_master
      WHERE type='table'
      AND substr(name, 1, 1) != '_'
@@ -153,6 +153,8 @@ async fn test_production_schema_matches_test_schema() {
     "budget_change_requests",
     "budget_leases",
     "budget_modification_history",
+    "invite_links",
+    "invite_seats",
     "project_provider_key_assignments",
     "system_config",
     "token_blacklist",
@@ -160,6 +162,8 @@ async fn test_production_schema_matches_test_schema() {
     "usage_limits",
     "user_audit_log",
     "users",
+    "workspace_policy",
+    "workspaces",
   ];
 
   assert_eq!(
@@ -168,15 +172,16 @@ async fn test_production_schema_matches_test_schema() {
   );
 
   // Verify index count
-  let index_count: i64 =
-    query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'")
-      .fetch_one(&pool)
-      .await
-      .expect("LOUD FAILURE: Failed to count indexes");
+  let index_count = sqlx::query_scalar::<_, i64>(
+    "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'",
+  )
+  .fetch_one(&pool)
+  .await
+  .expect("LOUD FAILURE: Failed to count indexes");
 
   assert_eq!(
-    index_count, 54,
-    "Should have 54 indexes across all migrations"
+    index_count, 59,
+    "Should have 59 indexes across all migrations"
   );
 }
 
@@ -199,10 +204,11 @@ async fn test_temp_databases_cleanup() {
       .expect("LOUD FAILURE: Failed to apply migrations");
 
     // Verify database is functional while in scope
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE type='table'")
-      .fetch_one(db.pool())
-      .await
-      .expect("LOUD FAILURE: Database should be functional");
+    let count =
+      sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM sqlite_master WHERE type='table'")
+        .fetch_one(db.pool())
+        .await
+        .expect("LOUD FAILURE: Database should be functional");
 
     assert!(count > 0, "Database should have tables");
 
@@ -219,18 +225,19 @@ async fn test_all_migrations_have_guards() {
   let pool = db.pool().clone();
   core::mem::forget(db);
 
-  // Verify guard tables exist for all migrations (001-030)
-  let guard_tables: Vec<String> = (1..=30)
+  // Verify guard tables exist for all migrations (001-036)
+  let guard_tables = (1..=36)
     .map(|n| format!("_migration_{n:03}_completed"))
-    .collect();
+    .collect::<Vec<_>>();
 
   for guard_table in guard_tables {
-    let exists: i64 =
-      query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = $1")
-        .bind(&guard_table)
-        .fetch_one(&pool)
-        .await
-        .expect("LOUD FAILURE: Failed to check guard table");
+    let exists = sqlx::query_scalar::<_, i64>(
+      "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = $1",
+    )
+    .bind(&guard_table)
+    .fetch_one(&pool)
+    .await
+    .expect("LOUD FAILURE: Failed to check guard table");
 
     assert_eq!(exists, 1, "Guard table {guard_table} should exist");
   }
@@ -243,7 +250,7 @@ async fn test_foreign_keys_enabled() {
   core::mem::forget(db);
 
   // Check that foreign keys are enabled
-  let foreign_keys_on: i64 = query_scalar("PRAGMA foreign_keys")
+  let foreign_keys_on = sqlx::query_scalar::<_, i64>("PRAGMA foreign_keys")
     .fetch_one(&pool)
     .await
     .expect("LOUD FAILURE: Failed to check foreign keys");
@@ -282,23 +289,25 @@ async fn test_seed_data_creates_expected_records() {
     .expect("LOUD FAILURE: Failed to connect to seeded database");
 
   // Verify 3 users created
-  let user_count: i64 =
-    query_scalar("SELECT COUNT(*) FROM users WHERE username IN ('admin', 'demo', 'viewer')")
-      .fetch_one(&pool)
-      .await
-      .expect("LOUD FAILURE: Failed to count users");
+  let user_count = sqlx::query_scalar::<_, i64>(
+    "SELECT COUNT(*) FROM users WHERE username IN ('admin', 'demo', 'viewer')",
+  )
+  .fetch_one(&pool)
+  .await
+  .expect("LOUD FAILURE: Failed to count users");
   assert_eq!(user_count, 3, "Should have 3 test users");
 
   // Verify 3 tokens created
-  let token_count: i64 =
-    query_scalar("SELECT COUNT(*) FROM api_tokens WHERE name LIKE '%Development Token%'")
-      .fetch_one(&pool)
-      .await
-      .expect("LOUD FAILURE: Failed to count tokens");
+  let token_count = sqlx::query_scalar::<_, i64>(
+    "SELECT COUNT(*) FROM api_tokens WHERE name LIKE '%Development Token%'",
+  )
+  .fetch_one(&pool)
+  .await
+  .expect("LOUD FAILURE: Failed to count tokens");
   assert_eq!(token_count, 3, "Should have 3 test tokens");
 
   // Verify usage data created
-  let usage_count: i64 = query_scalar("SELECT COUNT(*) FROM token_usage")
+  let usage_count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM token_usage")
     .fetch_one(&pool)
     .await
     .expect("LOUD FAILURE: Failed to count usage");
@@ -336,7 +345,7 @@ async fn test_seed_data_is_idempotent() {
     .await
     .expect("LOUD FAILURE: Failed to connect");
 
-  let user_count: i64 = query_scalar("SELECT COUNT(*) FROM users")
+  let user_count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM users")
     .fetch_one(&pool)
     .await
     .expect("LOUD FAILURE: Failed to count users");
@@ -371,19 +380,19 @@ async fn test_wipe_and_seed_integration_with_config() {
   // Verify seed data exists
   let pool = storage.pool();
 
-  let user_count: i64 = query_scalar("SELECT COUNT(*) FROM users")
+  let user_count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM users")
     .fetch_one(pool)
     .await
     .expect("LOUD FAILURE: Failed to count users");
   assert_eq!(user_count, 5, "Should have 5 users after first init");
 
-  let token_count: i64 = query_scalar("SELECT COUNT(*) FROM api_tokens")
+  let token_count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM api_tokens")
     .fetch_one(pool)
     .await
     .expect("LOUD FAILURE: Failed to count tokens");
   assert_eq!(token_count, 8, "Should have 8 tokens after first init");
 
-  let provider_count: i64 = query_scalar("SELECT COUNT(*) FROM ai_provider_keys")
+  let provider_count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM ai_provider_keys")
     .fetch_one(pool)
     .await
     .expect("LOUD FAILURE: Failed to count providers");
@@ -396,13 +405,13 @@ async fn test_wipe_and_seed_integration_with_config() {
   sqlx::query(
     "INSERT INTO users (id, username, password_hash, email, role, is_active, created_at) \
      VALUES ('user_manual', 'manual_user', 'hash', 'manual@example.com', 'manager', 1, 0)",
-  // 'manager' is the post-migration-025 name for the former 'user' role
+    // 'manager' is the post-migration-025 name for the former 'user' role
   )
   .execute(pool)
   .await
   .expect("LOUD FAILURE: Failed to insert manual user");
 
-  let user_count: i64 = query_scalar("SELECT COUNT(*) FROM users")
+  let user_count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM users")
     .fetch_one(pool)
     .await
     .expect("LOUD FAILURE: Failed to count users");
@@ -418,7 +427,7 @@ async fn test_wipe_and_seed_integration_with_config() {
     .expect("LOUD FAILURE: Wipe should succeed");
 
   // Verify wipe removed all data including manual insert
-  let user_count: i64 = query_scalar("SELECT COUNT(*) FROM users")
+  let user_count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM users")
     .fetch_one(pool)
     .await
     .expect("LOUD FAILURE: Failed to count users after wipe");
@@ -430,7 +439,7 @@ async fn test_wipe_and_seed_integration_with_config() {
     .expect("LOUD FAILURE: Seed should succeed");
 
   // Verify seed data restored (manual insert gone)
-  let user_count: i64 = query_scalar("SELECT COUNT(*) FROM users")
+  let user_count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM users")
     .fetch_one(pool)
     .await
     .expect("LOUD FAILURE: Failed to count users after re-seed");
@@ -439,29 +448,30 @@ async fn test_wipe_and_seed_integration_with_config() {
     "Should have 5 users after re-seed (manual insert removed)"
   );
 
-  let token_count: i64 = query_scalar("SELECT COUNT(*) FROM api_tokens")
+  let token_count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM api_tokens")
     .fetch_one(pool)
     .await
     .expect("LOUD FAILURE: Failed to count tokens after re-seed");
   assert_eq!(token_count, 8, "Should have 8 tokens after re-seed");
 
   // Verify specific seed data exists
-  let admin_exists: i64 =
-    query_scalar("SELECT COUNT(*) FROM users WHERE username = 'admin' AND role = 'admin'")
-      .fetch_one(pool)
-      .await
-      .expect("LOUD FAILURE: Failed to check admin");
+  let admin_exists = sqlx::query_scalar::<_, i64>(
+    "SELECT COUNT(*) FROM users WHERE username = 'admin' AND role = 'admin'",
+  )
+  .fetch_one(pool)
+  .await
+  .expect("LOUD FAILURE: Failed to check admin");
   assert_eq!(admin_exists, 1, "Admin user should exist with correct role");
 
-  let manual_user_exists: i64 =
-    query_scalar("SELECT COUNT(*) FROM users WHERE username = 'manual_user'")
+  let manual_user_exists =
+    sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM users WHERE username = 'manual_user'")
       .fetch_one(pool)
       .await
       .expect("LOUD FAILURE: Failed to check manual user");
   assert_eq!(manual_user_exists, 0, "Manual user should be wiped");
 
-  let openai_key_exists: i64 =
-    query_scalar("SELECT COUNT(*) FROM ai_provider_keys WHERE provider = 'openai'")
+  let openai_key_exists =
+    sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM ai_provider_keys WHERE provider = 'openai'")
       .fetch_one(pool)
       .await
       .expect("LOUD FAILURE: Failed to check OpenAI key");
@@ -503,7 +513,7 @@ async fn test_wipe_and_seed_disabled_preserves_data() {
   .await
   .expect("LOUD FAILURE: Failed to insert user");
 
-  let user_count: i64 = query_scalar("SELECT COUNT(*) FROM users")
+  let user_count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM users")
     .fetch_one(pool)
     .await
     .expect("LOUD FAILURE: Failed to count users");
@@ -524,7 +534,7 @@ async fn test_wipe_and_seed_disabled_preserves_data() {
   let pool2 = storage2.pool();
 
   // Verify data persisted
-  let user_count: i64 = query_scalar("SELECT COUNT(*) FROM users")
+  let user_count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM users")
     .fetch_one(pool2)
     .await
     .expect("LOUD FAILURE: Failed to count users");
@@ -533,8 +543,8 @@ async fn test_wipe_and_seed_disabled_preserves_data() {
     "User should persist when wipe_and_seed is false"
   );
 
-  let persistent_exists: i64 =
-    query_scalar("SELECT COUNT(*) FROM users WHERE username = 'persistent_user'")
+  let persistent_exists =
+    sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM users WHERE username = 'persistent_user'")
       .fetch_one(pool2)
       .await
       .expect("LOUD FAILURE: Failed to check persistent user");
