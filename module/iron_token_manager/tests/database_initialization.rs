@@ -12,7 +12,7 @@
 //! | `test_production_schema_matches_test_schema` | Schema consistency | Compare production vs test | Identical table/index structure | ✅ |
 //! | `test_seed_data_is_idempotent` | Multiple seed runs | Run seed script 3x | Same data, no duplicates | ✅ |
 //! | `test_temp_databases_cleanup` | Resource cleanup | Create test DB, drop handle | Database file deleted | ✅ |
-//! | `test_all_migrations_have_guards` | Migration safety | Check migrations 001-036 | All have guard tables | ✅ |
+//! | `test_all_migrations_have_guards` | Migration safety | Check migrations 001-038 | All have guard tables | ✅ |
 //! | `test_foreign_keys_enabled` | Schema enforcement | Create test DB | PRAGMA `foreign_keys` = ON | ✅ |
 //! | `test_seed_data_token_hashes_valid` | Token hash validation | Run seed script | Token hashes match SHA-256 | ✅ |
 //!
@@ -82,8 +82,8 @@ async fn test_migrations_are_idempotent() {
   .expect("LOUD FAILURE: Failed to count tables");
 
   assert_eq!(
-    table_count, 22,
-    "Should have exactly 22 application tables after multiple runs"
+    table_count, 23,
+    "Should have exactly 23 application tables after multiple runs"
   );
 }
 
@@ -155,6 +155,7 @@ async fn test_production_schema_matches_test_schema() {
     "budget_modification_history",
     "invite_links",
     "invite_seats",
+    "magic_link_tokens",
     "project_provider_key_assignments",
     "system_config",
     "token_blacklist",
@@ -180,8 +181,8 @@ async fn test_production_schema_matches_test_schema() {
   .expect("LOUD FAILURE: Failed to count indexes");
 
   assert_eq!(
-    index_count, 59,
-    "Should have 59 indexes across all migrations"
+    index_count, 60,
+    "Should have 60 indexes across all migrations"
   );
 }
 
@@ -225,8 +226,8 @@ async fn test_all_migrations_have_guards() {
   let pool = db.pool().clone();
   core::mem::forget(db);
 
-  // Verify guard tables exist for all migrations (001-036)
-  let guard_tables = (1..=36)
+  // Verify guard tables exist for all migrations (001-038)
+  let guard_tables = (1..=38)
     .map(|n| format!("_migration_{n:03}_completed"))
     .collect::<Vec<_>>();
 

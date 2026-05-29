@@ -96,17 +96,37 @@ async fn test_post_providers_creates_new_key_always() {
     "api_key": "sk-first-key-000000000000000000000000",
   });
 
-  let resp1 = post_provider(build_providers_router(state.clone()), &bearer("user_a"), body.clone())
-    .await;
-  assert_eq!(resp1.status(), StatusCode::CREATED, "First POST must return 201");
-  let bytes1 = axum::body::to_bytes(resp1.into_body(), usize::MAX).await.unwrap();
+  let resp1 = post_provider(
+    build_providers_router(state.clone()),
+    &bearer("user_a"),
+    body.clone(),
+  )
+  .await;
+  assert_eq!(
+    resp1.status(),
+    StatusCode::CREATED,
+    "First POST must return 201"
+  );
+  let bytes1 = axum::body::to_bytes(resp1.into_body(), usize::MAX)
+    .await
+    .unwrap();
   let json1: serde_json::Value = serde_json::from_slice(&bytes1).unwrap();
   let id1 = json1["id"].as_i64().expect("Response must have id field");
 
-  let resp2 = post_provider(build_providers_router(state.clone()), &bearer("user_a"), body.clone())
-    .await;
-  assert_eq!(resp2.status(), StatusCode::CREATED, "Second POST must return 201");
-  let bytes2 = axum::body::to_bytes(resp2.into_body(), usize::MAX).await.unwrap();
+  let resp2 = post_provider(
+    build_providers_router(state.clone()),
+    &bearer("user_a"),
+    body.clone(),
+  )
+  .await;
+  assert_eq!(
+    resp2.status(),
+    StatusCode::CREATED,
+    "Second POST must return 201"
+  );
+  let bytes2 = axum::body::to_bytes(resp2.into_body(), usize::MAX)
+    .await
+    .unwrap();
   let json2: serde_json::Value = serde_json::from_slice(&bytes2).unwrap();
   let id2 = json2["id"].as_i64().expect("Response must have id field");
 
@@ -141,18 +161,30 @@ async fn test_post_providers_cross_tenant_no_overwrite() {
   let body = json!({ "provider": "openai", "api_key": "sk-test-000000000000000000000000000" });
 
   // User P creates a key
-  let resp_p = post_provider(build_providers_router(state.clone()), &bearer("user_p"), body.clone())
-    .await;
+  let resp_p = post_provider(
+    build_providers_router(state.clone()),
+    &bearer("user_p"),
+    body.clone(),
+  )
+  .await;
   assert_eq!(resp_p.status(), StatusCode::CREATED);
-  let bytes_p = axum::body::to_bytes(resp_p.into_body(), usize::MAX).await.unwrap();
+  let bytes_p = axum::body::to_bytes(resp_p.into_body(), usize::MAX)
+    .await
+    .unwrap();
   let json_p: serde_json::Value = serde_json::from_slice(&bytes_p).unwrap();
   let id_p = json_p["id"].as_i64().unwrap();
 
   // User Q creates their own key
-  let resp_q = post_provider(build_providers_router(state.clone()), &bearer("user_q"), body.clone())
-    .await;
+  let resp_q = post_provider(
+    build_providers_router(state.clone()),
+    &bearer("user_q"),
+    body.clone(),
+  )
+  .await;
   assert_eq!(resp_q.status(), StatusCode::CREATED);
-  let bytes_q = axum::body::to_bytes(resp_q.into_body(), usize::MAX).await.unwrap();
+  let bytes_q = axum::body::to_bytes(resp_q.into_body(), usize::MAX)
+    .await
+    .unwrap();
   let json_q: serde_json::Value = serde_json::from_slice(&bytes_q).unwrap();
   let id_q = json_q["id"].as_i64().unwrap();
 
@@ -165,7 +197,10 @@ async fn test_post_providers_cross_tenant_no_overwrite() {
     .get_key_metadata(id_p)
     .await
     .expect("Should still be able to read user_p's key");
-  assert_eq!(p_key.user_id, "user_p", "user_p's key must not be overwritten by user_q");
+  assert_eq!(
+    p_key.user_id, "user_p",
+    "user_p's key must not be overwritten by user_q"
+  );
 }
 
 /// 429 must be returned when a user already has 20 keys for the same provider
@@ -256,7 +291,7 @@ async fn seed_user(pool: &sqlx::SqlitePool, user_id: &str, email: &str) {
 /// that the handler can decrypt the key during the handshake.
 async fn seed_provider_key(
   pool: &sqlx::SqlitePool,
-  crypto: &iron_secrets::crypto::CryptoService,
+  crypto: &CryptoService,
   key_id: i64,
   plaintext: &str,
   owner_id: &str,
@@ -307,11 +342,7 @@ async fn seed_agent(
 }
 
 /// Helper: insert `agent_budgets` and `usage_limits` rows required for handshake to proceed.
-async fn seed_agent_budget_and_limits(
-  pool: &sqlx::SqlitePool,
-  agent_id: i64,
-  owner_id: &str,
-) {
+async fn seed_agent_budget_and_limits(pool: &sqlx::SqlitePool, agent_id: i64, owner_id: &str) {
   let now_ms = chrono::Utc::now().timestamp_millis();
   sqlx::query(
     "INSERT OR IGNORE INTO agent_budgets \
@@ -343,10 +374,7 @@ async fn seed_agent_budget_and_limits(
 }
 
 /// Helper: fire a POST /api/budget/handshake request and return the response.
-async fn perform_handshake(
-  app: Router,
-  body: serde_json::Value,
-) -> axum::response::Response {
+async fn perform_handshake(app: Router, body: serde_json::Value) -> axum::response::Response {
   app
     .oneshot(
       Request::builder()
@@ -372,8 +400,22 @@ async fn test_handshake_uses_agent_assigned_key() {
   let agent_id: i64 = 901;
 
   seed_user(&pool, "owner_h1", "owner_h1@example.com").await;
-  seed_provider_key(&pool, crypto, provider_key_id, "sk-agent-assigned-key", "owner_h1").await;
-  seed_agent(&pool, agent_id, "agent_h1", "owner_h1", Some(provider_key_id)).await;
+  seed_provider_key(
+    &pool,
+    crypto,
+    provider_key_id,
+    "sk-agent-assigned-key",
+    "owner_h1",
+  )
+  .await;
+  seed_agent(
+    &pool,
+    agent_id,
+    "agent_h1",
+    "owner_h1",
+    Some(provider_key_id),
+  )
+  .await;
   seed_agent_budget_and_limits(&pool, agent_id, "owner_h1").await;
 
   let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
@@ -381,10 +423,16 @@ async fn test_handshake_uses_agent_assigned_key() {
   let body = json!({ "ic_token": ic_token, "provider": "openai" }); // no provider_key_id
   let resp = perform_handshake(build_handshake_router(state), body).await;
 
-  assert_eq!(resp.status(), StatusCode::OK, "Handshake with agent-assigned key should succeed");
+  assert_eq!(
+    resp.status(),
+    StatusCode::OK,
+    "Handshake with agent-assigned key should succeed"
+  );
 
   // Parse the response body and verify the ip_token decrypts to the seeded provider key
-  let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+  let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+    .await
+    .unwrap();
   let json_resp: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
   let ip_token = json_resp["ip_token"]
     .as_str()
@@ -394,7 +442,9 @@ async fn test_handshake_uses_agent_assigned_key() {
   let ip_token_key: [u8; 32] = [0u8; 32];
   let client_crypto =
     IpTokenCrypto::from_slice(&ip_token_key).expect("Should create IpTokenCrypto for decryption");
-  let decrypted = client_crypto.decrypt(ip_token).expect("ip_token should decrypt successfully");
+  let decrypted = client_crypto
+    .decrypt(ip_token)
+    .expect("ip_token should decrypt successfully");
 
   assert_eq!(
     decrypted.as_str(),
@@ -416,7 +466,14 @@ async fn test_handshake_rejects_cross_tenant_explicit_key() {
   // owner_h2 owns the agent; owner_other owns the key
   seed_user(&pool, "owner_h2", "owner_h2@example.com").await;
   seed_user(&pool, "owner_other", "other@example.com").await;
-  seed_provider_key(&pool, crypto, other_key_id, "sk-other-user-key", "owner_other").await;
+  seed_provider_key(
+    &pool,
+    crypto,
+    other_key_id,
+    "sk-other-user-key",
+    "owner_other",
+  )
+  .await;
   seed_agent(&pool, agent_id, "agent_h2", "owner_h2", None).await;
   seed_agent_budget_and_limits(&pool, agent_id, "owner_h2").await;
 
@@ -435,7 +492,9 @@ async fn test_handshake_rejects_cross_tenant_explicit_key() {
     StatusCode::FORBIDDEN,
     "Cross-tenant key access must be rejected with 403"
   );
-  let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+  let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+    .await
+    .unwrap();
   let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
   assert_eq!(
     json["error"].as_str().unwrap(),
@@ -467,7 +526,9 @@ async fn test_handshake_no_assigned_key_returns_403() {
     StatusCode::FORBIDDEN,
     "Agent without assigned key must get 403"
   );
-  let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+  let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+    .await
+    .unwrap();
   let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
   assert_eq!(
     json["error"].as_str().unwrap(),
@@ -552,7 +613,9 @@ async fn handshake_dev_key_creation_requires_flag() {
     StatusCode::FORBIDDEN,
     "agent_1 without IRON_ALLOW_DEV_KEYS must get 403"
   );
-  let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+  let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+    .await
+    .unwrap();
   let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
   assert_eq!(
     json["error"].as_str().unwrap(),
@@ -603,7 +666,9 @@ async fn handshake_dev_key_creation_works_with_flag() {
     StatusCode::OK,
     "agent_1 with IRON_ALLOW_DEV_KEYS must get 200"
   );
-  let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+  let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+    .await
+    .unwrap();
   let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
   assert!(
     json["ip_token"].is_string() && !json["ip_token"].as_str().unwrap().is_empty(),
@@ -647,7 +712,14 @@ async fn handshake_toctou_recheck_fails_for_wrong_owner() {
   // Agent is owned by user_b but has user_a's key assigned — the inconsistency
   // that the TOCTOU re-check is designed to catch
   let agent_id: i64 = 9199;
-  seed_agent(&pool, agent_id, "agent_toctou", "owner_toctou_b", Some(key_id)).await;
+  seed_agent(
+    &pool,
+    agent_id,
+    "agent_toctou",
+    "owner_toctou_b",
+    Some(key_id),
+  )
+  .await;
   seed_agent_budget_and_limits(&pool, agent_id, "owner_toctou_b").await;
 
   let ic_token = create_ic_token(&pool, agent_id, &state.ic_token_manager).await;
@@ -664,7 +736,9 @@ async fn handshake_toctou_recheck_fails_for_wrong_owner() {
     StatusCode::FORBIDDEN,
     "TOCTOU re-check must return 403 when key owner ≠ agent owner"
   );
-  let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+  let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+    .await
+    .unwrap();
   let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
   assert_eq!(
     json["error"].as_str().unwrap(),
@@ -755,7 +829,9 @@ async fn handshake_fails_gracefully_after_assigned_key_deleted() {
   );
 
   if status == StatusCode::FORBIDDEN {
-    let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+      .await
+      .unwrap();
     let json_resp: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(
       json_resp["error"].as_str().unwrap(),
